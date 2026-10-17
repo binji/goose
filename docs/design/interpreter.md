@@ -16,6 +16,7 @@
 - [11. Testing](#11-testing)
 - [12. Limits and follow-ups](#12-limits-and-follow-ups)
 - [13. Estimates](#13-estimates)
+- [14. The plan](#14-the-plan)
 
 </details>
 
@@ -671,3 +672,142 @@ been started.
 Roughly 7,000 lines of C++ for the interpreter, none of it in the existing
 passes; the gfx package's browser backend is a project of similar size on
 its own, and the first binary does not wait for it.
+
+## 14. The plan
+
+Each step is one commit, or a few, that a reviewer can read on its own:
+it adds one piece with the test that shows it working, and leaves every
+existing test passing. Nothing before step 6 touches a file outside
+`src/interp/` and `test/interp/`, so the first half of the work cannot
+break the compiler. The steps are ordered so that each has something to
+run against: the interpreter is built natively against C fixtures first,
+then against the emitted C, then widened by fixture area, and only then
+built to Wasm; packages and the page come after, and the gfx package's
+backend proceeds in its own repository in parallel from step 12 on.
+
+**Part one: the interpreter, natively, on its own**
+
+1. **Skeleton and the preprocessor.** `src/interp/` with its own
+   translation unit (`interp.cpp`, so the compiler's single unit does not
+   grow), the token and source-position types, and the preprocessor of
+   section 4: macros, `#if` arithmetic, `#include "file"` through a
+   callback, `#pragma pack` passed through. Test: `test/interp_pp.cpp`,
+   a unit test like `test/compiler_containers.cpp`, over fixtures in
+   `test/interp/pp/` with expected output, including `runtime.h`
+   preprocessed with the interpreter's predefined macros, checked to
+   contain none of the platform branches. About 1,000 lines.
+2. **Declarations, types and layout.** The parser for declarations only:
+   declarators, typedefs, structs and unions under `#pragma pack`, enums,
+   arrays, function prototypes, and static initializers, into a type
+   table. Test: a fixture of struct declarations in the shapes codegen
+   emits (packed ADTs, `{ len; T e[k]; }` wrappers, `gs_rhdr`, `gs_rref`)
+   with a C program the test builds with the host C compiler that prints
+   every `sizeof` and `offsetof`; the interpreter's layouts must match
+   them. This is the test that protects the one layout rule the whole
+   design rests on. About 1,500 lines.
+3. **Expressions and statements, lowering, the VM.** The rest of the
+   parser, the usual arithmetic conversions, lvalues, the typed bytecode,
+   the VM loop with explicit frames, segments of every kind, handles,
+   growth of stack segments, and a C library table just large enough to
+   print: `fwrite`, `memcpy`, `memset`, `memcmp`, `malloc`, `free`,
+   `exit`. Test: `test/interp/run/*.c`, small C programs with expected
+   output: arithmetic at every width, pointer arithmetic and differences,
+   gotos, switch, unions, static data, recursion deep enough to need the
+   explicit frames, a stack segment that grows and moves while a handle
+   into it stays valid, and faults that must be reported (an access past
+   a heap block, a difference across segments). This is the largest
+   step and may land as two commits, lowering and the VM each with the
+   fixtures that reach it; the VM without lowering can be tested on
+   hand-assembled bytecode. About 2,500 lines.
+4. **The rest of the C library.** The prelude's standard headers, the
+   adapters of section 6 (`fprintf` and `snprintf` over the runtime's
+   formats, math, `clock_gettime`, `getenv`, files), the interpreted
+   `qsort`, and function pointers to interpreted functions. Test: the
+   fixtures grow to cover each; `qsort` sorts through an interpreted
+   comparison. About 800 lines.
+
+**Part two: Goose programs**
+
+5. **The runtime's `GS_INTERP` branch.** The eight platform functions over
+   `gs_host_reserve` and `gs_host_release`, `gs_native_overflow`, the
+   `runtime_os.h` branch over plain POSIX, `gs_os_threads` returning 1
+   (section 10, item 1). Test: the runtime's text under `GS_INTERP`
+   preprocesses and parses in the interpreter's unit test; nothing runs it
+   yet. About 100 lines, and the first commit outside `src/interp/`.
+6. **`--interp` in the driver.** `RunInterp`, the flag, the define written
+   into the assembled text, `GOOSE_NO_JIT` as a build option that makes it
+   the default and leaves libtcc out. Test: `goose run --interp` on a
+   hello-world fixture and on `samples/07_sieve.goose`, compared with the
+   JIT's output, as a new section of `run_tests.py` behind `--interp`
+   that at this step runs just those. About 150 lines of driver and 100
+   of runner.
+7. **Widening by fixture area**, one commit each, each turning on another
+   part of the suite under `--interp` and fixing what it finds in the
+   interpreter: `test/codegen/` (130 fixtures, the central
+   `codegen_exec.goose` first), `test/runtime/`, `test/stdlib/`,
+   `test/storage/`, `test/lifetimes/` and `test/optimizer/`, then the
+   `-DGS_DEBUG=1` selection, then `samples/run_samples.py --interp` for
+   samples 01 to 22 and 24 to 26. Threads and native packages are
+   skipped as `no-jit` fixtures are. Each commit's message records the
+   gaps it closed; findings about codegen or the runtime, if any, are
+   commits of their own on `master`, not here.
+8. **Suspension and the time budget.** `goose_resume`-style re-entry of
+   the VM loop, the depth cap reported as native stack overflow, and the
+   instruction-count check that yields after a time budget. Test: a
+   fixture that recurses past the cap prints the runtime's message and
+   exits 1; a unit test resumes a suspended run to completion.
+
+**Part three: native packages, natively**
+
+9. **The thunk generator and `BuiltinPackage::thunks`.** The script over
+   `GS_*_API(X)` lists, `package.cmake` running it beside the symbol
+   table, the member in `builtin.h`, and the VM's external call laying
+   arguments out by the emitted prototype and calling by name, with the
+   compile-time rejection of builder parameters in native externs. Test:
+   a tiny in-tree test package under `test/interp/pkg/` with an X-macro
+   list covering every parameter shape, built in by the test's CMake, and
+   a Goose fixture calling each. About 600 lines.
+10. **The blessed packages through the interpreter.** Nothing new to
+    write if step 9 holds; this commit turns on the `gfx/`, `ui/` and
+    `physics/` tests under `--interp` for a compiler built with
+    `GOOSE_BUILTIN_LIBS`, headless, with `gs_gfx_frame`'s yield flag
+    inert there, and fixes what they find. `samples/27_gfx_cube` and
+    `29_ui_todo` render off screen and their images match the JIT's.
+
+**Part four: Wasm**
+
+11. **Building to `wasm32-wasi`.** `cmake/wasm32-wasi.cmake`, the three
+    `__wasi__` branches, `process_wasi.cpp`, `web_entry.cpp` with the
+    reactor exports, and the exception question settled one way or the
+    other in the commit message. Test: a script that builds `goose.wasm`
+    and runs the hello-world fixture under wasmtime (which can invoke a
+    reactor's exports and preopen a directory), as an optional CI job
+    that is skipped where wasi-sdk is absent. The second binary is not
+    built yet.
+12. **GLSL ES in the shader blob.** `shaderc.c` asks `cute_spirv` for the
+    GLSL ES 3.00 text and appends it; `gfx_blob.h`'s header gains its
+    offset and size and a version bump. Test: `--compile-shader` prints
+    it. Independent of everything else and the first thing the gfx
+    package's browser backend needs; its copy of `gfx_blob.h` takes the
+    same change.
+
+**Part five: the page**
+
+13. **The WASI shim and the text page.** `docs/site/play/`: the shim with
+    its in-memory tree, the editor, the panes, the sample picker, Run and
+    Stop over `goose_run` and `goose_resume`, the generated-C tab. The
+    site build copies `goose.wasm` in when it exists and leaves the page
+    out otherwise. Checked by hand in a browser; the shim's file calls get
+    a small JS unit test.
+14. **The gfx binary and its page.** When the gfx package's browser
+    backend exists: `GOOSE_BUILTIN_LIBS=all` under the toolchain file with
+    the backend option, the `gfx` and `audio` import modules in the page,
+    the canvas and event forwarding, and `gs_gfx_frame`'s yield driving
+    `requestAnimationFrame`. The headless gfx tests run in the browser
+    against the same expected pixels.
+
+**What can run in parallel.** Steps 1 to 4 are sequential. Step 5 can be
+written at any time, and step 12 at any time after step 1. Steps 9 and 11
+depend only on step 6 and can proceed beside step 7. The gfx package's
+backend (section 7.3) depends on step 12 for its shaders and on nothing
+else here until step 14.
