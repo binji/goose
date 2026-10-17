@@ -1,0 +1,1 @@
+error: error_toomany_init.c:1: error: too many initializers for [2]int32_t

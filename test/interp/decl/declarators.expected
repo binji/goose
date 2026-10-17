@@ -1,0 +1,42 @@
+typedef int8_t = char
+typedef uint8_t = uint8_t
+typedef int16_t = int16_t
+typedef uint16_t = uint16_t
+typedef int32_t = int32_t
+typedef uint32_t = uint32_t
+typedef int64_t = int64_t
+typedef uint64_t = uint64_t
+typedef uintptr_t = uint64_t
+typedef Arr3 = [3]int32_t
+typedef PArr3 = *[3]int32_t
+typedef Callback = *fn(*void, int64_t) -> int32_t
+var a: int32_t
+var b: *int32_t
+var c: **int32_t
+var d: [3]int32_t
+var e: [4]*int32_t
+var f: *[4]int32_t
+var g: *char
+var h: int32_t
+var fp: *fn(int32_t, *char) -> int32_t
+var fpa: [2]*fn() -> int32_t
+var nested: *fn(int32_t) -> *fn(double) -> void
+var arr: [3]int32_t
+var parr: *[3]int32_t
+var cb: *fn(*void, int64_t) -> int32_t
+fn proto1: fn(int32_t, *char) -> int32_t extern
+fn proto2: fn(int32_t, *char) -> int32_t extern
+fn proto3: fn() -> int32_t extern
+fn proto4: fn(?) -> int32_t extern
+fn proto5: fn(*char, ...) -> int32_t extern
+fn takes_array: fn(*int32_t, *int32_t, *[3]int32_t) -> void extern
+fn takes_function: fn(*fn(int32_t) -> int32_t, *fn(int32_t) -> int32_t) -> void extern
+fn takes_pointer_to_function_returning_pointer: fn(*fn() -> *char) -> void extern
+fn helper: fn(int64_t) -> int64_t static defined(v) body 7 tokens
+fn defined_later: fn(int32_t, char) -> int32_t extern defined(n, c) body 7 tokens
+var external: []int32_t extern
+var sized_by_init: [3]int32_t = {1, 2, 3}
+var text: [4]char = "abc"
+var exact: [3]char = "abc"
+var sz: uint64_t = 8
+var al: uint64_t = 8

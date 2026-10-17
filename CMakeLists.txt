@@ -71,6 +71,9 @@ add_executable(goose
     src/jit.h
     src/interp/interp.cpp
     src/interp/pp.h
+    src/interp/ctypes.h
+    src/interp/cast.h
+    src/interp/cparse.h
     src/runtime/runtime.h
     src/runtime/runtime_impl.h
     src/runtime/runtime_threads.h

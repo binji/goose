@@ -1,0 +1,85 @@
+struct S (size 8, align 4)
+    c: char @0
+    i: int32_t @4
+struct Natural (size 16, align 8)
+    a: char @0
+    b: int32_t @4
+    c: double @8
+union U (size 8, align 8)
+    i: int32_t @0
+    d: double @0
+struct Holder (size 16, align 4)
+    s: struct S @0
+    tail: [2]int32_t @8
+typedef int8_t = char
+typedef uint8_t = uint8_t
+typedef int16_t = int16_t
+typedef uint16_t = uint16_t
+typedef int32_t = int32_t
+typedef uint32_t = uint32_t
+typedef int64_t = int64_t
+typedef uint64_t = uint64_t
+typedef uintptr_t = uint64_t
+typedef size_t = uint64_t
+var a: [3]int32_t static = {1, 2, 3}
+var n: int32_t = 3
+var neg: int32_t = -3
+var mod: int32_t = -1
+var shifted: int32_t = 1048576
+var big: int32_t = -2147483648
+var u: uint32_t = 2147483648
+var wrapped: uint32_t = 4294967295
+var mixed: uint32_t = 0
+var l: int64_t = 1099511627776
+var cast_down: int64_t = -56
+var cast_up: int64_t = 255
+var lit: int64_t = 123456789012345678
+var hexlit: int64_t = 2147483647
+var octal: int64_t = 511
+var sz: uint64_t = 72
+var ch: int32_t = 66
+var esc: int32_t = 10
+var hex: int32_t = 65
+var oct: int32_t = 65
+var text: [6]char = "abcd\n"
+var p: *char = (decay "literal")
+var s6: [6]uint8_t = " nodes"
+var cond: int32_t = 2
+var logic: int32_t = 3
+var d: double = 1.5
+var e: double = 1000000000000000
+var f: double = 0.25
+var g: double = 3
+var fl: float = 2.5
+var ap: *int32_t = (& (* (+ (decay a) 1)))
+var dp: *int32_t = (+ (decay a) 2)
+var diff: int64_t = (- (& (* (+ (decay a) 2))) (& (* (+ (decay a) 0))))
+var deref: int32_t = (* (decay a))
+var sub: int32_t = (* (+ (decay a) 1))
+var member: int32_t = 4
+var fp: *fn(int32_t) -> int32_t = (cast *fn(int32_t) -> int32_t 0)
+var vp: *void = (cast *void 0)
+var vq: *void = (cast *void 0)
+var folded_compare: int32_t = 1
+var unsigned_compare: int32_t = 1
+var rhs: int64_t = 4294967295
+var narrow: uint8_t = 44
+var comma: int32_t = (, 1 2)
+var s: struct S = {120, 2}
+var arr: [2]struct S = {{97, 1}, {98, 2}}
+var desig: [4]int32_t = {2, _, 1, _}
+var desig2: struct S = {99, 3}
+fn f1: fn() -> void extern
+fn call_in_init: fn() -> int32_t extern defined() body 5 tokens
+var m: [2][3]int32_t = {{1, 2, 3}, {4, 5, 6}}
+var m2: [2][3]int32_t = {{1, _, _}, {4, 5, _}}
+var ss: [2]struct S = {{97, 1}, {98, 2}}
+var nat: struct Natural = {1, _, _}
+var uu: union U = {5}
+var ud: union U = {.1=2.5}
+var scalar_braced: int32_t = 7
+var cs: [2][4]char = {"ab", "cd"}
+var holder: struct Holder = {{113, 9}, {1, _}}
+var holder2: struct Holder = {{113, 9}, {1, 2}}
+var from_int: double = 3
+var null_double: *double = (cast *double 0)

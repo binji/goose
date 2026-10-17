@@ -5,3 +5,6 @@
 #include "../includes.h"
 #include "../utils.h"
 #include "pp.h"
+#include "ctypes.h"
+#include "cast.h"
+#include "cparse.h"

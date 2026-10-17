@@ -1,0 +1,1 @@
+error: error_incomplete.c:2: error: member 'f' has incomplete type struct Fwd

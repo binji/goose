@@ -1,0 +1,62 @@
+struct Fwd (size 16, align 8)
+    next: *struct Fwd @0
+    v: int32_t @8
+struct <anon> (size 16, align 1, pack 1)
+    base: *uint8_t @0
+    len: int64_t @8
+struct Node_g (size 32, align 1, pack 1)
+    key_g: int32_t @0
+    left_g: uint32_t @4
+    parent: *struct Node_g @8
+    items: struct <anon> @16
+struct <anon> (size 9, align 1, pack 1)
+    tag: uint8_t @0
+    u: union <anon> @1
+union <anon> (size 8, align 1, pack 1)
+    v_Push: struct <anon> @0
+    v_Pop: struct <anon> @0
+struct <anon> (size 8, align 1, pack 1)
+    v: int64_t @0
+struct <anon> (size 0, align 1, pack 1)
+struct Natural (size 16, align 8)
+    a: uint8_t @0
+    b: int32_t @4
+    c: double @8
+union U (size 16, align 8)
+    b: [3]uint8_t @0
+    i: int32_t @0
+    n: struct Natural @0
+struct Nested (size 24, align 8)
+    inner: struct <anon> @0
+    u: union U @8
+struct <anon> (size 8, align 4)
+    t: uint8_t @0
+    v: int32_t @4
+struct WithArrays (size 56, align 8)
+    m: [2][3]int32_t @0
+    ns: [2]struct Natural @24
+typedef int8_t = char
+typedef uint8_t = uint8_t
+typedef int16_t = int16_t
+typedef uint16_t = uint16_t
+typedef int32_t = int32_t
+typedef uint32_t = uint32_t
+typedef int64_t = int64_t
+typedef uint64_t = uint64_t
+typedef uintptr_t = uint64_t
+typedef Fwd = struct Fwd
+typedef gs_rhdr = struct <anon>
+typedef Node_g = struct Node_g
+typedef Op_g = struct <anon>
+enum Op_Push_k = 0
+enum Op_Pop_k = 1
+enum Op_Add_k = 2
+enum RED = 0
+enum GREEN = 5
+enum BLUE = 6
+enum BLACK = 12
+var fwdp: *struct Fwd
+var color: int32_t = 5
+var constants: [12]int32_t
+var natural: struct Natural
+var u: union U

@@ -1,0 +1,1 @@
+error: error_assign_rvalue.c:1: error: assignment to something that is not an lvalue

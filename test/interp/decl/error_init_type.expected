@@ -1,0 +1,1 @@
+error: error_init_type.c:2: error: initializer of type struct S for struct T
