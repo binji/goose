@@ -1,0 +1,9 @@
+int a = (1 + 1) * (1 + 1);
+int b = 42 + 1;
+int c = 3;
+int d;
+int e = self + 1, f = ping, g = pong;
+int h = 100;
+int i = a + b + c;
+int j = a+b, k = (a+b);
+int l = 1, m = 199901L, n = 1;

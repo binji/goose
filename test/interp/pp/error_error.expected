@@ -1,0 +1,1 @@
+error: error_error.c:3: error: #error "GS_STACK_RESERVE exceeds the 2^48 limit (goose_spec.md 10.4)"

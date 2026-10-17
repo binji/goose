@@ -1,0 +1,8 @@
+const char *in_b = "inc/b.h";
+const char *in_a = "inc/a.h";
+int a_line = 4;
+int guarded;
+typedef unsigned long size_t;
+int a = 1, b = 2, guards = 1;
+size_t n = ((void *)0);
+const char *here = "include.c" 11;

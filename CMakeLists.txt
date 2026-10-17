@@ -69,6 +69,8 @@ add_executable(goose
     src/codegen_nodes.h
     src/runtime_inline.h
     src/jit.h
+    src/interp/interp.cpp
+    src/interp/pp.h
     src/runtime/runtime.h
     src/runtime/runtime_impl.h
     src/runtime/runtime_threads.h

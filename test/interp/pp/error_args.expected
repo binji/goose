@@ -1,0 +1,1 @@
+error: error_args.c:2: error: macro 'MAX' expects 2 arguments, given 3
