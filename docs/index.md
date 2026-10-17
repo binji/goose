@@ -79,6 +79,10 @@ and the reference describe what was built; these say why.
   implemented.
 * [WebAssembly](design/wasm.md): running without address-space reservation,
   fixed partitions against relocating stacks; a proposal.
+* [An interpreter for the browser](design/interpreter.md): the compiler
+  built to Wasm with clang, interpreting the C it emits, with pointers as
+  segment handles so stacks can move, and the native packages behind
+  generated thunks; a proposal.
 
 ## Getting the compiler
 

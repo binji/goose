@@ -18,6 +18,9 @@ A proposal, not implemented. Spec §10.4 says platforms without address-space
 reservation fall back to "index-based references + bounds-checked growth"
 and leaves the details open (open issue 15); this note works them out. The
 cost figures in it are estimates, not measurements.
+For a demonstration page that runs the compiler itself in a browser, see
+[interpreter.md](interpreter.md), which interprets the emitted C and
+sidesteps the problem below rather than solving it.
 
 ## 1. The problem
 
