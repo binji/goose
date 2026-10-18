@@ -53,7 +53,10 @@ if(nfrags GREATER 0)
         string(JSON frag GET "${tj}" link commandFragments ${k} fragment)
         separate_arguments(words NATIVE_COMMAND "${frag}")
         foreach(w IN LISTS words)
-            if(w MATCHES "[/\\\\]" AND EXISTS "${BUILD_DIR}/${w}")
+            # A file the reply names relative to the build directory, a
+            # library built in a subdirectory or at the top (then a bare
+            # file name, as a package built from its sidecar's c_sources is).
+            if(NOT IS_ABSOLUTE "${w}" AND EXISTS "${BUILD_DIR}/${w}")
                 get_filename_component(w "${BUILD_DIR}/${w}" ABSOLUTE)
             endif()
             list(APPEND items "${w}")

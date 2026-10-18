@@ -1,0 +1,6 @@
+// The interpreter's test package: its native part, and the API header the
+// interpreter's thunks are generated from (docs/design/interpreter.md 7.1).
+c_sources = ["src/interptest.c"];
+c_include = ["include"];
+thunk_api = ["include/interptest_api.h"];
+thunk_yields = ["it_yield"];
