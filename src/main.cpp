@@ -40,7 +40,10 @@
 #include "codegen_nodes.h"
 #include "runtime_inline.h"
 #include "process.h"
+#ifndef GOOSE_NO_JIT
 #include "jit.h"
+#endif
+#include "interp/interp.h"
 #include "progress.h"
 #include "buildfile.h"
 #include "toolchain.h"
@@ -713,9 +716,9 @@ internals the options for looking into the compiler and testing it.
 R"(usage: goose run file.goose [options] [-- program args...]
        goose file.goose [options] [-- program args...]
 
-Compiles the program and runs it in this process with TinyCC, and exits with
-its exit code. What follows -- is the program's arguments. A program that
-starts threads needs goose build.
+Compiles the program and runs it in this process with TinyCC, or with
+--interp in the interpreter, and exits with its exit code. What follows -- is
+the program's arguments. A program that starts threads needs goose build.
 
 Options:
   -O0, -O1, -O2         Inlining level (default -O1).
@@ -820,6 +823,7 @@ Options:
                         and starts the program through goose_init.
   --include header.h    Have the C include this header (may be repeated).
   --jit                 Also run the program in this process.
+  --interp              Run it in the interpreter rather than with TinyCC.
   --emit-runtime out.c  Write the runtime's C.
   --<package>-link msvc|cc
                         Print the response file that links the native part of
@@ -1023,6 +1027,13 @@ int Main(int argc, char **argv) {
     auto nobce = false, bcetest = false, bcelines = false, norfcheck = false;
     auto stacks = false;
     auto forcejit = false, standalone = false;
+    // The interpreter in place of TinyCC (docs/design/interpreter.md): what a
+    // compiler built without TinyCC always runs with.
+    #ifdef GOOSE_NO_JIT
+        auto interp = true;
+    #else
+        auto interp = false;
+    #endif
     auto json = false, refresh = false, debug = false, verbose = false, dryrun = false;
     auto jsondiag = false;
     string ccrequest;
@@ -1069,6 +1080,7 @@ int Main(int argc, char **argv) {
         // Unsound; a measurement aid only (see CodeGen::norfcheck).
         else if (arg == "--unsafe-no-rf-check") norfcheck = true;
         else if (arg == "--jit") forcejit = true;
+        else if (arg == "--interp") interp = true;
         else if (arg == "--standalone") standalone = true;
         else if (arg == "--multi-test") multitest = true;
         else if (arg == "--gen-runtime-header") { GenRuntimeHeader(exe.c_str()); return 0; }
@@ -1132,6 +1144,9 @@ int Main(int argc, char **argv) {
         else files.push_back(arg);
     }
     if (verbose || dryrun) ProgressPlain();
+    // The runtime's interpreter branch, written into the C as a -D is, so
+    // the text the interpreter gets is one a C compiler could also build.
+    if (interp) cdefines.push_back("GS_INTERP=1");
     if (verb == "toolchain") {
         try {
             auto tools = FindTools(ccrequest, refresh);
@@ -1395,6 +1410,9 @@ int Main(int argc, char **argv) {
         if (jit && !nocgen) {
             // TinyCC's in-memory runner rejects a thread-local section, and
             // the runtime keeps each worker's data stacks in one.
+            if (cg.usesthreads && interp)
+                throw CompileError { "the interpreter does not support threads yet; compile "
+                                     "with -o and a C compiler instead" };
             if (cg.usesthreads)
                 throw CompileError { "JIT mode does not support threads yet (TinyCC cannot "
                                      "place thread-local storage in an in-memory run); "
@@ -1476,6 +1494,17 @@ int Main(int argc, char **argv) {
                                        msgs, rsps, astp->packages[0].output);
             }
             if (program.empty()) return code;
+            if (interp) {
+                // The native parts' functions reach an interpreted program
+                // through thunks (docs/design/interpreter.md §7), which are
+                // not here yet.
+                if (!nativepkgs.empty())
+                    throw CompileError { cat("the interpreter does not run programs that use "
+                                             "native packages yet (", astp->packages[nativepkgs[0]].name,
+                                             "); run it with TinyCC or compile with -o") };
+                fflush(msgs);
+                return RunInterp(program, filename, progargs);
+            }
             // The native parts the program reaches hand the run their
             // functions by name: a builtin package's from the table compiled
             // in with it, the others' from libraries built now and loaded.
@@ -1503,7 +1532,11 @@ int Main(int argc, char **argv) {
             // The program shares this process, so its exit code becomes ours
             // and whatever it wrote is already on the same streams.
             fflush(msgs);
-            return RunJit(program, JitLibPath(DirOf(exe)), filename, progargs, symbols);
+            #ifdef GOOSE_NO_JIT
+                return 1;   // unreachable: a compiler without TinyCC interprets
+            #else
+                return RunJit(program, JitLibPath(DirOf(exe)), filename, progargs, symbols);
+            #endif
         };
         auto code = 0;
         try {

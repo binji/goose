@@ -100,7 +100,9 @@ Windows and macOS (`CMakeLists.txt`); on Linux it has the stack limit the
 process started with (`ulimit -s`), which nothing in the executable sets.
 
 **Verbs** (`Main` in `main.cpp`). `goose run file.goose [options] [-- args]`
-compiles the program in this process and runs it (`--jit`), `goose build
+compiles the program in this process and runs it (`--jit`; with `--interp`
+in the interpreter of [design/interpreter.md](design/interpreter.md), which
+a compiler built with `GOOSE_NO_JIT` always uses), `goose build
 file.goose` writes the C to the program's build directory under
 `GOOSE_HOME` and compiles and links it into an executable beside the source
 (`build.h`: the runtime object compiled once per toolchain and
@@ -153,7 +155,7 @@ the slow steps (a line each, and on a terminal a live line below).
 | `--bce-test` | verify `// bce:elide` / `// bce:keep` annotations in the sources |
 | `--bce-lines` | print elided/kept counts per source line |
 | `--unsafe-no-rf-check` | omit the `return from` discriminant checks after calls: a measurement aid, unsound |
-| `-o out.c`, `--jit`, `--header`, `-D`, `--include`, `--stdlib`, `--` | output file, in-process run, a C API header for the exports (which builds the C without a `main`, for a C host), a define written into the generated C, a user header, the stdlib directory, program arguments |
+| `-o out.c`, `--jit`, `--interp`, `--header`, `-D`, `--include`, `--stdlib`, `--` | output file, in-process run, the in-process run interpreted (`interp/interp.h`, `RunInterp`) rather than compiled by TinyCC, a C API header for the exports (which builds the C without a `main`, for a C host), a define written into the generated C, a user header, the stdlib directory, program arguments |
 | `--<name>-link msvc\|cc` | print the response file of link inputs a program using the blessed package imported as `name` (`gfx`, `audio`, `ui`, `physics`) needs, when the package is compiled into this compiler (`builtin.h`, `BuiltinLinkFile`) |
 | `--multi-test a.goose b.goose ...` | compile each file in turn with the other flags, as a process of its own on it would (an `Ast` and a compile thread each, which is all the state a compile has), each file's output on both streams ending in a line `==== goose --multi-test: exit <code> <file>`; an `-o` names each file's C with `%` for its name. It runs no programs and writes no dump files. The test runner's batches of compiler runs (`docs/testing.md`) |
 | `--compile-shader f [--shader-source msl\|hlsl]` | hidden: what a shader compiles to, without a program around it |

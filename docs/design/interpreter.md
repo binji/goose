@@ -582,7 +582,8 @@ BCE, codegen, standard library and `jit.h` are untouched.
    is defined), writing `#define GS_INTERP 1` into the assembled text as
    `-D` does and calling `RunInterp` where `RunJit` is called, with the
    builtin packages' thunk tables where the symbol tables go; the
-   `__wasi__` branch of `RunOnCompilerStack`. About 40 lines.
+   `__wasi__` branch of `RunOnCompilerStack`, which comes with the Wasm
+   build (step 11). About 40 lines.
 3. **`src/builtin.h`**: a `thunks` member of `BuiltinPackage`;
    **`cmake/package.cmake`**: the thunk generator run beside the symbol
    table generator, and the browser-backend option passed to a package's

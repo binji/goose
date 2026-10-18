@@ -49,6 +49,10 @@ past resolution prints `parsed ok`, which tells a parse failure from a
 typecheck failure in one `--check` of an `errors_tc/` fixture. Where a level
 both builds the C and runs the program through TinyCC, one `goose -O<n> --jit
 -o <file>` does both: it writes the C, then runs the program in-process.
+With `--interp`, the runner also runs programs through the interpreter
+(`goose -O0 --interp`, [design/interpreter.md](design/interpreter.md) §11)
+and compares their output and exit code with the TinyCC run's; at this
+stage that covers the hello-world fixture and the sieve sample.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose

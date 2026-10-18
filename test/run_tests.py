@@ -1316,6 +1316,9 @@ def main():
                     help="fail if the baseline's second C-front-end check is unavailable")
     ap.add_argument("--no-jit", action="store_true",
                     help="skip the in-process TinyCC runs even where they are available")
+    ap.add_argument("--interp", action="store_true",
+                    help="also run programs through the interpreter (goose --interp) and "
+                         "compare with the TinyCC runs")
     ap.add_argument("--goose-in-goose-only", action="store_true",
                     help="run only the multi-stage Goose-written compiler regression")
     ap.add_argument("-j", "--jobs", type=int, default=default_jobs(),
@@ -2134,6 +2137,29 @@ def main():
                 r.say(f"skip {len(skipped)} JIT test(s) the backend cannot run yet: "
                       + ", ".join(sorted(set(skipped))))
         r.show_later(jit_skips)
+
+    # --- Interpreter: the same programs, interpreted inside the compiler ----
+    # The C the JIT would build, run by the interpreter instead
+    # (docs/design/interpreter.md §11): the output and exit code must be the
+    # TinyCC run's. For now the smallest program and one sample; the suite
+    # widens as the interpreter does.
+    r.section("interpreter runs")
+    if not args.interp:
+        r.show_later(r.say, "skip interpreter runs (--interp runs them)")
+    else:
+        interp_files = [HERE / "codegen" / "hello_world.goose",
+                        tc.REPO_ROOT / "samples" / "07_sieve.goose"]
+
+        def interp_run(f):
+            jcode, jout, jerr = r.goose("-O0", "--jit", f)
+            icode, iout, ierr = r.goose("-O0", "--interp", f)
+            if icode != jcode or joined(iout) != joined(jout):
+                r.fail(f"interp {f.name}", f"--- interpreter (exit {icode}):\n{iout}{ierr}"
+                                           f"--- TinyCC (exit {jcode}):\n{jout}{jerr}")
+            else:
+                r.ok(f"interp {f.name}")
+        for f in interp_files:
+            r.show_task(interp_run, f)
 
     parse_errors = sorted((HERE / "errors").glob("*.goose"))
     parse_runs = r.goose_each(["--parse"], parse_errors)

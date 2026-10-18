@@ -1,8 +1,9 @@
 // Goose compiler — the interpreter's translation unit (docs/design/interpreter.md).
 // The interpreter runs the C a JIT run would hand TinyCC, in place of it, and
 // is built as a unit of its own so the compiler's single unit does not grow
-// with it. Steps 1 to 4 of the plan (§14): the preprocessor, the parser,
-// lowering, the VM and its C library.
+// with it. Steps 1 to 6 of the plan (§14): the preprocessor, the parser,
+// lowering, the VM and its C library, and RunInterp, the entry point the
+// driver calls where it would call RunJit.
 #include "../includes.h"
 #include "../utils.h"
 #include "pp.h"
@@ -14,3 +15,64 @@
 #include "vm.h"
 #include "prelude.h"
 #include "clib.h"
+#include <filesystem>
+#include "interp.h"
+
+namespace goose {
+
+// The program's resource directory, as RunJit defines it (jit.h): the
+// entry source's directory, absolute, as a C string literal in fixed-width
+// octal escapes, with a slash last.
+static string ResourceDirDefine(const string &progname) {
+    std::error_code ec;
+    auto root = filesystem::absolute(filesystem::path(progname), ec).parent_path();
+    if (ec) throw CompileError { "cannot locate the entry source directory" };
+    auto bytes = root.generic_u8string();
+    string define = "#define GS_JIT_RESOURCE_DIR \"";
+    for (auto ch : bytes) {
+        char escaped[5];
+        snprintf(escaped, sizeof escaped, "\\%03o", (unsigned)(uint8_t)ch);
+        define += escaped;
+    }
+    if (bytes.empty() || bytes.back() != u8'/') define += '/';
+    return define + "\"\n";
+}
+
+int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs) {
+    using namespace interp;
+    // <name> is the prelude's; "name" is an --include header, named as the
+    // command named it, so relative to where the command runs.
+    Preprocessor pp(PreludeIncluder([](const string &name, bool system, const string &from,
+                                       string &text, string &path) {
+        if (system) return false;
+        for (auto &dir : { from, string() }) {
+            auto p = dir.empty() ? name : cat(dir, "/", name);
+            if (LoadFile(p, text)) {
+                path = p;
+                return true;
+            }
+        }
+        return false;
+    }));
+    TypeTable types;
+    Program prog;
+    try {
+        auto toks = pp.Run(ResourceDirDefine(progname) + csrc, "<generated C>");
+        CParser parser(toks, pp.files, types);
+        auto &unit = parser.ParseUnit();
+        prog = Lowerer(unit, pp.files).Run();
+    } catch (CompileError &e) {
+        throw CompileError { cat("interpreter: ", e.msg) };
+    }
+    // The runtime makes stdout unbuffered so that output is never lost to
+    // an abort and interleaves with stderr; its setvbuf reaches the VM's
+    // adapter, not the process, so the process does the same here.
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    VM vm(prog);
+    vector<string> args;
+    args.push_back(progname);
+    args.insert(args.end(), progargs.begin(), progargs.end());
+    return vm.Run(args);
+}
+
+}  // namespace goose

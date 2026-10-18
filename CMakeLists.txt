@@ -70,6 +70,7 @@ add_executable(goose
     src/runtime_inline.h
     src/jit.h
     src/interp/interp.cpp
+    src/interp/interp.h
     src/interp/pp.h
     src/interp/ctypes.h
     src/interp/cast.h
@@ -139,11 +140,18 @@ endif()
 target_link_libraries(goose PRIVATE goose_shaderc)
 
 # The in-process C backend: TinyCC, vendored under third_party/tinycc and
-# built into every compiler (cmake/libtcc.cmake).
-include(cmake/libtcc.cmake)
-target_link_libraries(goose PRIVATE libtcc)
-add_dependencies(goose tcc_runtime)
-target_compile_definitions(goose PRIVATE GOOSE_TCC_LIB_PATH="${TCC_STAGE}")
+# built into every compiler (cmake/libtcc.cmake), unless GOOSE_NO_JIT leaves
+# it out, as the browser build does (docs/design/interpreter.md §8): then
+# `goose run` always runs the interpreter.
+option(GOOSE_NO_JIT "Build without TinyCC; goose run uses the interpreter" OFF)
+if(GOOSE_NO_JIT)
+    target_compile_definitions(goose PRIVATE GOOSE_NO_JIT=1)
+else()
+    include(cmake/libtcc.cmake)
+    target_link_libraries(goose PRIVATE libtcc)
+    add_dependencies(goose tcc_runtime)
+    target_compile_definitions(goose PRIVATE GOOSE_TCC_LIB_PATH="${TCC_STAGE}")
+endif()
 
 # The blessed packages GOOSE_BUILTIN_LIBS names (src/blessed.txt; `all`, or
 # a list of their names), compiled into the compiler (cmake/package.cmake),
