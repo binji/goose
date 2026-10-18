@@ -16,6 +16,7 @@
 #endif
 #include "../src/includes.h"
 #include "../src/utils.h"
+#include "../src/interp/thunk.h"
 #include "../src/interp/pp.h"
 #include "../src/interp/ctypes.h"
 #include "../src/interp/cast.h"

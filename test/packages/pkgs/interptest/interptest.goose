@@ -1,6 +1,7 @@
 // The interpreter's test package (docs/design/interpreter.md 7.1, step 9
 // of 14): a native part with an extern fn of every parameter shape the
-// foreign boundary admits, which test/interp/thunks.goose calls. Natively a
+// foreign boundary admits, which test/packages/pkg_interp_thunks.goose
+// calls. Natively a
 // program links or loads the C; the interpreter calls it through the
 // thunks generated from include/interptest_api.h.
 namespace interptest;

@@ -387,7 +387,13 @@ public:
             auto &fp = natives[(size_t)(&f - prog.funcs.data())];
             if (!fp) {
                 auto it = library.find(f.name);
-                if (it == library.end()) throw Fault { cat("undefined function '", f.name, "'") };
+                if (it == library.end()) {
+                    if (auto th = thunks.find(f.name); th != thunks.end()) {
+                        CallThunk(f, th->second, nargs);
+                        return false;
+                    }
+                    throw Fault { cat("undefined function '", f.name, "'") };
+                }
                 fp = it->second;
             }
             auto args = stack.data() + sp - (size_t)nargs;
@@ -420,6 +426,41 @@ public:
         frames.push_back(Frame { &f, 0, (uint64_t)fp, sp });
         frametop = top;
         return true;
+    }
+
+    // A call into a native package's C through its thunk (§7.1): the
+    // arguments laid out by the prototype codegen emitted, each at an
+    // 8-byte slot in the generated C's own layout (a scalar as its size, a
+    // record as its bytes, a pointer as its handle), the result read back
+    // by the return type, into the hidden result pointer for a record.
+    void CallThunk(const Function &f, const goose_thunk *t, int nargs) {
+        auto ft = f.decl->type;
+        size_t first = f.sret ? 1 : 0;
+        if ((size_t)nargs != ft->params.size() + first)
+            throw Fault { cat("'", f.name, "' called with ", nargs - first, " arguments, declared with ", ft->params.size()) };
+        auto args = stack.data() + sp - (size_t)nargs;
+        vector<uint8_t> buf;
+        for (size_t i = 0; i < ft->params.size(); i++) {
+            auto pt = ft->params[i];
+            auto v = args[first + i];
+            auto off = buf.size();
+            if (pt->IsRecord()) {
+                buf.resize(off + (size_t)RoundUp(pt->size, 8));
+                memcpy(buf.data() + off, Access(v, (uint64_t)pt->size), (size_t)pt->size);
+            } else {
+                buf.resize(off + 8);
+                StoreVal(buf.data() + off, VTOf(pt), v);
+            }
+        }
+        uint8_t ret[64] = {};
+        t->fn(reinterpret_cast<goose_vm *>(this), buf.data(), ret);
+        if (t->yields) RequestYield();
+        if (f.sret) {
+            auto rt = ft->elem;
+            memcpy(Access(args[0], (uint64_t)rt->size), ret, (size_t)rt->size);
+        }
+        sp -= (size_t)nargs;
+        if (f.ret != VT_VOID) Push(Normalize(LoadVal(ret, f.ret), f.ret));
     }
 
     void Ret(VT t) {
@@ -762,6 +803,9 @@ public:
 
     unordered_map<string, Native> library;
     unordered_map<string, uint64_t> libobjects;   // extern variables: their values
+    // The native packages' functions, by name, through their thunks
+    // (builtin.h, §7.1), where the program has them.
+    unordered_map<string, const goose_thunk *> thunks;
     uint64_t errnoh = 0;                          // errno's cell
 
     // A FILE *: one of the three standard streams, or a file the program

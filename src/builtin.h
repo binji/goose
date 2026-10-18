@@ -5,6 +5,8 @@
 // the response file a program using it links was written.
 #pragma once
 
+#include "interp/thunk.h"
+
 namespace goose {
 
 // An entry of a package's symbol table, as native.h's goose_symbols.c and
@@ -19,6 +21,7 @@ struct BuiltinPackage {
     const goose_symbol *(*symbols)();   // nullptr for a package without a native part.
     const char *srcdir;                 // Its root, with a trailing slash.
     const char *rspdir;                 // Where its link-{cc,msvc}.rsp are; "" without a native part.
+    const goose_thunk *(*thunks)();     // nullptr where the package's sidecar names no thunk_api.
 };
 
 }  // namespace goose

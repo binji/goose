@@ -132,7 +132,11 @@ inline void LoadSidecar(Package &pkg, bool isprogram) {
     if (!pkg.hassidecar) return;
     const char *lists[] = { "c_sources", "c_include", "c_defines", "c_flags_cc", "c_flags_msvc",
                             "c_libs" };
-    vector<string> known = { "cmake_target", "cmake_options", "main_thread_only", "exclude" };
+    // thunk_api and thunk_yields are cmake/package.cmake's (the headers the
+    // interpreter's thunks are generated from, and the functions it yields
+    // after), accepted here so a sidecar can carry them.
+    vector<string> known = { "cmake_target", "cmake_options", "main_thread_only", "exclude",
+                             "thunk_api", "thunk_yields" };
     for (auto key : lists)
         for (auto suffix : { "", "_windows", "_linux", "_macos" }) known.push_back(cat(key, suffix));
     if (isprogram) known.push_back("output");

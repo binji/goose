@@ -71,6 +71,7 @@ add_executable(goose
     src/jit.h
     src/interp/interp.cpp
     src/interp/interp.h
+    src/interp/thunk.h
     src/interp/pp.h
     src/interp/ctypes.h
     src/interp/cast.h
@@ -161,6 +162,10 @@ endif()
 set(GOOSE_BUILTIN_LIBS "" CACHE STRING
     "Blessed packages to compile into the compiler: all, or a list of their names")
 include(cmake/package.cmake)
+# The interpreter's test package (test/packages/pkgs/interptest), compiled in
+# so that test/packages/pkg_interp_thunks.goose runs through its thunks under
+# --interp.
+option(GOOSE_INTERP_TEST_PACKAGE "Compile the interpreter's test package in" OFF)
 goose_builtin_packages("${GOOSE_BUILTIN_LIBS}")
 if(MSVC AND TARGET goose_gfx)
     # The system DLLs static SDL brings into goose with the gfx package:

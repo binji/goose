@@ -295,6 +295,11 @@ void ParseProgram(Ast &ast, const string &rootpath, const vector<string> &stdlib
                         }
                         ast.packages.push_back(Package { imp.path, root, false });
                         if (!src.ispath) ast.packages.back().cachekey = GitCacheKey(src);
+                        // Declared from the very directory the compiler's build
+                        // compiled it in from: its native part is in this
+                        // process already (the interpreter's test package).
+                        if (auto b = BuiltinLookup(imp.path); b && root == BuiltinSrcDir(*b, exedir))
+                            ast.packages.back().builtin = BuiltinIndex(b);
                         LoadSidecar(ast.packages.back(), false);
                         auto dp = DeclaredPackage { src, (int)ast.packages.size() - 1,
                                                     imp.line.line };
@@ -1413,6 +1418,19 @@ int Main(int argc, char **argv) {
             if (cg.usesthreads && interp)
                 throw CompileError { "the interpreter does not support threads yet; compile "
                                      "with -o and a C compiler instead" };
+            // A builder parameter (u8[>..]&) is the one shape a thunk cannot
+            // hand to compiled code (docs/design/interpreter.md §7.1); an
+            // --include header's C is interpreted, so only a native
+            // package's externs are refused.
+            if (interp)
+                for (auto sp : cg.usedexterns) {
+                    if (!ast.packages[ast.filepkg[sp->sf->line.fileidx]].HasNative()) continue;
+                    for (size_t i = 0; i < sp->argtypes.size(); i++)
+                        if (cg.CT(sp->argtypes[i]) == "gs_rref")
+                            throw CompileError { cat("the interpreter does not pass a builder parameter to native code: ",
+                                                     sp->sf->name, "'s parameter ", sp->sf->params[i].name,
+                                                     " (package ", ast.packages[ast.filepkg[sp->sf->line.fileidx]].name, ")") };
+                }
             if (cg.usesthreads)
                 throw CompileError { "JIT mode does not support threads yet (TinyCC cannot "
                                      "place thread-local storage in an in-memory run); "
@@ -1496,14 +1514,24 @@ int Main(int argc, char **argv) {
             if (program.empty()) return code;
             if (interp) {
                 // The native parts' functions reach an interpreted program
-                // through thunks (docs/design/interpreter.md §7), which are
-                // not here yet.
-                if (!nativepkgs.empty())
-                    throw CompileError { cat("the interpreter does not run programs that use "
-                                             "native packages yet (", astp->packages[nativepkgs[0]].name,
-                                             "); run it with TinyCC or compile with -o") };
+                // through the thunks generated with a package compiled into
+                // this compiler (docs/design/interpreter.md §7.1); a package
+                // built now, or built in without a thunk_api, has none.
+                vector<const goose_thunk *> thunks;
+                for (auto pkg : nativepkgs) {
+                    auto &p = astp->packages[pkg];
+                    if (p.builtin < 0)
+                        throw CompileError { cat("the interpreter does not run programs that use a native "
+                                                 "package this compiler was not built with (", p.name,
+                                                 "); run it with TinyCC or compile with -o") };
+                    auto table = builtin_packages[p.builtin].thunks;
+                    if (!table)
+                        throw CompileError { cat("the interpreter does not run programs that use the package ",
+                                                 p.name, ", whose sidecar names no thunk_api for its C") };
+                    thunks.push_back(table());
+                }
                 fflush(msgs);
-                return RunInterp(program, filename, progargs);
+                return RunInterp(program, filename, progargs, thunks);
             }
             // The native parts the program reaches hand the run their
             // functions by name: a builtin package's from the table compiled

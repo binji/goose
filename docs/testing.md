@@ -55,7 +55,12 @@ at both levels against the same blessed output, for the fixture areas the
 interpreter has been widened to (`INTERP_AREAS` in the runner; a fixture
 the interpreter refuses, for threads or a native package, is a skip), the
 `GS_DEBUG=1` selection through it as well (`interp-debug`), and the samples
-through `run_samples.py --interp`, which the flag passes on.
+through `run_samples.py --interp`, which the flag passes on. The
+interpreter's calls into a native package go through generated thunks
+(design/interpreter.md §7.1), which `test/packages/pkg_interp_thunks.goose`
+exercises against the in-tree package `test/packages/pkgs/interptest` when
+the compiler was configured with `-DGOOSE_INTERP_TEST_PACKAGE=ON`; without
+it the fixture is skipped under `--interp`, and runs natively either way.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose

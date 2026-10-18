@@ -6,6 +6,7 @@
 // driver calls where it would call RunJit.
 #include "../includes.h"
 #include "../utils.h"
+#include "thunk.h"
 #include "pp.h"
 #include "ctypes.h"
 #include "cast.h"
@@ -38,7 +39,15 @@ static string ResourceDirDefine(const string &progname) {
     return define + "\"\n";
 }
 
-int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs) {
+// What a thunk decodes a handle through (§7.1): the bytes of a VM segment,
+// a pointer good for the duration of the call.
+extern "C" void *goose_vm_decode(goose_vm *vm, uint64_t handle, uint64_t len) {
+    if (!handle) return nullptr;
+    return reinterpret_cast<interp::VM *>(vm)->Access(handle, len);
+}
+
+int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs,
+              const vector<const goose_thunk *> &thunks) {
     using namespace interp;
     // <name> is the prelude's; "name" is an --include header, named as the
     // command named it, so relative to where the command runs.
@@ -54,12 +63,17 @@ int RunInterp(const string &csrc, const string &progname, const vector<string> &
         }
         return false;
     }));
+    // The parser owns the declarations and the types, which the program's
+    // functions point at for as long as the VM runs (an external call lays
+    // its arguments out by its prototype; a fault report names its file).
     TypeTable types;
+    vector<PPToken> toks;
+    unique_ptr<CParser> parser;
     Program prog;
     try {
-        auto toks = pp.Run(ResourceDirDefine(progname) + csrc, "<generated C>");
-        CParser parser(toks, pp.files, types);
-        auto &unit = parser.ParseUnit();
+        toks = pp.Run(ResourceDirDefine(progname) + csrc, "<generated C>");
+        parser = make_unique<CParser>(toks, pp.files, types);
+        auto &unit = parser->ParseUnit();
         prog = Lowerer(unit, pp.files).Run();
     } catch (CompileError &e) {
         throw CompileError { cat("interpreter: ", e.msg) };
@@ -69,6 +83,8 @@ int RunInterp(const string &csrc, const string &progname, const vector<string> &
     // adapter, not the process, so the process does the same here.
     setvbuf(stdout, nullptr, _IONBF, 0);
     VM vm(prog);
+    for (auto table : thunks)
+        for (auto t = table; t->name; t++) vm.thunks[t->name] = t;
     vector<string> args;
     args.push_back(progname);
     args.insert(args.end(), progargs.begin(), progargs.end());

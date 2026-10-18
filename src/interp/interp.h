@@ -4,6 +4,8 @@
 // of it.
 #pragma once
 
+#include "thunk.h"
+
 namespace goose {
 
 // Runs the C a JIT run would hand TinyCC: preprocesses it with the
@@ -11,10 +13,13 @@ namespace goose {
 // `progargs` after argv[0], returning what the program returned or exited
 // with. The text must have been assembled with GS_INTERP defined. An
 // `--include` header is read relative to the directory the command runs
-// in, as TinyCC would read it. Throws CompileError where the C does not
-// parse, which is a bug in codegen, the runtime or the interpreter rather
-// than in the program; a fault during the run is reported on stderr and
-// exits with 134, as an abort would.
-int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs);
+// in, as TinyCC would read it. `thunks` are the thunk tables of the native
+// packages the program reaches (builtin.h), through which it calls their
+// C (docs/design/interpreter.md §7.1). Throws CompileError where the C does
+// not parse, which is a bug in codegen, the runtime or the interpreter
+// rather than in the program; a fault during the run is reported on stderr
+// and exits with 134, as an abort would.
+int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs,
+              const vector<const goose_thunk *> &thunks);
 
 }  // namespace goose

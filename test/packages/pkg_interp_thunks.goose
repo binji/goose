@@ -1,9 +1,9 @@
 // Every parameter shape across the foreign boundary, through the
-// interpreter's test package (pkg/interptest): natively the C is linked or
-// loaded; under --interp each call goes through a generated thunk, which
-// lays the arguments out, decodes the pointers and stores the result.
+// interpreter's test package (pkgs/interptest): natively the C is linked
+// or loaded; under --interp each call goes through a generated thunk,
+// which lays the arguments out, decodes the pointers and stores the result.
 import std;
-import interptest from "./pkg/interptest";
+import interptest from "./pkgs/interptest";
 
 fn main() {
     print(interptest::scalars(-5, 200, -300, 60000, -70000, 4000000000, -1, 10, 1.5, 0.25, true));

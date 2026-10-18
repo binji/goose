@@ -377,14 +377,27 @@ static void thunk_gs_gfx_open(gs_vm *vm, const uint8_t *args, uint8_t *ret) {
 A slice decodes by its `len` times the element size, a pointer to a struct
 by `sizeof` the struct, a scalar not at all. The thunk table is `{ name,
 thunk, yields }` in a generated `goose_thunks_<name>.c`, which
-`package.cmake` writes next to `goose_symbols_<name>.c`, and `builtin.h`'s
-`BuiltinPackage` gains a `thunks` member the driver passes to `RunInterp`
-as it passes `symbols` to `RunJit`. The VM, at a call to a function the
-unit does not define, lays the arguments out by the prototype codegen
-emitted for it (the generated code's layout, packed as its types are) and
-calls the thunk by name. A package whose layer has no such list cannot be
-built into the interpreter; gfx, audio and ui have one, and physics is
-expected to, being written the same way.
+`package.cmake` writes next to `goose_symbols_<name>.c` by running
+`scripts/gen_thunks.py` over the headers the package's sidecar names
+(`thunk_api = ["src/gfx/gfx_api.h", ...]`, with `thunk_yields` naming the
+functions the VM yields after), and `builtin.h`'s `BuiltinPackage` gains a
+`thunks` member the driver passes to `RunInterp` as it passes `symbols` to
+`RunJit`. The VM, at a call to a function the unit does not define, lays
+the arguments out by the prototype codegen emitted for it, one after
+another at 8-byte slots in the generated code's own layout (a scalar as
+its size, a packed struct as its bytes, a pointer as its 64-bit handle, a
+slice as a handle and a length), calls the thunk by name, and reads the
+result back by the return type, into the hidden result pointer for a
+struct. A thunk reads handles and lengths as 64-bit fields and decodes
+each handle through `goose_vm_decode`, so the same thunk serves the 64-bit
+host and the 32-bit Wasm one; a struct that crosses by value holds no
+pointers, so its bytes are the same on both. A package whose layer has no
+such list cannot be built into the interpreter; gfx, audio and ui have one,
+and physics is expected to, being written the same way. A package declared
+by path from the very directory the compiler's build compiled it in from
+counts as built in, which is how the in-tree test package
+(`test/packages/pkgs/interptest`, `GOOSE_INTERP_TEST_PACKAGE`) reaches its
+thunks.
 
 **Marshaling.** In the Wasm build the VM's segments are linear memory, so a
 decode is a pointer into the module and a layer reads a slice or writes
@@ -798,9 +811,11 @@ backend proceeds in its own repository in parallel from step 12 on.
    table, the member in `builtin.h`, and the VM's external call laying
    arguments out by the emitted prototype and calling by name, with the
    compile-time rejection of builder parameters in native externs. Test:
-   a tiny in-tree test package under `test/interp/pkg/` with an X-macro
-   list covering every parameter shape, built in by the test's CMake, and
-   a Goose fixture calling each. About 600 lines.
+   a tiny in-tree test package under `test/packages/pkgs/` (beside the
+   other test packages, whose fixtures the runner builds with `goose
+   build`) with an X-macro list covering every parameter shape, built in
+   by the `GOOSE_INTERP_TEST_PACKAGE` option, and a Goose fixture calling
+   each. About 600 lines.
 10. **The blessed packages through the interpreter.** Nothing new to
     write if step 9 holds; this commit turns on the `gfx/`, `ui/` and
     `physics/` tests under `--interp` for a compiler built with
