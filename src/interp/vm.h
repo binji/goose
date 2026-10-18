@@ -620,8 +620,10 @@ struct VM {
             return Normalize((uint64_t)(int64_t)d, to);
         }
         if (IsFloat(to)) {
-            double d = IsUnsigned(from) ? (double)v : (double)(int64_t)v;
-            return FloatBits(d, to);
+            // An integer rounds to a float once: through a double first it
+            // could round twice, which differs for integers above 2^53.
+            if (to == VT_F32) return bit_cast<uint64_t>((double)(IsUnsigned(from) ? (float)v : (float)(int64_t)v));
+            return bit_cast<uint64_t>(IsUnsigned(from) ? (double)v : (double)(int64_t)v);
         }
         return Normalize(v, to);
     }

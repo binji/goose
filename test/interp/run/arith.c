@@ -165,6 +165,13 @@ int main(void) {
     show_f("(double)(i64)-1", (double)(i64)-1);
     show_f("(double)1 << 53 + 1", (double)((1LL << 53) + 1));
     show_f("(float)(1 << 24) + 1", (float)((1 << 24) + 1));
+    /* An integer rounds to float once: 2^60 + 2^36 + 1 is above the tie
+       and rounds up, where a double in between would round it to the tie
+       and then down. */
+    static i64 big60[1] = { 1152921573326323713LL };
+    static u64 wide64[1] = { 18446744073709551615ULL };
+    show_f("(float)(2^60 + 2^36 + 1)", (float)big60[0]);
+    show_f("(float)(u64)-1", (float)wide64[0]);
     show_f("-x", -da);
     show_f("int / double", 7 / 2.0);
     show_f("int / int", 7 / 2);

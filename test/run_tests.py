@@ -139,7 +139,7 @@ def runtime_defines(source):
 
 # The fixture directories the interpreter runs under --interp: those the
 # interpreter has been widened to (docs/design/interpreter.md §14, step 7).
-INTERP_AREAS = ("codegen",)
+INTERP_AREAS = ("codegen", "runtime")
 
 
 # What `goose --multi-test` ends each file's part of stdout and of stderr
