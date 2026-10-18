@@ -25,7 +25,7 @@ documents, and fails on a broken one.
 | `style.css` | the one stylesheet |
 | `links.lua` | a pandoc filter: `.md` links become `.html`, `.goose` links reach the sample pages, and the `<details>` table of contents each file carries for GitHub is dropped in favour of the sidebar |
 | `goose.xml` | Goose syntax highlighting for pandoc, in the KDE syntax definition format |
-| `play/` | the playground: `index.html`, `play.mjs` and `play.css` are the page, `wasi.mjs` the WASI shim it runs `goose.wasm` on (`docs/design/interpreter.md` §9), `wasi_test.mjs` the shim's test under node |
+| `play/` | the playground: `index.html`, `play.mjs` and `play.css` are the page, `worker.mjs` the worker a run of `goose.wasm` happens in, `wasi.mjs` the WASI shim it runs on (`docs/design/interpreter.md` §9), `wasi_test.mjs` the test of the shim and the worker under node |
 
 The playground needs the compiler built to WebAssembly: `--wasm` names the
 module (default `build/wasm/goose.wasm`, where `test/wasm_build.py` puts

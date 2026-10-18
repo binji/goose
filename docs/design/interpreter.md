@@ -600,17 +600,30 @@ binary a canvas.
   which include `fd_prestat_*`, `path_rename`, `path_remove_directory` and
   `poll_oneoff`; a sleep returns at once, since a page cannot block. The
   site build writes the tree's starting files into `files.json`.)
-* **Running.** The page calls `goose_run("run /prog.goose -O2 -- args")`
-  and then `goose_resume()` from `requestAnimationFrame` until the run
-  reports it is finished, with the exit status. The VM yields on its time
-  budget as well as at frames, so a long-running text program leaves the
-  page responsive and Stop is a flag the next resume sees, with no Web
-  Worker needed; the text-only binary can still be run in a Worker if a
-  page prefers, since nothing in it touches the DOM. The module is
-  instantiated afresh for every run, since a run leaves its state behind
-  and the compiler is not written to run twice in one process; a sieve of
-  ten million runs in about ten seconds this way, against four under node
-  without the frame scheduling and two natively.
+* **Running.** The page compiles `goose.wasm` once and runs every command
+  in a Web Worker of its own (`worker.mjs`), handing it the compiled
+  module, the tree's files and the command line. The worker instantiates
+  the module on the shim, calls `goose_run("run /prog.goose -O2 -- args")`
+  and then `goose_resume()` back to back until the run reports it is
+  finished, posting the output in batches at each piece and the exit status
+  at the end, with the files the page asked to read back (`/out.c`). Stop
+  terminates the worker, which ends the run at once whatever it is doing,
+  and the VM's step budget only sets the cadence of the output. A fresh
+  instance per run is right anyway, since a run leaves its state behind and
+  the compiler is not written to run twice in one process. (Step 13 first
+  ran the module on the main thread, resuming from `requestAnimationFrame`
+  with Stop a flag the next piece saw. The worker did not change the
+  speed: a sieve of ten million takes about ten seconds in Chrome 147
+  either way, against four in Firefox, three under node and two natively.
+  The compile phase takes the same 0.3 s everywhere; it is the VM loop's
+  pieces that run four times slower in Chrome than in node, from the first
+  piece on, slower even than node with Liftoff alone, so Chrome's engine
+  is treating the loop function differently. Not investigated further;
+  the page's note gives the slowdown as a range.) The gfx binary's frame
+  yield of §7.2 will still need the main thread's animation callback,
+  since WebGL and input live there; its page can keep the worker for the
+  compile and the VM and forward frames and events over messages, or run
+  on the main thread as this section first described.
 * **Graphics.** The `gfx` and `audio` import modules of section 7.3,
   implemented over a canvas's WebGL 2 context and an `AudioContext`, and
   DOM listeners that queue events for the next resume.

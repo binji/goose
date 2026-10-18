@@ -48,9 +48,9 @@
       <pre id="cfile" class="view"></pre>
     </section>
   </div>
-  <p class="note">The compiler runs in your browser as WebAssembly, and its interpreter runs the program
-  (<a href="../docs/design/interpreter.html">how</a>). Programs run some 15 to 30 times slower than a native
-  build, so the samples that time themselves take a few seconds; Stop ends a run between frames of work.
+  <p class="note">The compiler runs in your browser as WebAssembly, in a worker, and its interpreter runs the
+  program (<a href="../docs/design/interpreter.html">how</a>). Programs run some 15 to 30 times slower than a
+  native build, so the samples that time themselves take a few seconds; Stop ends a run at once.
   Standard input is empty; <code>-o /out.c</code> is what the Generated C button runs.</p>
 </main>
 <script type="module" src="play.mjs"></script>

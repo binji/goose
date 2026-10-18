@@ -1,7 +1,9 @@
 // Tests of the playground's WASI shim (wasi.mjs) under node: the file calls
 // through a memory of their own, as wasi-libc makes them, and, where a
 // goose.wasm is given, the hello-world fixture and the generated-C tab's
-// command through the shim end to end.
+// command through the shim end to end, and then the same through the
+// playground's worker (worker.mjs) on node's worker threads, whose port
+// takes the browser's messages.
 //
 //     node docs/site/play/wasi_test.mjs [goose.wasm]
 //
@@ -161,6 +163,40 @@ if (wasm) {
     tree.writeFile("/bad.goose", "fn main() { let x: i64 = \"no\"; }\n");
     const code3 = runCommand(instance, "--check /bad.goose --stdlib /stdlib");
     check("a type error reports and exits 1", code3 === 1 && /error/.test(err), `exit ${code3}, err ${err.slice(0, 200)}`);
+
+    // The worker, as the page drives it: one run per worker, the compiled
+    // module posted with the files, the output and the exit status posted
+    // back, and the file asked for read back at the end.
+    const { Worker } = await import("node:worker_threads");
+    const module = await WebAssembly.compile(readFileSync(wasm));
+    const files = {};
+    for (const f of readdirSync(join(root, "stdlib"))) if (f.endsWith(".goose"))
+        files[`/stdlib/${f}`] = readFileSync(join(root, "stdlib", f), "utf8");
+    files["/prog.goose"] = readFileSync(join(root, "test", "codegen", "hello_world.goose"), "utf8");
+    const viaWorker = (cmdline, readback = []) => new Promise((resolve, reject) => {
+        const w = new Worker(new URL("./worker.mjs", import.meta.url));
+        const got = { out: "", err: "", status: [], code: undefined, files: {} };
+        w.on("message", m => {
+            if (m.type === "status") got.status.push(m.text);
+            else if (m.type === "output") { got.out += m.out; got.err += m.err; }
+            else if (m.type === "done") { got.code = m.code; got.files = m.files; w.terminate().then(() => resolve(got)); }
+        });
+        w.on("error", reject);
+        w.postMessage({ module, files, cmdline, readback });
+    });
+    const r1 = await viaWorker("run /prog.goose --stdlib /stdlib");
+    check("hello world through the worker", r1.code === 0 && r1.out === "Hello, world!\n",
+          `exit ${r1.code}, out ${JSON.stringify(r1.out)}, err ${r1.err.slice(0, 200)}`);
+    const r2 = await viaWorker("-O2 -o /out.c /prog.goose --stdlib /stdlib", ["/out.c", "/missing.c"]);
+    check("the worker reads the generated C back", r2.code === 0 && (r2.files["/out.c"] || "").includes("gs_rt_start") &&
+          !("/missing.c" in r2.files), `exit ${r2.code}, files ${Object.keys(r2.files)}, err ${r2.err.slice(0, 200)}`);
+    files["/loop.goose"] = "fn main() { var n: i64 = 0; for i in 3000000 { n += i; } print(n); }\n";
+    const r3 = await viaWorker("run /loop.goose -O0 --stdlib /stdlib");
+    check("a run that suspends reports running and finishes", r3.code === 0 && r3.status.includes("running…") &&
+          r3.out === "4499998500000\n", `exit ${r3.code}, status ${r3.status}, out ${JSON.stringify(r3.out)}, err ${r3.err.slice(0, 200)}`);
+    files["/bad.goose"] = "fn main() { let x: i64 = \"no\"; }\n";
+    const r4 = await viaWorker("--check /bad.goose --stdlib /stdlib");
+    check("a type error through the worker", r4.code === 1 && /error/.test(r4.err), `exit ${r4.code}, err ${r4.err.slice(0, 200)}`);
 } else {
     console.log("skip the end-to-end checks: no goose.wasm given");
 }

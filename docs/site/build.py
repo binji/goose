@@ -204,7 +204,7 @@ def build_play(out_dir, wasm):
         return False
     play_out = os.path.join(out_dir, "play")
     os.makedirs(play_out, exist_ok=True)
-    for name in ("index.html", "play.mjs", "play.css", "wasi.mjs"):
+    for name in ("index.html", "play.mjs", "play.css", "worker.mjs", "wasi.mjs"):
         shutil.copy(os.path.join(SITE, "play", name), os.path.join(play_out, name))
     shutil.copy(wasm, os.path.join(play_out, "goose.wasm"))
     files, skipped = play_files()

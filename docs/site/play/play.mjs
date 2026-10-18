@@ -1,16 +1,13 @@
 // The playground (docs/design/interpreter.md §9): goose.wasm run on the WASI
 // shim over an in-memory tree that holds the standard library and the
 // samples (files.json, written by the site build) and the editor's program
-// as /prog.goose. Run compiles and interprets the program in pieces from
-// requestAnimationFrame, so the page stays responsive and Stop is seen at
-// the next piece; Check typechecks; Generated C writes -o /out.c and shows
-// it. The module is instantiated once per run, since a run leaves its
-// state behind and the compiler is not written to run twice in a process.
-import { WasiShim, Tree, SUSPENDED } from "./wasi.mjs";
-
+// as /prog.goose. Every run is a Worker of its own (worker.mjs), given the
+// module the page compiled once: the worker runs the compiler and the
+// program back to back, streaming the output, so the page stays responsive
+// and Stop ends the run at once by terminating the worker. Check
+// typechecks; Generated C writes -o /out.c and shows it.
 const $ = id => document.getElementById(id);
-const dec = new TextDecoder();
-const state = { wasmBytes: null, files: null, running: false, stop: false };
+const state = { module: null, files: null, worker: null };
 
 function status(text) { $("status").textContent = text; }
 
@@ -36,79 +33,52 @@ function append(id, text, cls) {
     view.scrollTop = view.scrollHeight;
 }
 
-// The tree a run sees: every file of files.json and the editor's program.
-function makeTree() {
-    const tree = new Tree();
-    for (const [path, text] of Object.entries(state.files)) tree.writeFile(path, text);
-    tree.writeFile("/prog.goose", $("source").value);
-    return tree;
-}
-
 function setBusy(busy) {
-    state.running = busy;
-    for (const id of ["run", "check", "emit"]) $(id).disabled = busy || !state.wasmBytes;
+    for (const id of ["run", "check", "emit"]) $(id).disabled = busy || !state.module;
     $("stop").disabled = !busy;
 }
 
-// Runs a command line: compiles and, for `run`, interprets the program in
-// pieces of work between animation frames. `done(code, tree)` is called at
-// the end, with null for a stopped run.
-async function runCommand(cmdline, done) {
-    if (state.running) return;
+// Runs a command line in a fresh worker over the tree of files.json and
+// the editor's program. `done(code, files)` is called at the end with the
+// exit status, null for a stopped run, and the files of `readback` the run
+// left in the tree.
+function runCommand(cmdline, readback, done) {
+    if (state.worker) return;
     setBusy(true);
-    state.stop = false;
     clearViews();
-    const tree = makeTree();
-    const shim = new WasiShim({
-        tree,
-        stdout: b => append("output", dec.decode(b)),
-        stderr: b => append("messages", dec.decode(b), "err"),
-        env: { GOOSE_PROGRESS: "plain" },
-    });
-    let instance;
+    const started = performance.now();
+    let worker;
     try {
-        ({ instance } = await WebAssembly.instantiate(state.wasmBytes, shim.imports));
-        shim.start(instance);
+        worker = new Worker("worker.mjs", { type: "module" });
     } catch (e) {
-        append("messages", `cannot start goose.wasm: ${e.message}\n`, "err");
+        append("messages", `cannot start the worker: ${e.message}\n`, "err");
         setBusy(false);
         return;
     }
-    const { memory, goose_argbuf, goose_run, goose_resume } = instance.exports;
-    const line = new TextEncoder().encode(cmdline);
-    const buf = goose_argbuf(line.length);
-    new Uint8Array(memory.buffer, buf, line.length + 1).set(line);
-    const started = performance.now();
-    status("compiling…");
-    let code;
-    try {
-        code = goose_run(buf);
-    } catch (e) {
-        code = shim.exitCode ?? 1;
-        if (shim.exitCode === null) append("messages", `goose.wasm failed: ${e.message}\n`, "err");
-    }
-    const finish = result => {
+    state.worker = worker;
+    const finish = (code, files = {}) => {
+        worker.terminate();
+        state.worker = null;
         const secs = ((performance.now() - started) / 1000).toFixed(1);
-        status(result === null ? `stopped after ${secs}s` : `exit ${result} in ${secs}s`);
+        status(code === null ? `stopped after ${secs}s` : `exit ${code} in ${secs}s`);
         setBusy(false);
-        done(result, tree);
+        done(code, files);
     };
-    if (code !== SUSPENDED) return finish(code);
-    // Resume between frames: each piece is a step budget of the VM's.
-    status("running…");
-    const step = () => {
-        if (state.stop) return finish(null);
-        let c;
-        try {
-            c = goose_resume();
-        } catch (e) {
-            c = shim.exitCode ?? 1;
-            if (shim.exitCode === null) append("messages", `goose.wasm failed: ${e.message}\n`, "err");
-        }
-        if (c === SUSPENDED) requestAnimationFrame(step);
-        else finish(c);
+    state.stop = () => finish(null);
+    worker.onmessage = ({ data: m }) => {
+        if (m.type === "status") status(m.text);
+        else if (m.type === "output") {
+            if (m.out) append("output", m.out);
+            if (m.err) append("messages", m.err, "err");
+        } else if (m.type === "done") finish(m.code, m.files);
     };
-    requestAnimationFrame(step);
+    worker.onerror = e => {
+        append("messages", `the worker failed: ${e.message || "cannot load worker.mjs"}\n`, "err");
+        finish(1);
+    };
+    const files = { ...state.files, "/prog.goose": $("source").value };
+    worker.postMessage({ module: state.module, files, cmdline, readback });
+    status("compiling…");
 }
 
 function optLevel() { return $("opt").value; }
@@ -120,24 +90,24 @@ function programArgs() {
 
 $("run").onclick = () => {
     show("output");
-    runCommand(`run /prog.goose ${optLevel()} --stdlib /stdlib${programArgs()}`, () => {});
+    runCommand(`run /prog.goose ${optLevel()} --stdlib /stdlib${programArgs()}`, [], () => {});
 };
 $("check").onclick = () => {
     show("messages");
-    runCommand(`--check /prog.goose --stdlib /stdlib`, code => {
+    runCommand(`--check /prog.goose --stdlib /stdlib`, [], code => {
         if (code === 0) append("messages", "no errors\n");
     });
 };
 $("emit").onclick = () => {
     show("messages");
-    runCommand(`${optLevel()} -o /out.c /prog.goose --stdlib /stdlib`, (code, tree) => {
+    runCommand(`${optLevel()} -o /out.c /prog.goose --stdlib /stdlib`, ["/out.c"], (code, files) => {
         if (code === 0) {
-            $("cfile").textContent = tree.readText("/out.c") || "";
+            $("cfile").textContent = files["/out.c"] || "";
             show("cfile");
         }
     });
 };
-$("stop").onclick = () => { state.stop = true; };
+$("stop").onclick = () => { if (state.worker) state.stop(); };
 for (const b of document.querySelectorAll(".right .tab")) b.onclick = () => show(b.dataset.tab);
 
 $("sample").onchange = () => {
@@ -161,7 +131,9 @@ async function load() {
             fetch("goose.wasm").then(r => { if (!r.ok) throw new Error(`goose.wasm: ${r.status}`); return r.arrayBuffer(); }),
         ]);
         state.files = files;
-        state.wasmBytes = wasm;
+        state.size = wasm.byteLength;
+        // Compiled once; each run's worker is handed the module.
+        state.module = await WebAssembly.compile(wasm);
     } catch (e) {
         status(`cannot load the playground: ${e.message}`);
         return;
@@ -181,7 +153,7 @@ async function load() {
         picker.value = "/samples/01_tour.goose";
         picker.onchange();
     }
-    status(`ready (goose.wasm, ${(state.wasmBytes.byteLength / 1048576).toFixed(1)} MB)`);
+    status(`ready (goose.wasm, ${(state.size / 1048576).toFixed(1)} MB)`);
     setBusy(false);
 }
 
