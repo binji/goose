@@ -8,7 +8,9 @@
 // calls, static data, the faults the VM must report, and each part of the
 // library. A fixture gets a fresh empty directory as argv[1] for its files,
 // `name.stdin` as its standard input if there is one, and the environment
-// variable INTERP_RUN_VAR set to "forty-two".
+// variable INTERP_RUN_VAR set to "forty-two". Each fixture runs twice: whole,
+// and in pieces under a small budget of steps (docs/design/interpreter.md
+// §4, step 8 of §14), which must print the same; yield.c counts its resumes.
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -90,8 +92,10 @@ struct Compiled {
 };
 
 // Runs a fixture and returns its output; the stack limit is small so the
-// recursion fixtures reach it quickly.
-static string RunFixture(const fs::path &f, const fs::path &dir, bool dump) {
+// recursion fixtures reach it quickly. With a budget the run is suspended
+// and resumed, `resumes` times in all.
+static string RunFixture(const fs::path &f, const fs::path &dir, bool dump, int64_t budget = 0,
+                         int *resumes = nullptr) {
     string out;
     auto tmp = fs::temp_directory_path() / cat("interp_run_", f.stem().string());
     fs::remove_all(tmp);
@@ -115,8 +119,12 @@ static string RunFixture(const fs::path &f, const fs::path &dir, bool dump) {
             at += n;
             return n;
         };
-        int status = vm.Run({ "fixture", tmp.generic_string() });
-        if (status) Append(out, "exit status ", status, "\n");
+        vm.budget = budget;
+        vm.Start({ "fixture", tmp.generic_string() });
+        int n = 0;
+        do n++; while (!vm.Resume());
+        if (resumes) *resumes = n;
+        if (vm.status) Append(out, "exit status ", vm.status, "\n");
     } catch (CompileError &e) {
         Append(out, "error: ", e.msg, "\n");
     }
@@ -214,8 +222,27 @@ int main(int argc, char **argv) {
             continue;
         }
         auto want = ReadAll(expected);
-        if (want != got) Fail(name, cat("expected:\n", want, "got:\n", got));
-        else printf("ok %s\n", name.c_str());
+        if (want != got) {
+            Fail(name, cat("expected:\n", want, "got:\n", got));
+            continue;
+        }
+        // In pieces: a budget of a few steps suspends the run at nearly
+        // every loop iteration and call.
+        int resumes = 0;
+        auto pieces = RunFixture(f, dir, false, 3, &resumes);
+        if (pieces != got) {
+            Fail(cat(name, " in pieces"), cat("whole run:\n", got, "in pieces (", resumes, " resumes):\n", pieces));
+            continue;
+        }
+        if (name == "yield.c") {
+            // Three gs_host_yield calls: four resumes without a budget.
+            RunFixture(f, dir, false, 0, &resumes);
+            if (resumes != 4) {
+                Fail(name, cat("expected 4 resumes over its yields, got ", resumes));
+                continue;
+            }
+        }
+        printf("ok %s\n", name.c_str());
     }
     Runtime(here.parent_path());
     if (failures) printf("%d failure(s)\n", failures);

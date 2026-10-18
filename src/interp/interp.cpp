@@ -72,7 +72,12 @@ int RunInterp(const string &csrc, const string &progname, const vector<string> &
     vector<string> args;
     args.push_back(progname);
     args.insert(args.end(), progargs.begin(), progargs.end());
-    return vm.Run(args);
+    // In pieces, as the page runs it (§9), so that every run exercises the
+    // suspension; natively the pieces just follow one another.
+    vm.budget = 1 << 20;
+    vm.Start(args);
+    while (!vm.Resume()) {}
+    return vm.status;
 }
 
 }  // namespace goose

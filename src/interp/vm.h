@@ -103,19 +103,34 @@ struct VM {
         Library();
     }
 
-    // Runs the static initializers, then main with the arguments; returns
-    // the exit status. A fault is reported on the error stream and exits
-    // with status 134, as abort() would.
-    int Run(const vector<string> &args) {
+    // The run, in pieces, so that a page can call in repeatedly (§4, §7.2,
+    // §9): Start runs the static initializers and sets up the call of main
+    // with the arguments; each Resume then runs the program until it ends,
+    // which returns true with `status` set, or until it has spent its
+    // budget or a native asked to yield, which returns false with the
+    // program parked at an instruction the next Resume continues from.
+    // The budget counts backward jumps and calls, the only ways a program
+    // runs long; 0 is no budget. A fault is reported on the error stream
+    // and ends the run with status 134, as abort() would.
+    int64_t budget = 0;
+    bool finished = false;
+    int status = 0;
+
+    void Start(const vector<string> &args) {
         try {
             segs[frameseg].limit = framelimit;
             if (prog.init >= 0) {
+                // Static initializers run whole: nothing in them is worth
+                // yielding over.
+                auto saved = budget;
+                budget = 0;
                 Enter(prog.funcs[(size_t)prog.init], 0);
-                Loop();
+                while (Loop()) {}
+                budget = saved;
             }
             if (prog.main < 0) throw Fault { "no main function" };
-            auto &m = prog.funcs[(size_t)prog.main];
-            if (!m.params.empty()) {
+            mainfn = &prog.funcs[(size_t)prog.main];
+            if (!mainfn->params.empty()) {
                 // argv: the strings and an array of their handles, NULL last.
                 auto argv = NewSeg(SEG_STATIC, "argv", 8 * (args.size() + 1));
                 for (size_t i = 0; i < args.size(); i++) {
@@ -125,19 +140,56 @@ struct VM {
                 }
                 Push((uint64_t)args.size());
                 Push(Handle(argv, 0));
-                if (m.params.size() > 2) Push(0);
+                if (mainfn->params.size() > 2) Push(0);
             }
-            Enter(m, (int)m.params.size());
-            Loop();
-            return m.ret == VT_VOID ? 0 : (int)Pop();
+            Enter(*mainfn, (int)mainfn->params.size());
         } catch (Exit &e) {
-            return e.status;
+            Finish(e.status);
         } catch (Fault &f) {
             Report(f.msg);
-            return 134;
+            Finish(134);
         }
     }
 
+    bool Resume() {
+        if (finished) return true;
+        budgetleft = budget;
+        yieldrequested = false;
+        try {
+            if (Loop()) return false;
+            Finish(mainfn->ret == VT_VOID ? 0 : (int)Pop());
+        } catch (Exit &e) {
+            Finish(e.status);
+        } catch (Fault &f) {
+            Report(f.msg);
+            Finish(134);
+        }
+        return true;
+    }
+
+    // The whole run at once: the exit status.
+    int Run(const vector<string> &args) {
+        Start(args);
+        while (!Resume()) {}
+        return status;
+    }
+
+    // A native that must hand control back to the VM's caller (a frame's
+    // end in the browser, §7.2) asks here; the loop returns after the call.
+    void RequestYield() { yieldrequested = true; }
+
+private:
+    const Function *mainfn = nullptr;
+    int64_t budgetleft = 0;
+    bool yieldrequested = false;
+
+    void Finish(int code) {
+        finished = true;
+        status = code;
+        frames.clear();
+    }
+
+public:
     // ---- Segments
 
     vector<Segment> segs;
@@ -383,10 +435,12 @@ struct VM {
 
     // ---- The loop
 
-    // Runs until no frame is left. The top frame's state lives in locals
-    // while its code runs and goes back to the frame at a call, a return
-    // or a fault, whose report reads the frames.
-    void Loop() {
+    // Runs until no frame is left (false), or until the budget is spent or
+    // a native asked to yield (true, the program parked). The top frame's
+    // state lives in locals while its code runs and goes back to the frame
+    // at a call, a return, a yield or a fault, whose report reads the
+    // frames.
+    bool Loop() {
         while (!frames.empty()) {
             auto &fr = frames.back();
             const Function *fn = fr.fn;
@@ -482,20 +536,41 @@ struct VM {
                             break;
                         }
                         case OP_CVT: sp[-1] = Convert(sp[-1], in.t, (VT)in.t2); break;
-                        case OP_JMP: pc = (size_t)in.imm; continue;
+                        // A jump back is a loop going round: a budget step.
+                        case OP_JMP: {
+                            bool back = (size_t)in.imm <= pc;
+                            pc = (size_t)in.imm;
+                            if (back && budget && --budgetleft <= 0) goto yield;
+                            continue;
+                        }
                         case OP_JZ:
-                            if (*--sp == 0) { pc = (size_t)in.imm; continue; }
+                            if (*--sp == 0) {
+                                if ((size_t)in.imm <= pc && budget && --budgetleft <= 0) { pc = (size_t)in.imm; goto yield; }
+                                pc = (size_t)in.imm;
+                                continue;
+                            }
                             break;
                         case OP_JNZ:
-                            if (*--sp != 0) { pc = (size_t)in.imm; continue; }
+                            if (*--sp != 0) {
+                                if ((size_t)in.imm <= pc && budget && --budgetleft <= 0) { pc = (size_t)in.imm; goto yield; }
+                                pc = (size_t)in.imm;
+                                continue;
+                            }
                             break;
                         case OP_JCMP: {
                             auto b = sp[-1], a = sp[-2];
                             sp -= 2;
-                            if (Compare((Op)in.t2, in.t, a, b)) { pc = (size_t)in.imm; continue; }
+                            if (Compare((Op)in.t2, in.t, a, b)) {
+                                if ((size_t)in.imm <= pc && budget && --budgetleft <= 0) { pc = (size_t)in.imm; goto yield; }
+                                pc = (size_t)in.imm;
+                                continue;
+                            }
                             break;
                         }
                         case OP_CALL:
+                            // A call is a budget step too, before it happens,
+                            // so a resume repeats it.
+                            if (budget && --budgetleft <= 0) goto yield;
                             fr.pc = pc;
                             this->sp = (size_t)(sp - base);
                             if (Enter(prog.funcs[(size_t)in.imm], in.t2)) goto reload;
@@ -504,6 +579,7 @@ struct VM {
                             sp = stack.data() + this->sp;
                             base = stack.data();
                             frame = segs[frameseg].mem.data() + fp;
+                            if (yieldrequested) { pc++; goto yield; }
                             break;
                         case OP_CALLI: {
                             auto h = sp[-1 - in.t2];
@@ -511,6 +587,7 @@ struct VM {
                             if (s.kind != SEG_FUNC || OffOf(h) != 0)
                                 throw Fault { cat("call through a pointer to ", Describe(s)) };
                             // The callee's handle sits below the arguments: move them down over it.
+                            if (budget && --budgetleft <= 0) goto yield;
                             memmove(sp - 1 - in.t2, sp - in.t2, in.t2 * sizeof *sp);
                             sp--;
                             fr.pc = pc;
@@ -519,6 +596,7 @@ struct VM {
                             sp = stack.data() + this->sp;
                             base = stack.data();
                             frame = segs[frameseg].mem.data() + fp;
+                            if (yieldrequested) { pc++; goto yield; }
                             break;
                         }
                         case OP_RET:
@@ -529,6 +607,11 @@ struct VM {
                         case OP_UNREACHABLE: throw Fault { "unreachable code reached" };
                     }
                     pc++;
+                    continue;
+                yield:
+                    fr.pc = pc;
+                    this->sp = (size_t)(sp - base);
+                    return true;
                 }
             } catch (Fault &) {
                 // The report reads the frames, so the top one gets its place.
@@ -544,6 +627,7 @@ struct VM {
             }
         reload:;
         }
+        return false;
     }
 
     // ---- Arithmetic

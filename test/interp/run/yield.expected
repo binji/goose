@@ -1,0 +1,4 @@
+before
+after one: 10
+after three: 50, counter 3
+exit status 3

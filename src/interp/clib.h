@@ -688,6 +688,12 @@ inline void VM::Library() {
         vm.segs[id].limit = a[0];
         return Handle(id, 0);
     };
+    // A native yield point (§7.2): the loop returns to the VM's caller after
+    // this call, and the next Resume continues after it.
+    library["gs_host_yield"] = [](VM &vm, const uint64_t *, int) -> uint64_t {
+        vm.RequestYield();
+        return 0;
+    };
     library["gs_host_release"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
         auto &s = vm.Seg(a[0]);
         if (s.kind != SEG_STACK || OffOf(a[0]) != 0) throw Fault { cat("release of ", vm.Describe(s)) };

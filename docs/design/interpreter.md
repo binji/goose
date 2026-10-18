@@ -187,7 +187,13 @@ Four pieces, in `src/interp/`, built into the compiler like `jit.h` is.
    *suspend*: return to its caller with the program parked at an
    instruction, to be continued by a later call. Section 7 uses this at
    the end of a frame; the page uses it to keep the browser responsive, a
-   yield after a time budget checked every few thousand instructions.
+   yield after a budget of steps, where a step is a backward jump or a
+   call, the only ways a program runs long, so straight-line code costs no
+   check. The VM's `Start` sets the run up and each `Resume` runs until the
+   program ends or yields; a native that must hand control back
+   (`gs_host_yield`, the frame thunk of section 7.2) asks the VM, which
+   returns after the call. The driver runs natively in pieces too, so
+   every test run exercises the suspension.
 
 Everything in the C text is interpreted, the runtime included. Only the C
 library and the native packages are compiled code. This keeps every write
