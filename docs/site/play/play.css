@@ -1,0 +1,102 @@
+/* The playground's layout on top of the site's stylesheet: a toolbar, two
+   panes side by side (stacked on a narrow screen), and the panes' tabs. */
+main.play {
+  max-width: none;
+  padding: 0 16px 16px;
+}
+.play .bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  padding: 10px 0;
+}
+.play .bar label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.95em;
+}
+.play .bar input[type=text] {
+  width: 16em;
+  font: inherit;
+  padding: 3px 6px;
+}
+.play .bar button {
+  font: inherit;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.play .bar button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.play #status {
+  margin-left: auto;
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+.play .panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-height: 60vh;
+}
+@media (max-width: 900px) {
+  .play .panes { grid-template-columns: 1fr; }
+}
+.play .pane {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 60vh;
+}
+.play .tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px 0;
+  background: rgba(127, 127, 127, 0.12);
+  border-bottom: 1px solid rgba(127, 127, 127, 0.4);
+}
+.play .tab {
+  font: inherit;
+  font-size: 0.9em;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: none;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.play .tab.active {
+  opacity: 1;
+  background: inherit;
+  border-color: rgba(127, 127, 127, 0.4);
+}
+.play textarea, .play pre.view {
+  flex: 1;
+  margin: 0;
+  padding: 10px;
+  border: none;
+  resize: none;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+  background: inherit;
+  color: inherit;
+}
+.play textarea:focus { outline: none; }
+.play pre.view { display: none; }
+.play pre.view.active { display: block; }
+.play pre.view .err { color: #c0392b; }
+.play .note {
+  font-size: 0.9em;
+  opacity: 0.85;
+  margin: 12px 0 0;
+}

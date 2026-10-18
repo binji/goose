@@ -12,7 +12,8 @@ and each sample program gets a highlighted page of its own.
 python docs/site/build.py --out build/site --check
 ```
 
-needs pandoc 2.11 or later on PATH. The pages land in `build/site`; open
+needs pandoc 2.11 or later on PATH, and the playground's module built
+first for the playground to be part of the site. The pages land in `build/site`; open
 `build/site/index.html` in a browser. `--check` verifies every internal
 link and fragment of the built site, including the `spec §` links between
 documents, and fails on a broken one.
@@ -24,6 +25,14 @@ documents, and fails on a broken one.
 | `style.css` | the one stylesheet |
 | `links.lua` | a pandoc filter: `.md` links become `.html`, `.goose` links reach the sample pages, and the `<details>` table of contents each file carries for GitHub is dropped in favour of the sidebar |
 | `goose.xml` | Goose syntax highlighting for pandoc, in the KDE syntax definition format |
+| `play/` | the playground: `index.html`, `play.mjs` and `play.css` are the page, `wasi.mjs` the WASI shim it runs `goose.wasm` on (`docs/design/interpreter.md` §9), `wasi_test.mjs` the shim's test under node |
+
+The playground needs the compiler built to WebAssembly: `--wasm` names the
+module (default `build/wasm/goose.wasm`, where `test/wasm_build.py` puts
+it); the build copies it into `play/` with `files.json`, the standard
+library and the text samples the page's file tree starts with, and links
+the page from every page's navigation. Without the module the playground
+is left out and the build says so.
 
 Pandoc reads the files as GitHub-flavored markdown, so heading anchors
 are the ones GitHub makes (`#33-the-array-family`), and the cross-document

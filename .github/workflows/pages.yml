@@ -24,13 +24,33 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+
+      # The playground (docs/site/play) runs the compiler built to
+      # WebAssembly (docs/design/interpreter.md section 8): wasi-sdk's
+      # clang, the toolchain file, and node to check the module before the
+      # page ships with it. The site build leaves the page out where the
+      # module is missing, so a failure here is a missing playground, not a
+      # broken site.
+      - name: Install wasi-sdk
+        run: |
+          wget -q https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-linux.tar.gz
+          tar xzf wasi-sdk-34.0-x86_64-linux.tar.gz
+          echo "WASI_SDK_PATH=$PWD/wasi-sdk-34.0-x86_64-linux" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build the compiler to WebAssembly and check it
+        run: |
+          sudo apt-get install -y ninja-build
+          python test/wasm_build.py
+          node --no-warnings docs/site/play/wasi_test.mjs build/wasm/goose.wasm
 
       # A pinned pandoc rather than the distribution's, so that the build
       # here and on a developer's machine agree on the HTML.

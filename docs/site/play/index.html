@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="play.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<main class="play">
+  <div class="bar">
+    <label>Sample <select id="sample"><option value="">(your program)</option></select></label>
+    <label>Optimize <select id="opt"><option>-O0</option><option>-O1</option><option selected>-O2</option></select></label>
+    <label>Arguments <input id="args" type="text" placeholder="program arguments" spellcheck="false"></label>
+    <button id="run" disabled>Run</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="check" disabled>Check</button>
+    <button id="emit" disabled>Generated C</button>
+    <span id="status">loading goose.wasm…</span>
+  </div>
+  <div class="panes">
+    <section class="pane editor">
+      <div class="tabs"><span class="tab active">prog.goose</span></div>
+      <textarea id="source" spellcheck="false" wrap="off"></textarea>
+    </section>
+    <section class="pane right">
+      <div class="tabs">
+        <button class="tab active" data-tab="output">Output</button>
+        <button class="tab" data-tab="messages">Messages</button>
+        <button class="tab" data-tab="cfile">Generated C</button>
+      </div>
+      <pre id="output" class="view active"></pre>
+      <pre id="messages" class="view"></pre>
+      <pre id="cfile" class="view"></pre>
+    </section>
+  </div>
+  <p class="note">The compiler runs in your browser as WebAssembly, and its interpreter runs the program
+  (<a href="../docs/design/interpreter.html">how</a>). Programs run some 15 to 30 times slower than a native
+  build, so the samples that time themselves take a few seconds; Stop ends a run between frames of work.
+  Standard input is empty; <code>-o /out.c</code> is what the Generated C button runs.</p>
+</main>
+<script type="module" src="play.mjs"></script>
+</body>
+</html>

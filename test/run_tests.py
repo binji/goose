@@ -77,6 +77,7 @@ import json
 import concurrent.futures
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -2236,6 +2237,27 @@ def main():
             r.fail("wasm build", text)
     r.section("the compiler as WebAssembly (wasi-sdk)")
     r.show_task(wasm_build)
+
+    # The playground's WASI shim (docs/site/play/wasi.mjs) under node, and
+    # through goose.wasm where a Wasm build is at hand.
+    def wasi_shim():
+        node = shutil.which("node")
+        if not node:
+            r.say("skip the playground's WASI shim test (no node)")
+            return
+        wasm = tc.REPO_ROOT / "build" / "wasm" / "goose.wasm"
+        argv = [node, "--no-warnings", str(tc.REPO_ROOT / "docs" / "site" / "play" / "wasi_test.mjs")]
+        if wasm.exists():
+            argv.append(str(wasm))
+        result = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        text = tc.decode(result.stdout).rstrip("\n")
+        if result.returncode == 0:
+            r.ok(f"playground WASI shim ({len([l for l in text.splitlines() if l.startswith('ok')])} checks"
+                 f"{'' if wasm.exists() else ', no goose.wasm for the end-to-end ones'})")
+        else:
+            r.fail("playground WASI shim", text)
+    r.section("the playground's WASI shim (node)")
+    r.show_task(wasi_shim)
 
     parse_errors = sorted((HERE / "errors").glob("*.goose"))
     parse_runs = r.goose_each(["--parse"], parse_errors)

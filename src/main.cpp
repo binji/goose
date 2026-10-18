@@ -1149,9 +1149,6 @@ int Main(int argc, char **argv) {
         else files.push_back(arg);
     }
     if (verbose || dryrun) ProgressPlain();
-    // The runtime's interpreter branch, written into the C as a -D is, so
-    // the text the interpreter gets is one a C compiler could also build.
-    if (interp) cdefines.push_back("GS_INTERP=1");
     if (verb == "toolchain") {
         try {
             auto tools = FindTools(ccrequest, refresh);
@@ -1217,6 +1214,11 @@ int Main(int argc, char **argv) {
     // which is what --jit asks for explicitly; a build writes the C to its
     // build directory instead.
     auto jit = verb != "build" && (forcejit || outname.empty());
+    // The runtime's interpreter branch, written into the C as a -D is, so
+    // the text the interpreter gets is one a C compiler could also build;
+    // only for a run in this process, so that -o writes the C a native
+    // build gets whichever backend this compiler runs programs with.
+    if (interp && jit) cdefines.push_back("GS_INTERP=1");
     if (!headername.empty() && (jit || multitest)) {
         fprintf(stderr, "--header requires C output for a single input file\n");
         return 1;

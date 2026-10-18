@@ -69,7 +69,11 @@ names a wasi-sdk, `test/wasm_build.py` (a section of the runner, a skip
 without the sdk or node) builds the compiler to WebAssembly with
 `cmake/wasm32-wasi.cmake` and runs the hello-world fixture and the sieve
 sample through `goose.wasm` under node's WASI (`scripts/wasm_run.mjs`),
-against the same blessed output.
+against the same blessed output. Where node is installed, the playground's
+own WASI shim (`docs/site/play/wasi.mjs`) is tested too
+(`wasi_test.mjs`): its file calls through a memory of their own, and with
+a `build/wasm/goose.wasm` at hand the hello-world fixture, a generated-C
+run and a type error through the shim end to end.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose

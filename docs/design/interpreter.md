@@ -595,14 +595,22 @@ binary a canvas.
   shim that does the same. Files a program writes land in the tree and can
   be shown; `-o /out.c` lets the page show the generated C in a tab, which
   is a good part of the demonstration, as are `--check` diagnostics while
-  the visitor types and `--specs` and `--stacks`.
+  the visitor types and `--specs` and `--stacks`. (Step 13's shim,
+  `docs/site/play/wasi.mjs`, implements the 21 imports the module has,
+  which include `fd_prestat_*`, `path_rename`, `path_remove_directory` and
+  `poll_oneoff`; a sleep returns at once, since a page cannot block. The
+  site build writes the tree's starting files into `files.json`.)
 * **Running.** The page calls `goose_run("run /prog.goose -O2 -- args")`
   and then `goose_resume()` from `requestAnimationFrame` until the run
   reports it is finished, with the exit status. The VM yields on its time
   budget as well as at frames, so a long-running text program leaves the
   page responsive and Stop is a flag the next resume sees, with no Web
   Worker needed; the text-only binary can still be run in a Worker if a
-  page prefers, since nothing in it touches the DOM.
+  page prefers, since nothing in it touches the DOM. The module is
+  instantiated afresh for every run, since a run leaves its state behind
+  and the compiler is not written to run twice in one process; a sieve of
+  ten million runs in about ten seconds this way, against four under node
+  without the frame scheduling and two natively.
 * **Graphics.** The `gfx` and `audio` import modules of section 7.3,
   implemented over a canvas's WebGL 2 context and an `AudioContext`, and
   DOM listeners that queue events for the next resume.

@@ -16,6 +16,7 @@ fails the build on a broken one, which is how the Pages workflow runs it.
 import argparse
 import glob
 import html
+import json
 import os
 import re
 import shutil
@@ -63,12 +64,17 @@ def title_of(md_text, fallback):
     return fallback
 
 
+# Set when the playground is part of the site (goose.wasm was found): the
+# pages' navigation then links to it.
+PANDOC_VARS = []
+
+
 def pandoc(args, pandoc_exe, stdin_text=None, src=None, out=None):
     cmd = [pandoc_exe, "--from", "gfm", "--to", "html5", "--standalone",
            "--template", os.path.join(SITE, "template.html"),
            "--lua-filter", os.path.join(SITE, "links.lua"),
            "--syntax-definition", os.path.join(SITE, "goose.xml"),
-           "--highlight-style", "tango"] + args
+           "--highlight-style", "tango"] + PANDOC_VARS + args
     if src:
         cmd.append(src)
     if out:
@@ -166,17 +172,64 @@ def check(out_dir):
     return bad == 0
 
 
+# The playground (docs/design/interpreter.md section 9): play/ holds the
+# page and the WASI shim; the build adds files.json, the files the page's
+# tree starts with (the standard library, the text samples and their data),
+# and goose.wasm from the Wasm build (cmake/wasm32-wasi.cmake), when there
+# is one. Without the module the page is left out and the site says so.
+def play_files():
+    files = {}
+    for p in sorted(glob.glob(os.path.join(ROOT, "stdlib", "*.goose"))):
+        files["/stdlib/" + os.path.basename(p)] = open(p, encoding="utf-8").read()
+    skipped = []
+    for p in sorted(glob.glob(os.path.join(ROOT, "samples", "*.goose"))):
+        text = open(p, encoding="utf-8").read()
+        # The samples that need a thread or a native layer the text page
+        # does not have are left out.
+        if re.search(r"^import (gfx|audio|ui|physics);", text, re.M) or "thread_fn" in text:
+            skipped.append(os.path.basename(p))
+            continue
+        files["/samples/" + os.path.basename(p)] = text
+    for p in sorted(glob.glob(os.path.join(ROOT, "samples", "*.h"))):
+        files["/samples/" + os.path.basename(p)] = open(p, encoding="utf-8").read()
+    for p in sorted(glob.glob(os.path.join(ROOT, "samples", "data", "*"))):
+        if os.path.splitext(p)[1] in (".txt", ".args", ".stdin", ".json", ".md"):
+            files["/samples/data/" + os.path.basename(p)] = open(p, encoding="utf-8").read()
+    return files, skipped
+
+
+def build_play(out_dir, wasm):
+    if not wasm or not os.path.isfile(wasm):
+        print("no goose.wasm (%s): the playground is left out" % (wasm or "none given"))
+        return False
+    play_out = os.path.join(out_dir, "play")
+    os.makedirs(play_out, exist_ok=True)
+    for name in ("index.html", "play.mjs", "play.css", "wasi.mjs"):
+        shutil.copy(os.path.join(SITE, "play", name), os.path.join(play_out, name))
+    shutil.copy(wasm, os.path.join(play_out, "goose.wasm"))
+    files, skipped = play_files()
+    with open(os.path.join(play_out, "files.json"), "w", encoding="utf-8") as f:
+        json.dump(files, f, ensure_ascii=False)
+    print("playground: %d files in files.json (%d samples left out: %s), goose.wasm %.1f MB" %
+          (len(files), len(skipped), ", ".join(skipped), os.path.getsize(wasm) / 1048576))
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default=os.path.join(ROOT, "build", "site"), help="output directory (default build/site)")
     ap.add_argument("--pandoc", default="pandoc", help="the pandoc executable")
     ap.add_argument("--check", action="store_true", help="verify every internal link of the built site")
+    ap.add_argument("--wasm", default=os.path.join(ROOT, "build", "wasm", "goose.wasm"),
+                    help="the compiler built to WebAssembly for the playground (default build/wasm/goose.wasm)")
     a = ap.parse_args()
     out_dir = os.path.abspath(a.out)
     if os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
     os.makedirs(out_dir)
     shutil.copy(os.path.join(SITE, "style.css"), os.path.join(out_dir, "style.css"))
+    if build_play(out_dir, a.wasm):
+        PANDOC_VARS.extend(["-V", "play=1"])
     for src_rel, out_rel in PAGES:
         if os.path.exists(os.path.join(ROOT, src_rel)):
             build_page(src_rel, out_rel, out_dir, a.pandoc)
