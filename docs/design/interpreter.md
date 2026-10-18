@@ -392,8 +392,21 @@ struct. A thunk reads handles and lengths as 64-bit fields and decodes
 each handle through `goose_vm_decode`, so the same thunk serves the 64-bit
 host and the 32-bit Wasm one; a struct that crosses by value holds no
 pointers, so its bytes are the same on both. A package whose layer has no
-such list cannot be built into the interpreter; gfx, audio and ui have one,
-and physics is expected to, being written the same way. A package declared
+such list cannot be built into the interpreter; gfx, audio and ui have one
+(456 functions over the three headers), and physics has one too
+(`src/physics_api.h`, 502 functions), whose results include structs of a
+few hundred bytes, so the VM sizes a result's room by the return type.
+The two packages' sidecars need the keys, which is a change in their
+repositories:
+
+```
+thunk_api = ["src/gfx/gfx_api.h", "src/ui/ui_api.h", "src/audio/audio_api.h"];
+thunk_yields = ["gs_gfx_frame"];
+```
+
+in `gfx.build`, and `thunk_api = ["src/physics_api.h"];` in
+`physics.build`; the tree's runner and driver are ready for them, and were
+tested against fetched copies with the keys added. A package declared
 by path from the very directory the compiler's build compiled it in from
 counts as built in, which is how the in-tree test package
 (`test/packages/pkgs/interptest`, `GOOSE_INTERP_TEST_PACKAGE`) reaches its

@@ -61,6 +61,10 @@ interpreter's calls into a native package go through generated thunks
 exercises against the in-tree package `test/packages/pkgs/interptest` when
 the compiler was configured with `-DGOOSE_INTERP_TEST_PACKAGE=ON`; without
 it the fixture is skipped under `--interp`, and runs natively either way.
+The `gfx/`, `ui/`, `physics/` and `audio/` fixtures and the samples that use
+those modules run through the interpreter where their package is compiled
+in (`GOOSE_BUILTIN_LIBS`) and its sidecar names a `thunk_api`, headless
+as the TinyCC runs are; elsewhere they are skipped.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose

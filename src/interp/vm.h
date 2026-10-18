@@ -452,15 +452,15 @@ public:
                 StoreVal(buf.data() + off, VTOf(pt), v);
             }
         }
-        uint8_t ret[64] = {};
-        t->fn(reinterpret_cast<goose_vm *>(this), buf.data(), ret);
+        // The result's room: a record's size, as the prototype has it, which
+        // is the host's too since a record that crosses holds no pointers.
+        auto rt = ft->elem;
+        vector<uint8_t> ret((size_t)max<int64_t>(rt->size, 8));
+        t->fn(reinterpret_cast<goose_vm *>(this), buf.data(), ret.data());
         if (t->yields) RequestYield();
-        if (f.sret) {
-            auto rt = ft->elem;
-            memcpy(Access(args[0], (uint64_t)rt->size), ret, (size_t)rt->size);
-        }
+        if (f.sret) memcpy(Access(args[0], (uint64_t)rt->size), ret.data(), (size_t)rt->size);
         sp -= (size_t)nargs;
-        if (f.ret != VT_VOID) Push(Normalize(LoadVal(ret, f.ret), f.ret));
+        if (f.ret != VT_VOID) Push(Normalize(LoadVal(ret.data(), f.ret), f.ret));
     }
 
     void Ret(VT t) {

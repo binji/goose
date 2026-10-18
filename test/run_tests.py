@@ -139,7 +139,8 @@ def runtime_defines(source):
 
 # The fixture directories the interpreter runs under --interp: those the
 # interpreter has been widened to (docs/design/interpreter.md §14, step 7).
-INTERP_AREAS = ("codegen", "runtime", "stdlib", "storage", "lifetimes", "optimizer", "packages")
+INTERP_AREAS = ("codegen", "runtime", "stdlib", "storage", "lifetimes", "optimizer", "packages",
+                "gfx", "ui", "physics", "audio")
 
 
 # What `goose --multi-test` ends each file's part of stdout and of stderr
@@ -930,14 +931,20 @@ class Runner:
         left out here too, and one the interpreter refuses (threads, a
         native package) is a skip to report, not a failure."""
         name = f.stem
-        if "no-jit" in line or res.modules:
+        # A native module's fixture runs where its package is compiled in,
+        # through the package's thunks (§7.1), headless as the JIT runs are.
+        if "no-jit" in line or any(not self.native[m] for m in res.modules):
             res.interpskips.append(f.name)
             return
         runs = {}
         for ol in ("0", "2"):
-            code, out, err = self.goose(f"-O{ol}", "--interp", f)
+            with self.gpu(res.modules):
+                code, out, err = self.goose(f"-O{ol}", "--interp", f)
             if code != 0 and tc.INTERP_UNSUPPORTED in err:
                 res.interpskips.append(f.name)
+                return
+            if any(tc.native_unavailable(m, err) for m in res.modules):
+                res.nativeskips.append(f.name)
                 return
             out = self.check_run(name, f"interp -O{ol} {f.name}", code, out, err)
             if out is None:

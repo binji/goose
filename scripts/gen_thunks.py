@@ -20,8 +20,8 @@ handle and a 64-bit length, a pointer as a 64-bit handle. A thunk reads
 handles and lengths as 64-bit fields and decodes each handle to a host
 pointer through goose_vm_decode, so the same thunk serves a 64-bit host and
 the 32-bit Wasm one. A struct that crosses by value holds no pointers, so
-its bytes are the same on both. The result goes into a 64-byte buffer the
-VM reads by the prototype's return type.
+its bytes are the same on both. The result goes into a buffer the
+VM sized by the prototype's return type, and reads back by it.
 """
 
 import os
@@ -151,7 +151,7 @@ def thunk(ret, name, params, types):
         kind, _ = classify(ret, types)
         if kind not in ("scalar", "struct"):
             raise SystemExit(f"{name}: returns a type this script does not know: {ret}")
-        lines.append(f"    {{ {ret} r = {call}; GOOSE_THUNK_RET_FITS({ret}); memcpy(ret, &r, sizeof r); }}")
+        lines.append(f"    {{ {ret} r = {call}; memcpy(ret, &r, sizeof r); }}")
     lines.append("}")
     return "\n".join(lines)
 
@@ -191,12 +191,7 @@ def main():
             "typedef struct goose_vm goose_vm;",
             "void *goose_vm_decode(goose_vm *vm, uint64_t handle, uint64_t len);",
             "typedef void (*goose_thunk_fn)(goose_vm *vm, const uint8_t *args, uint8_t *ret);",
-            "typedef struct { const char *name; goose_thunk_fn fn; int yields; } goose_thunk;",
-            "#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L",
-            "#define GOOSE_THUNK_RET_FITS(T) _Static_assert(sizeof(T) <= 64, \"a thunk's result fits 64 bytes\")",
-            "#else",
-            "#define GOOSE_THUNK_RET_FITS(T) (void)0",
-            "#endif", ""]
+            "typedef struct { const char *name; goose_thunk_fn fn; int yields; } goose_thunk;", ""]
     for ret, name, params in entries:
         src.append(thunk(ret, name, params, types))
         src.append("")
