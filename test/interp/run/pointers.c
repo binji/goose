@@ -40,6 +40,12 @@ int main(void) {
     show("p == table", p == table);
     show("q == table + 4", q == table + 4);
     show("&table[5] - table", &table[5] - table);   /* one past the end */
+    /* One before the start, which C forms as an origin and never reads:
+       codegen's relative references measure from a pool's base - 1. */
+    int *origin = table - 1;
+    show("table - origin", table - origin);
+    show("&table[2] - origin", &table[2] - origin);
+    show("origin + 1 == table", origin + 1 == table);
     p += 3;
     show("*p after += 3", *p);
     p -= 2;

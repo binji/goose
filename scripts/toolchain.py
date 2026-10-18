@@ -92,6 +92,8 @@ def find_goose(explicit=None):
 # The runners report those as skips rather than failures, so the coverage
 # returns by itself once the backend grows the feature.
 JIT_UNSUPPORTED = "JIT mode does not support"
+# And for one the interpreter cannot run yet (threads, native packages).
+INTERP_UNSUPPORTED = "the interpreter does not"
 
 # What the compiler says when a program needs a C compiler (a native part
 # to build) and the machine has none it can find: a skip, like a layer

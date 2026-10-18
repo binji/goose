@@ -51,8 +51,10 @@ both builds the C and runs the program through TinyCC, one `goose -O<n> --jit
 -o <file>` does both: it writes the C, then runs the program in-process.
 With `--interp`, the runner also runs programs through the interpreter
 (`goose -O0 --interp`, [design/interpreter.md](design/interpreter.md) §11)
-and compares their output and exit code with the TinyCC run's; at this
-stage that covers the hello-world fixture and the sieve sample.
+at both levels against the same blessed output, for the fixture areas the
+interpreter has been widened to (`INTERP_AREAS` in the runner; a fixture
+the interpreter refuses, for threads or a native package, is a skip), and
+the sieve sample against its TinyCC run.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose

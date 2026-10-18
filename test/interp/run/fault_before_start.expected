@@ -1,0 +1,3 @@
+fault: access of 4 bytes at offset -4, before the start of static object 'table' (16 bytes)
+  in main (fault_before_start.c:5)
+exit status 134

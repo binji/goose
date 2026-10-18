@@ -203,8 +203,12 @@ on the handle unchanged:
 
 * `base + i * size`, field offsets, `t139 += 4`, a relative reference's
   `(uint8_t *)&field + off` with a negative `off`: addition to the low
-  half, checked to stay within `[0, limit]` of the segment. A carry into the
-  id is an interpreter fault, never a silent wrap.
+  half, checked to stay within the segment's reach, `[-2^31, limit]`. The
+  offset is signed: a limit is at most 2 GB (`GS_STACK_RESERVE`), so the
+  negative half holds the pointers C forms before an object and never
+  dereferences, such as the `base - 1` codegen uses as a pool's
+  relative-reference origin, and an access through one faults. A carry
+  into the id is an interpreter fault, never a silent wrap.
 * `a - b` on pointers, and the `uintptr_t` difference of a pool's range
   test: both must name one segment (else a fault), and the result is the
   difference of offsets.

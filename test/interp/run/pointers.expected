@@ -6,6 +6,9 @@ p < q = 1
 p == table = 1
 q == table + 4 = 1
 &table[5] - table = 5
+table - origin = 1
+&table[2] - origin = 3
+origin + 1 == table = 1
 *p after += 3 = 40
 *p after -= 2 = 20
 *p++ = 20

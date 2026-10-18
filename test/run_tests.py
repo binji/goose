@@ -137,6 +137,11 @@ def runtime_defines(source):
     return re.findall(r"^// runtime-define: (\w+=\w+)$", first_line(source))
 
 
+# The fixture directories the interpreter runs under --interp: those the
+# interpreter has been widened to (docs/design/interpreter.md §14, step 7).
+INTERP_AREAS = ("codegen",)
+
+
 # What `goose --multi-test` ends each file's part of stdout and of stderr
 # with, on a line of its own, followed by the file's exit code and name.
 MULTIMARK = "==== goose --multi-test: exit"
@@ -305,8 +310,8 @@ class Fixture:
 
     def __init__(self):
         self.front, self.bce, self.cgen, self.dump = Out(), Out(), Out(), Out()
-        self.debug, self.jit, self.jitdebug = Out(), Out(), Out()
-        self.nativeskips, self.jitskips = [], []
+        self.debug, self.jit, self.jitdebug, self.interp = Out(), Out(), Out(), Out()
+        self.nativeskips, self.jitskips, self.interpskips = [], [], []
         # What fixture() found and generated, for the rest of the fixture.
         self.line, self.dumped = "", False
         # By build_options key, the compiler run that wrote the C and where.
@@ -691,6 +696,9 @@ class Runner:
             return res
         built = {key: b.result().get(f) for key, b in builds.items()}
         self.programs(f, res, built)
+        if self.interp and f.parent.name in INTERP_AREAS:
+            with self.into(res.interp):
+                self.interp_program(f, line, res)
         if self.cc and res.dumped:
             with self.into(res.dump):
                 self.dump_program(f, res, built.get("dump"))
@@ -907,6 +915,31 @@ class Runner:
                 self.fail(f"jit-output-differs-by-O {f.name}")
             elif self.check_stdout(name, f"jit {f.name}", runs["2"]):
                 self.ok(f"jit {f.name}")
+
+    def interp_program(self, f, line, res):
+        """Runs the program through the interpreter at both levels, as the
+        JIT runs do (docs/design/interpreter.md §11), against the same
+        blessed output. A fixture the TinyCC runs leave out (no-jit) is
+        left out here too, and one the interpreter refuses (threads, a
+        native package) is a skip to report, not a failure."""
+        name = f.stem
+        if "no-jit" in line or res.modules:
+            res.interpskips.append(f.name)
+            return
+        runs = {}
+        for ol in ("0", "2"):
+            code, out, err = self.goose(f"-O{ol}", "--interp", f)
+            if code != 0 and tc.INTERP_UNSUPPORTED in err:
+                res.interpskips.append(f.name)
+                return
+            out = self.check_run(name, f"interp -O{ol} {f.name}", code, out, err)
+            if out is None:
+                return
+            runs[ol] = out
+        if len(set(runs.values())) != 1:
+            self.fail(f"interp-output-differs-by-O {f.name}")
+        elif self.check_stdout(name, f"interp {f.name}", runs["2"]):
+            self.ok(f"interp {f.name}")
 
     def dump_program(self, f, res, argv):
         """A stable dump can still change grouping and therefore semantics:
@@ -1424,6 +1457,7 @@ def main():
     gendir = builddir / "gen" / args.profile
     gendir.mkdir(parents=True, exist_ok=True)
     r.cc, r.native, r.profile, r.extra, r.jit = cc, native, args.profile, extra, jit
+    r.interp = args.interp
     r.levels = ("0", "2") if args.profile == "baseline" else ("2",)
     r.gendir, r.dumpdir = gendir, dumpdir
     deepdir = gendir
@@ -2140,17 +2174,26 @@ def main():
 
     # --- Interpreter: the same programs, interpreted inside the compiler ----
     # The C the JIT would build, run by the interpreter instead
-    # (docs/design/interpreter.md §11): the output and exit code must be the
-    # TinyCC run's. For now the smallest program and one sample; the suite
-    # widens as the interpreter does.
+    # (docs/design/interpreter.md §11), against the same blessed output, for
+    # the fixture areas the interpreter has reached (INTERP_AREAS), and one
+    # sample compared with its TinyCC run until the samples' runner takes
+    # the flag.
     r.section("interpreter runs")
     if not args.interp:
         r.show_later(r.say, "skip interpreter runs (--interp runs them)")
     else:
-        interp_files = [HERE / "codegen" / "hello_world.goose",
-                        tc.REPO_ROOT / "samples" / "07_sieve.goose"]
+        for f in tests:
+            if f.parent.name in INTERP_AREAS:
+                r.show(lambda f=f: fixtures[f].result().interp)
 
-        def interp_run(f):
+        def interp_skips():
+            skipped = [name for f in tests for name in fixtures[f].result().interpskips]
+            if skipped:
+                r.say(f"skip {len(skipped)} interpreter test(s) it cannot run yet: "
+                      + ", ".join(sorted(set(skipped))))
+        r.show_later(interp_skips)
+
+        def interp_sample(f):
             jcode, jout, jerr = r.goose("-O0", "--jit", f)
             icode, iout, ierr = r.goose("-O0", "--interp", f)
             if icode != jcode or joined(iout) != joined(jout):
@@ -2158,8 +2201,7 @@ def main():
                                            f"--- TinyCC (exit {jcode}):\n{jout}{jerr}")
             else:
                 r.ok(f"interp {f.name}")
-        for f in interp_files:
-            r.show_task(interp_run, f)
+        r.show_task(interp_sample, tc.REPO_ROOT / "samples" / "07_sieve.goose")
 
     parse_errors = sorted((HERE / "errors").glob("*.goose"))
     parse_runs = r.goose_each(["--parse"], parse_errors)

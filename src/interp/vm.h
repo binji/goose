@@ -44,9 +44,15 @@ struct Segment {
     int func = -1;               // SEG_FUNC: the function
 };
 
-inline uint64_t Handle(uint32_t id, uint64_t off) { return ((uint64_t)id << 32) | off; }
+// The offset is a signed 32-bit number: a segment's limit is at most 2 GB
+// (GS_STACK_RESERVE, §5), so the negative half is for pointers before a
+// segment's start, which C forms and never dereferences (codegen's
+// relative-reference origin is a pool's base minus one). Access, as
+// unsigned, finds them past every size.
+inline uint64_t Handle(uint32_t id, uint64_t off) { return ((uint64_t)id << 32) | (uint32_t)off; }
 inline uint32_t SegOf(uint64_t h) { return (uint32_t)(h >> 32); }
 inline uint64_t OffOf(uint64_t h) { return (uint32_t)h; }
+inline int64_t SOffOf(uint64_t h) { return (int32_t)(uint32_t)h; }
 
 struct VM;
 using Native = uint64_t (*)(VM &vm, const uint64_t *args, int nargs);
@@ -155,7 +161,7 @@ struct VM {
     Segment &Seg(uint64_t h) {
         auto id = SegOf(h);
         if (id == 0) throw Fault { cat("null pointer access (address ", OffOf(h), ")") };
-        if (id >= segs.size()) throw Fault { cat("invalid pointer ", id, ":", OffOf(h)) };
+        if (id >= segs.size()) throw Fault { cat("invalid pointer ", id, ":", SOffOf(h)) };
         return segs[id];
     }
 
@@ -176,8 +182,10 @@ struct VM {
     GS_NOINLINE_ATTR uint8_t *AccessSlow(uint64_t h, uint64_t n) {
         auto &s = Seg(h);
         auto off = OffOf(h);
-        if (!s.alive) throw Fault { cat("use after free: ", n, " bytes at offset ", off, " of a ", Describe(s)) };
+        if (!s.alive) throw Fault { cat("use after free: ", n, " bytes at offset ", SOffOf(h), " of a ", Describe(s)) };
         if (s.kind == SEG_FUNC) throw Fault { cat("data access to ", Describe(s)) };
+        if (SOffOf(h) < 0)
+            throw Fault { cat("access of ", n, " bytes at offset ", SOffOf(h), ", before the start of ", Describe(s)) };
         if (off + n > s.size) {
             if (s.kind == SEG_STACK && off + n <= s.limit) Grow(s, off + n);
             else if (s.kind == SEG_STACK)
@@ -197,16 +205,18 @@ struct VM {
         s.size = size;
     }
 
-    // Pointer arithmetic stays within the segment: [0, size], or a stack's
-    // limit. An integer cast to a pointer (segment 0) is plain arithmetic.
+    // Pointer arithmetic stays within reach of the segment: up to its
+    // size, or a stack's limit, and below zero as far as the offset's
+    // signed half goes. An integer cast to a pointer (segment 0) is plain
+    // arithmetic.
     uint64_t PtrAdd(uint64_t p, int64_t delta) {
         auto id = SegOf(p);
         if (id == 0) return p + (uint64_t)delta;
-        if (id >= segs.size()) throw Fault { cat("invalid pointer ", id, ":", OffOf(p)) };
+        if (id >= segs.size()) throw Fault { cat("invalid pointer ", id, ":", SOffOf(p)) };
         auto &s = segs[id];
-        auto off = (int64_t)OffOf(p) + delta;
+        auto off = SOffOf(p) + delta;
         auto lim = s.kind == SEG_STACK ? s.limit : s.size;
-        if (off < 0 || (uint64_t)off > lim)
+        if (off < INT32_MIN || off > (int64_t)lim)
             throw Fault { cat("pointer arithmetic leaves ", Describe(s), ": offset ", off) };
         return Handle(id, (uint64_t)off);
     }
@@ -216,7 +226,7 @@ struct VM {
             throw Fault { cat("difference of pointers into different segments (",
                               SegOf(a) ? Describe(Seg(a)) : "null", " and ",
                               SegOf(b) ? Describe(Seg(b)) : "null", ")") };
-        return ((int64_t)OffOf(a) - (int64_t)OffOf(b)) / size;
+        return (SOffOf(a) - SOffOf(b)) / size;
     }
 
     // ---- Values in memory, little-endian, as the host is
@@ -734,7 +744,7 @@ struct VM {
         auto &s = Seg(h);
         if (s.kind != SEG_HEAP && s.kind != SEG_STACK) throw Fault { cat("free of ", Describe(s)) };
         if (!s.alive) throw Fault { cat("double free of ", Describe(s)) };
-        if (OffOf(h) != 0) throw Fault { cat("free of an interior pointer (offset ", OffOf(h), ") of ", Describe(s)) };
+        if (OffOf(h) != 0) throw Fault { cat("free of an interior pointer (offset ", SOffOf(h), ") of ", Describe(s)) };
         s.alive = false;
         s.mem = {};
     }
