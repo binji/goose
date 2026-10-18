@@ -302,7 +302,18 @@ enforces. The table:
   implements over WASI's `path_open`, `fd_read` and `fd_readdir`, and the
   page's shim over an in-memory directory tree.
 
-Some 60 to 80 entries. An `--include` header is C text in the same unit
+Some 150 entries, counting the `f` forms of the math functions, which are
+the double function rounded, as the VM's float arithmetic is. `fprintf`
+and `snprintf` cannot be forwarded to the host, since a variadic call has
+no way to be re-made; the interpreter parses the format itself and does
+each conversion through the host's `snprintf`, with the argument decoded by
+the conversion's type (`%d` an `int` in the slot, `%lld` and `%zu` a 64-bit
+one, `%s` a handle), and a format with more conversions than arguments is
+a fault rather than a read past them. The prelude's constants that name OS
+facts (`O_CREAT`, `EEXIST`, `S_IFDIR`, `CLOCK_MONOTONIC`) have Linux's
+values and the adapters translate them, so a program sees one numbering
+on every host; `errno` is a cell the VM owns, set from the host's after
+each call that can fail. An `--include` header is C text in the same unit
 and is interpreted with the program, so `samples/24_call_c.goose` runs in
 the browser with no C compiler.
 

@@ -897,13 +897,16 @@ struct CParser {
                 d->isstatic = ds.isstatic;
                 d->istls = ds.istls;
                 d->islocal = !ds.isstatic;
+                // The name's scope begins at the end of its declarator, so
+                // the initializer sees it (`int *p = malloc(sizeof *p)`).
+                Bind(at, name, CSym { CSym::S_VAR, d->type, d, 0 });
                 if (Accept("=")) {
                     d->init = ParseInit();
                     d->defined = true;
                     d->type = TypeInit(d->init, d->type);
+                    scope->syms[name].type = d->type;
                 }
                 if (!d->type->IsComplete()) Error(at, cat("variable '", name, "' has incomplete type ", TypeName(d->type)));
-                Bind(at, name, CSym { CSym::S_VAR, d->type, d, 0 });
                 if (ds.isstatic) unit.decls.push_back(d);
                 else {
                     curfn->locals.push_back(d);

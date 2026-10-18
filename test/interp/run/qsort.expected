@@ -1,0 +1,14 @@
+ints: 0 1 2 3 4 5 5 6 7 8 9
+desc: 9 8 7 6 5 5 4 3 2 1 0
+names: apple banana cherry date fig pear
+bob 70 3.5
+carol 70 1.5
+dave 85 4.5
+alice 90 2.5
+erin 90 5.5
+big: sorted 1, first 0, last 99, sum 100285
+empty and single: fine
+bsearch 7: index 8
+bsearch 11: absent
+strlen via pointer: 12, by_int via pointer: -1
+rand after srand(1): 16838 5758 10113

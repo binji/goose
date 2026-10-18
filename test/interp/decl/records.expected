@@ -1,3 +1,4 @@
+struct FILE (incomplete)
 struct Fwd (size 16, align 8)
     next: *struct Fwd @0
     v: int32_t @8
@@ -35,6 +36,16 @@ struct <anon> (size 8, align 4)
 struct WithArrays (size 56, align 8)
     m: [2][3]int32_t @0
     ns: [2]struct Natural @24
+typedef size_t = uint64_t
+typedef ssize_t = int64_t
+typedef ptrdiff_t = int64_t
+typedef intptr_t = int64_t
+typedef uintptr_t = uint64_t
+typedef off_t = int64_t
+typedef time_t = int64_t
+typedef mode_t = uint32_t
+typedef clockid_t = int32_t
+typedef FILE = struct FILE
 typedef int8_t = char
 typedef uint8_t = uint8_t
 typedef int16_t = int16_t
@@ -43,7 +54,8 @@ typedef int32_t = int32_t
 typedef uint32_t = uint32_t
 typedef int64_t = int64_t
 typedef uint64_t = uint64_t
-typedef uintptr_t = uint64_t
+typedef intmax_t = int64_t
+typedef uintmax_t = uint64_t
 typedef Fwd = struct Fwd
 typedef gs_rhdr = struct <anon>
 typedef Node_g = struct Node_g

@@ -15,6 +15,7 @@
 #include "../src/interp/ctypes.h"
 #include "../src/interp/cast.h"
 #include "../src/interp/cparse.h"
+#include "../src/interp/prelude.h"
 
 #include <filesystem>
 #include <stddef.h>
@@ -47,16 +48,17 @@ static void WriteAll(const fs::path &p, const string &s) {
     fclose(f);
 }
 
-// "a.h" beside the including file, <a.h> under the fixture directory's sys/.
-static PPIncludeFn Includer(const fs::path &sysdir) {
-    return [sysdir](const string &name, bool system, const string &from, string &text,
-                    string &path) {
-        auto p = system ? sysdir / name : fs::path(from) / name;
+// <a.h> from the prelude, "a.h" beside the including file.
+static PPIncludeFn Includer() {
+    return PreludeIncluder([](const string &name, bool system, const string &from, string &text,
+                              string &path) {
+        if (system) return false;
+        auto p = fs::path(from) / name;
         if (!fs::is_regular_file(p)) return false;
         text = ReadAll(p);
         path = p.generic_string();
         return true;
-    };
+    });
 }
 
 static string Relative(string s, const fs::path &dir) {
@@ -70,8 +72,8 @@ struct Parsed {
     TypeTable types;
     vector<PPToken> toks;
     unique_ptr<CParser> parser;
-    Parsed(const fs::path &file, const fs::path &sysdir) {
-        Preprocessor pp(Includer(sysdir));
+    explicit Parsed(const fs::path &file) {
+        Preprocessor pp(Includer());
         toks = pp.Run(ReadAll(file), file.generic_string());
         // The parser keeps a reference to the file table, so it is copied out
         // of the preprocessor, which does not outlive this constructor.
@@ -91,7 +93,7 @@ static void Fixtures(const fs::path &dir, bool bless) {
         auto name = f.filename().string();
         string got;
         try {
-            Parsed p(f, dir / "sys");
+            Parsed p(f);
             got = DumpUnit(p.parser->Unit(), p.types);
         } catch (CompileError &e) {
             got = cat("error: ", e.msg, "\n");
@@ -135,7 +137,7 @@ static bool OffsetOf(const CType *t, const string &path, int64_t &off) {
 static void Layout(const fs::path &dir) {
     unique_ptr<Parsed> parsed;
     try {
-        parsed = make_unique<Parsed>(dir / "types.h", dir / "sys");
+        parsed = make_unique<Parsed>(dir / "types.h");
     } catch (CompileError &e) {
         Fail("layout/types.h", e.msg);
         return;

@@ -1,0 +1,4 @@
+fine: 1
+fault: format "%d and %s\n" needs more than the 1 argument given
+  in main (fault_format.c:6)
+exit status 134

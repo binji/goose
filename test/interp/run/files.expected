@@ -1,0 +1,49 @@
+scratch dir is a directory: 1
+fopen for writing: 1
+fclose: 0, wrote 14
+read 32 bytes:
+line 1
+line 2
+line 3
+!
+appended
+feof 1 ferror 0
+fseek 0 ftell 5
+fgetc after seek: 1
+fgets: line 1
+fgets: line 2
+fgets: line 3
+fgets: !
+fgets: appended
+fgetc at end: -1
+stat: 0, regular 1, size 32
+fopen missing: 1, ENOENT 1, No such file or directory
+stat missing: -1
+open O_EXCL: 1
+write: 11
+fsync: 0, close: 0
+open O_EXCL again: -1, EEXIST 1
+rename: 0
+old gone 1, new there 1
+read back: 11 "posix bytes"
+after append: size 12
+after truncate: size 0
+mkdir: 0, is dir 1
+mkdir again: -1, EEXIST 1
+opendir: 1
+readdir end with errno 0, 3 entries
+  x
+  y
+  z
+opendir missing: 1, ENOENT 1
+rmdir nonempty: -1, ENOTEMPTY or EEXIST 1
+unlink x: 0
+unlink y: 0
+unlink z: 0
+rmdir: 0, gone 1
+remove: 0 0, unlink missing: -1
+errno is ENOENT: 1
+stderr bytes
+fwrite to stderr: 13
+fflush(stdout): 0, fflush(NULL): 0
+setvbuf: 0

@@ -8,9 +8,11 @@
 // stacks move without the emitted code noticing. Out-of-range accesses,
 // use after free and arithmetic that leaves a segment are faults, reported
 // with the interpreted call stack. The C library the program calls is a
-// table of adapters over the host's library (§6); this step holds what the
-// fixtures need, step 4 the rest.
+// table of adapters over the host's library (§6), in clib.h; this file has
+// the primitives they decode through: accesses, strings and streams.
 #pragma once
+
+#include <errno.h>
 
 namespace goose {
 namespace interp {
@@ -51,9 +53,13 @@ struct Frame {
 struct VM {
     const Program &prog;
 
-    // Output: what fwrite and friends write to the two streams.
+    // The standard streams: what fwrite and friends write to stdout (1) and
+    // stderr (2), and what fread and friends read from stdin.
     function<void(int fd, string_view data)> write = [](int fd, string_view data) {
         fwrite(data.data(), 1, data.size(), fd == 2 ? stderr : stdout);
+    };
+    function<size_t(char *buf, size_t n)> read = [](char *buf, size_t n) {
+        return fread(buf, 1, n, stdin);
     };
     // The frame segment's limit: the native stack size, which caps recursion.
     uint64_t framelimit = 8u << 20;
@@ -65,9 +71,12 @@ struct VM {
         statichandles.assign(prog.statics.size(), 0);
         funchandles.assign(prog.funcs.size(), 0);
         natives.assign(prog.funcs.size(), nullptr);
-        auto out = NewSeg(SEG_STATIC, "stdout", 1), err = NewSeg(SEG_STATIC, "stderr", 1);
-        stdouth = Handle(out, 0);
-        stderrh = Handle(err, 0);
+        for (int fd = 0; fd < 3; fd++) {
+            auto h = Handle(NewSeg(SEG_STATIC, fd == 0 ? "stdin" : fd == 1 ? "stdout" : "stderr", 1), 0);
+            streams[h].fd = fd;
+            libobjects[fd == 0 ? "stdin" : fd == 1 ? "stdout" : "stderr"] = h;
+        }
+        errnoh = Handle(NewSeg(SEG_STATIC, "errno", 4), 0);
         Library();
     }
 
@@ -111,7 +120,6 @@ struct VM {
     vector<Segment> segs;
     uint32_t frameseg = 0;
     uint64_t frametop = 0;
-    uint64_t stdouth = 0, stderrh = 0;
 
     uint32_t NewSeg(SegKind kind, string name, uint64_t size) {
         if (segs.size() >= 0xffffffffu) throw Fault { "too many segments" };
@@ -549,16 +557,48 @@ struct VM {
         write(2, s);
     }
 
-    // ---- The C library
+    // ---- What the C library adapters decode through (clib.h has the table)
 
     unordered_map<string, Native> library;
     unordered_map<string, uint64_t> libobjects;   // extern variables: their values
+    uint64_t errnoh = 0;                          // errno's cell
 
-    // The stream a FILE * handle names.
-    int Fd(uint64_t h) {
-        if (h == stdouth) return 1;
-        if (h == stderrh) return 2;
-        throw Fault { "not a stream" };
+    // A FILE *: one of the three standard streams, or a file the program
+    // opened. A handle names one; the segment behind it has no bytes of its
+    // own and dies when the file closes.
+    struct Stream {
+        int fd = -1;                 // 0, 1, 2 for the standard streams; -1 for a file
+        FILE *file = nullptr;
+        bool eof = false, err = false;
+    };
+    unordered_map<uint64_t, Stream> streams;
+    unordered_map<uint64_t, void *> dirs;        // likewise for a DIR * (a host DIR)
+    unordered_map<uint64_t, uint64_t> direntries; // a DIR's struct dirent, filled by each readdir
+
+    Stream &StreamOf(uint64_t h) {
+        auto it = streams.find(h);
+        if (it == streams.end()) {
+            if (h && SegOf(h) < segs.size() && !segs[SegOf(h)].alive)
+                throw Fault { cat("use of a closed stream (", Describe(segs[SegOf(h)]), ")") };
+            throw Fault { cat("not a stream: ", SegOf(h) ? Describe(Seg(h)) : "null") };
+        }
+        return it->second;
+    }
+
+    void Out(Stream &st, string_view data) {
+        if (data.empty()) return;
+        if (st.fd >= 0) { write(st.fd, data); return; }
+        if (fwrite(data.data(), 1, data.size(), st.file) != data.size()) st.err = true;
+    }
+
+    size_t In(Stream &st, char *buf, size_t n) {
+        if (n == 0) return 0;
+        size_t got = st.fd >= 0 ? read(buf, n) : fread(buf, 1, n, st.file);
+        if (got < n) {
+            if (st.file && ferror(st.file)) st.err = true;
+            else st.eof = true;
+        }
+        return got;
     }
 
     // The bytes of a NUL-terminated string, within its segment.
@@ -573,97 +613,45 @@ struct VM {
         return string_view((const char *)p, (size_t)(end - p));
     }
 
-    void Library() {
-        libobjects["stdout"] = stdouth;
-        libobjects["stderr"] = stderrh;
-        library["fwrite"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            auto n = a[1] * a[2];
-            auto fd = vm.Fd(a[3]);
-            if (n) vm.write(fd, string_view((const char *)vm.Access(a[0], n), (size_t)n));
-            return a[2];
-        };
-        library["fputs"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            auto s = vm.CString(a[0]);
-            vm.write(vm.Fd(a[1]), s);
-            return 1;
-        };
-        library["fputc"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            char c = (char)a[0];
-            vm.write(vm.Fd(a[1]), string_view(&c, 1));
-            return (uint8_t)c;
-        };
-        library["putchar"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            char c = (char)a[0];
-            vm.write(1, string_view(&c, 1));
-            return (uint8_t)c;
-        };
-        library["puts"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            vm.write(1, cat(vm.CString(a[0]), "\n"));
-            return 1;
-        };
-        library["fflush"] = [](VM &, const uint64_t *, int) -> uint64_t { return 0; };
-        library["memcpy"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            if (a[2]) {
-                vm.Access(a[0], a[2]);
-                auto s = vm.Access(a[1], a[2]);
-                memmove(vm.Access(a[0], a[2]), s, (size_t)a[2]);
-            }
-            return a[0];
-        };
-        library["memmove"] = library["memcpy"];
-        library["memset"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            if (a[2]) memset(vm.Access(a[0], a[2]), (int)a[1], (size_t)a[2]);
-            return a[0];
-        };
-        library["memcmp"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            if (!a[2]) return 0;
-            auto x = vm.Access(a[0], a[2]);
-            auto y = vm.Access(a[1], a[2]);
-            int r = memcmp(x, y, (size_t)a[2]);
-            return (uint64_t)(int64_t)(r < 0 ? -1 : r > 0 ? 1 : 0);
-        };
-        library["strlen"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            return vm.CString(a[0]).size();
-        };
-        library["malloc"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            return Handle(vm.NewSeg(SEG_HEAP, "", a[0]), 0);
-        };
-        library["calloc"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            return Handle(vm.NewSeg(SEG_HEAP, "", a[0] * a[1]), 0);
-        };
-        library["realloc"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            auto id = vm.NewSeg(SEG_HEAP, "", a[1]);
-            if (a[0]) {
-                auto &old = vm.Seg(a[0]);
-                if (old.kind != SEG_HEAP || !old.alive || OffOf(a[0]) != 0)
-                    throw Fault { cat("realloc of ", vm.Describe(old)) };
-                memcpy(vm.segs[id].mem.data(), old.mem.data(), (size_t)min(old.size, a[1]));
-                vm.Free(a[0]);
-            }
-            return Handle(id, 0);
-        };
-        library["free"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            if (a[0]) vm.Free(a[0]);
-            return 0;
-        };
-        library["exit"] = [](VM &, const uint64_t *a, int) -> uint64_t { throw Exit { (int)a[0] }; };
-        library["_exit"] = library["exit"];
-        library["abort"] = [](VM &, const uint64_t *, int) -> uint64_t { throw Fault { "abort() called" }; };
-        // The runtime's GS_INTERP branch reserves a data stack with these
-        // (§5, §10): a segment that grows on access up to the reservation.
-        library["gs_host_reserve"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            if (a[0] > 0xffffffffull) throw Fault { cat("stack reservation of ", a[0], " bytes exceeds the 4 GB a handle addresses") };
-            auto id = vm.NewSeg(SEG_STACK, "", 0);
-            vm.segs[id].limit = a[0];
-            return Handle(id, 0);
-        };
-        library["gs_host_release"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
-            auto &s = vm.Seg(a[0]);
-            if (s.kind != SEG_STACK || OffOf(a[0]) != 0) throw Fault { cat("release of ", vm.Describe(s)) };
-            vm.Free(a[0]);
-            return 0;
-        };
+    // A copy of a string, for a C library call that needs a char *.
+    string CStr(uint64_t h) { return string(CString(h)); }
+
+    // A fresh static object holding the bytes and a NUL, for what the
+    // library hands back as a string it owns (getenv, strerror).
+    uint64_t NewString(string_view name, string_view bytes) {
+        auto id = NewSeg(SEG_STATIC, string(name), bytes.size() + 1);
+        memcpy(segs[id].mem.data(), bytes.data(), bytes.size());
+        return Handle(id, 0);
     }
+
+    // The program's errno, in the prelude's numbering (Linux's), from the
+    // host's.
+    void SetErrno(int hosterr) {
+        int e;
+        switch (hosterr) {
+            case 0: e = 0; break;
+            case EPERM: e = 1; break;
+            case ENOENT: e = 2; break;
+            case EINTR: e = 4; break;
+            case EIO: e = 5; break;
+            case EBADF: e = 9; break;
+            case EAGAIN: e = 11; break;
+            case ENOMEM: e = 12; break;
+            case EACCES: e = 13; break;
+            case EEXIST: e = 17; break;
+            case ENOTDIR: e = 20; break;
+            case EISDIR: e = 21; break;
+            case EINVAL: e = 22; break;
+            case EMFILE: e = 24; break;
+            case ENOSPC: e = 28; break;
+            case ERANGE: e = 34; break;
+            case ENOTEMPTY: e = 39; break;
+            default: e = 5; break;
+        }
+        StoreVal(Access(errnoh, 4), VT_I32, (uint64_t)(int64_t)e);
+    }
+
+    void Library();   // clib.h
 
     void Free(uint64_t h) {
         auto &s = Seg(h);

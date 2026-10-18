@@ -1,3 +1,4 @@
-argc = 1
+argc = 2
 argv[0] = fixture
+argv[1] is a path = 1
 argv[argc] is null = 1

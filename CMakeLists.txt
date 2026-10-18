@@ -77,6 +77,8 @@ add_executable(goose
     src/interp/bytecode.h
     src/interp/lower.h
     src/interp/vm.h
+    src/interp/prelude.h
+    src/interp/clib.h
     src/runtime/runtime.h
     src/runtime/runtime_impl.h
     src/runtime/runtime_threads.h

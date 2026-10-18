@@ -3,9 +3,12 @@
 // to the two streams, followed by `exit status N` when that is not zero,
 // is compared with `name.expected` (`--bless` rewrites them; `--dump name`
 // prints a fixture's bytecode). The fixtures are small C programs over the
-// handful of library functions this step binds (docs/design/interpreter.md
-// §14, step 3): arithmetic at every width, pointers and segments, control
-// flow, calls, static data, and the faults the VM must report.
+// prelude and the C library (docs/design/interpreter.md §14, steps 3 and
+// 4): arithmetic at every width, pointers and segments, control flow,
+// calls, static data, the faults the VM must report, and each part of the
+// library. A fixture gets a fresh empty directory as argv[1] for its files,
+// `name.stdin` as its standard input if there is one, and the environment
+// variable INTERP_RUN_VAR set to "forty-two".
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -18,6 +21,8 @@
 #include "../src/interp/bytecode.h"
 #include "../src/interp/lower.h"
 #include "../src/interp/vm.h"
+#include "../src/interp/prelude.h"
+#include "../src/interp/clib.h"
 
 #include <filesystem>
 
@@ -48,16 +53,17 @@ static void WriteAll(const fs::path &p, const string &s) {
     fclose(f);
 }
 
-// "a.h" beside the including file, <a.h> under the fixture directory's sys/.
-static PPIncludeFn Includer(const fs::path &sysdir) {
-    return [sysdir](const string &name, bool system, const string &from, string &text,
-                    string &path) {
-        auto p = system ? sysdir / name : fs::path(from) / name;
+// <a.h> from the prelude, "a.h" beside the including file.
+static PPIncludeFn Includer() {
+    return PreludeIncluder([](const string &name, bool system, const string &from, string &text,
+                              string &path) {
+        if (system) return false;
+        auto p = fs::path(from) / name;
         if (!fs::is_regular_file(p)) return false;
         text = ReadAll(p);
         path = p.generic_string();
         return true;
-    };
+    });
 }
 
 static string Relative(string s, const fs::path &dir) {
@@ -73,8 +79,8 @@ struct Compiled {
     vector<PPToken> toks;
     unique_ptr<CParser> parser;
     Program prog;
-    Compiled(const fs::path &file, const fs::path &sysdir) {
-        Preprocessor pp(Includer(sysdir));
+    explicit Compiled(const fs::path &file) {
+        Preprocessor pp(Includer());
         toks = pp.Run(ReadAll(file), file.generic_string());
         files = pp.files;
         parser = make_unique<CParser>(toks, files, types);
@@ -87,20 +93,35 @@ struct Compiled {
 // recursion fixtures reach it quickly.
 static string RunFixture(const fs::path &f, const fs::path &dir, bool dump) {
     string out;
+    auto tmp = fs::temp_directory_path() / cat("interp_run_", f.stem().string());
+    fs::remove_all(tmp);
+    fs::create_directories(tmp);
     try {
-        Compiled c(f, dir / "sys");
+        Compiled c(f);
         if (dump)
             for (auto &fn : c.prog.funcs)
                 if (!fn.external) out += Disasm(c.prog, fn);
         VM vm(c.prog);
         vm.framelimit = 1u << 20;
         vm.write = [&](int, string_view data) { out += data; };
-        int status = vm.Run({ "fixture" });
+        string input;
+        auto in = f;
+        in.replace_extension(".stdin");
+        if (fs::exists(in)) input = ReadAll(in);
+        size_t at = 0;
+        vm.read = [&](char *buf, size_t n) {
+            n = min(n, input.size() - at);
+            memcpy(buf, input.data() + at, n);
+            at += n;
+            return n;
+        };
+        int status = vm.Run({ "fixture", tmp.generic_string() });
         if (status) Append(out, "exit status ", status, "\n");
     } catch (CompileError &e) {
         Append(out, "error: ", e.msg, "\n");
     }
-    return Relative(out, dir);
+    fs::remove_all(tmp);
+    return Relative(Relative(out, dir), tmp);
 }
 
 int main(int argc, char **argv) {
@@ -115,6 +136,11 @@ int main(int argc, char **argv) {
             return 2;
         }
     }
+#ifdef _WIN32
+    _putenv_s("INTERP_RUN_VAR", "forty-two");
+#else
+    setenv("INTERP_RUN_VAR", "forty-two", 1);
+#endif
     auto here = fs::path(__FILE__).parent_path();
     auto dir = here / "interp" / "run";
     if (!only.empty()) {

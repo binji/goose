@@ -1,0 +1,3 @@
+fault: use of a closed stream (static object 'a stream' (1 bytes))
+  in main (fault_closed_stream.c:9)
+exit status 134

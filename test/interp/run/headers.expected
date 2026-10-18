@@ -1,0 +1,17 @@
+sizes: 8 8 8 8 8 8
+offsetof: 0 8 16
+NULL is zero: 1, EOF -1
+bool: 1 0 1
+limits: -2147483648 2147483647 4294967295 -9223372036854775808 18446744073709551615 8
+stdint: -128 32767 4294967295 -9223372036854775808 18446744073709551615 18446744073709551615
+stdint constants: -5000000000 18446744073709551615
+exit codes: 0 1, RAND_MAX 2147483647
+seek: 0 1 2, buffering 0 1 2
+open flags: 0 65 128 1024
+errno values: 2 17 4, starts at 0
+S_ISDIR: 1 0
+clocks: 0 1
+math constants: 3.14159 2.71828
+dirent name room: 256
+stream handles: 1 1 1
+ok

@@ -1,0 +1,7 @@
+fgets: first line
+fgets short buffer: abcd|
+rest of that line: efgh tail
+fgetc: XYZ
+fread: 5 bytes "12345"
+feof: 1
+fread at end: 0, feof 1, fgets null 1, fgetc EOF 1

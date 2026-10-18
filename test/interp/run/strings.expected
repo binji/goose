@@ -1,0 +1,30 @@
+strcpy: hello (5)
+strcat: hello, world (12)
+strcmp: -1 1 0 -1
+strncmp: 0 -1 0
+strncmp unterminated: 0
+strchr: nd the needle in the haystack
+strrchr: haystack
+strchr none: 1
+strchr NUL: 31
+strstr: needle in the haystack
+strstr none: 1
+strstr empty: 0
+memchr: ind the needle in the haystack
+memchr none: 1
+strncpy: ab, 6 zero bytes after
+strncpy cut: longer t
+strdup: Duplicate
+strerror(ENOENT): No such file or directory
+atoi: 123 -45 0
+atol: 9000000000
+strtol hex: 31, rest "z"
+strtol auto octal: 511, rest ""
+strtol binary: -10
+strtol none: 0, end at start 1
+strtoll: -9223372036854775808
+strtoull: 18446744073709551615
+strtoul range: 18446744073709551615, ERANGE 1
+strtod: 350, rest " tail"
+atof: -0.25
+ctype: 111011 Qq

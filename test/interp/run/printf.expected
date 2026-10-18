@@ -1,0 +1,27 @@
+plain text
+42 -42 42
+-2147483648 2147483647
+4294967295 ff FF 10
+-9223372036854775808 9223372036854775807 18446744073709551615 18446744073709551615 123456789012345
+ffffffffffffffff DEADBEEFCAFE
+44 4464 44 4464
+[   42] [42   ] [00042] [+42] [ 42]
+[     7] [7     ] [0007]
+[0xff] [010] [005] [     005]
+abc
+[text] [     right] [left      ] [tru] [ab]
+[raw] [rawx]
+(null)
+100% done
+3.500000 3.14      2.500 2.5       | 1.234500e+03 0.0001 1e+20
+1.500000 0.250000
+2
+mixed 1 args 2
+to stdout 1
+to stderr 2
+returns the count = 17
+snprintf -> 16 "12345-abcdefghi" len 15
+snprintf(0) -> 1, buf untouched "12345-abcdefghi"
+snprintf(1) -> 1 ""
+snprintf(NULL, 0) -> 18
+sprintf -> 22 "sprintf|   -7|z  |1000"
