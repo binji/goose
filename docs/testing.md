@@ -65,8 +65,9 @@ The `gfx/`, `ui/`, `physics/` and `audio/` fixtures and the samples that use
 those modules run through the interpreter where their package is compiled
 in (`GOOSE_BUILTIN_LIBS`) and its sidecar names a `thunk_api`, headless
 as the TinyCC runs are; elsewhere they are skipped. Where `WASI_SDK_PATH`
-names a wasi-sdk, `test/wasm_build.py` (a section of the runner, a skip
-without the sdk or node) builds the compiler to WebAssembly with
+names a wasi-sdk or `build/wasm` is configured already, `test/wasm_build.py`
+(a section of the runner, a skip otherwise or without node; run on its own
+with `--fetch`, it lets the toolchain file fetch the sdk) builds the compiler to WebAssembly with
 `cmake/wasm32-wasi.cmake` and runs the hello-world fixture and the sieve
 sample through `goose.wasm` under node's WASI (`scripts/wasm_run.mjs`),
 against the same blessed output. Where node is installed, the playground's

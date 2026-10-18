@@ -2,10 +2,11 @@
 """Builds the compiler to WebAssembly and runs a program through it
 (docs/design/interpreter.md section 8, step 11 of section 14).
 
-    python test/wasm_build.py [--build-dir DIR] [--exe goose.wasm]
+    python test/wasm_build.py [--build-dir DIR] [--exe goose.wasm] [--fetch]
 
 With wasi-sdk at $WASI_SDK_PATH (or a --build-dir already configured with
-cmake/wasm32-wasi.cmake), configures build/wasm with the toolchain file,
+cmake/wasm32-wasi.cmake, or --fetch, which lets the toolchain file fetch
+the sdk into build/wasi-sdk), configures build/wasm with the toolchain file,
 builds goose.wasm, and runs the hello-world fixture and the sieve sample
 under node's WASI through scripts/wasm_run.mjs, comparing their output with
 the blessed files. Exits 0 when they match, 1 on a failure, and 3 where
@@ -33,6 +34,8 @@ def main():
     ap.add_argument("--build-dir", default=str(ROOT / "build" / "wasm"),
                     help="where goose.wasm is configured and built (default build/wasm)")
     ap.add_argument("--exe", help="a goose.wasm built already, to run without building")
+    ap.add_argument("--fetch", action="store_true",
+                    help="without WASI_SDK_PATH, configure anyway: the toolchain file fetches wasi-sdk")
     args = ap.parse_args()
     node = shutil.which("node")
     if not node:
@@ -42,14 +45,13 @@ def main():
     if not exe:
         sdk = os.environ.get("WASI_SDK_PATH")
         builddir = Path(args.build_dir)
-        if not sdk and not (builddir / "CMakeCache.txt").exists():
-            print("skip: WASI_SDK_PATH is not set and no build is configured")
+        if not sdk and not args.fetch and not (builddir / "CMakeCache.txt").exists():
+            print("skip: WASI_SDK_PATH is not set and no build is configured (--fetch fetches wasi-sdk)")
             return 3
         if not (builddir / "CMakeCache.txt").exists():
             r = run(["cmake", "-S", str(ROOT), "-B", str(builddir), "-G", "Ninja",
                      "-DCMAKE_BUILD_TYPE=Release",
-                     f"-DCMAKE_TOOLCHAIN_FILE={ROOT / 'cmake' / 'wasm32-wasi.cmake'}"],
-                    env={**os.environ, "WASI_SDK_PATH": sdk})
+                     f"-DCMAKE_TOOLCHAIN_FILE={ROOT / 'cmake' / 'wasm32-wasi.cmake'}"])
             if r.returncode != 0:
                 print(r.stdout)
                 print("FAIL wasm configure")

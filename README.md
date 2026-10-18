@@ -457,19 +457,21 @@ Linux, SDL needs the X11 or Wayland development packages
 without them the build leaves the `gfx` module out and says what to install.
 
 The compiler also builds to WebAssembly, where its interpreter runs programs
-in place of TinyCC (`docs/design/interpreter.md`): with
-[wasi-sdk](https://github.com/WebAssembly/wasi-sdk) (release 34 or later)
-unpacked somewhere,
+in place of TinyCC (`docs/design/interpreter.md`):
 
 ```bash
-WASI_SDK_PATH=/path/to/wasi-sdk cmake -B build/wasm -G Ninja \
+cmake -B build/wasm -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake
 cmake --build build/wasm
 node scripts/wasm_run.mjs build/wasm/goose.wasm . run /samples/07_sieve.goose --stdlib /stdlib
 ```
 
 builds `goose.wasm`, a WASI reactor a page calls into, and runs a program
-through it under node (`test/wasm_build.py` does both as a check).
+through it under node (`test/wasm_build.py` does both as a check). The
+toolchain file fetches [wasi-sdk](https://github.com/WebAssembly/wasi-sdk)
+34 for the host into `build/wasi-sdk` the first time, checked against the
+release's digest; set `WASI_SDK_PATH` to use one unpacked elsewhere
+(release 34 or later).
 
 The runner scripts prefer `build/Release`, then `build/RelWithDebInfo`, then
 `build`, then `build/Debug`. Pass `--exe` to select a specific compiler; use an

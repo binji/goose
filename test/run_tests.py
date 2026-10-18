@@ -2222,8 +2222,9 @@ def main():
         r.show_task(interp_sample, tc.REPO_ROOT / "samples" / "07_sieve.goose")
 
     # --- Wasm: the compiler built to WebAssembly, run under node ----------
-    # Where wasi-sdk is at hand (WASI_SDK_PATH), test/wasm_build.py builds
-    # goose.wasm and runs two programs through it; elsewhere a skip.
+    # Where wasi-sdk is at hand (WASI_SDK_PATH) or build/wasm is configured,
+    # test/wasm_build.py builds goose.wasm and runs two programs through it;
+    # elsewhere a skip, since the runner does not fetch the sdk itself.
     def wasm_build():
         result = subprocess.run([sys.executable, str(HERE / "wasm_build.py")],
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
