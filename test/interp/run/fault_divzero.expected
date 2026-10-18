@@ -1,0 +1,5 @@
+divide = 3
+fault: division by zero
+  in divide (fault_divzero.c:3)
+  in main (fault_divzero.c:6)
+exit status 134

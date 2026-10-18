@@ -1,13 +1,13 @@
-// Goose compiler — the interpreter's C parser: declarations and expressions
-// (docs/design/interpreter.md §4, step 2 of §14). It consumes the
-// preprocessor's tokens and builds the declarations of a translation unit
-// with every type laid out (ctypes.h) and every expression typed (cast.h),
-// folding integer constant expressions as it goes, which array sizes, enum
-// values and #if-free conditions need. Function bodies are kept as token
-// ranges for the statement parser of step 3. The dialect is C99 as codegen
+// Goose compiler — the interpreter's C parser (docs/design/interpreter.md §4,
+// steps 2 and 3 of §14). It consumes the preprocessor's tokens and builds a
+// translation unit with every type laid out (ctypes.h) and every expression
+// typed (cast.h), folding integer constant expressions as it goes, which
+// array sizes, enum values and case labels need. Declarations are parsed
+// first, with function bodies kept as token ranges, and the bodies after, so
+// a body sees every file-scope declaration. The dialect is C99 as codegen
 // and the runtime write it, plus what the standard headers' declarations
-// need: no bitfields, no variable-length arrays, no anonymous members, no
-// designated initializers beyond parsing them, and __attribute__ dropped.
+// need: no bitfields, no variable-length arrays, no anonymous members, and
+// __attribute__ dropped.
 #pragma once
 
 namespace goose {
@@ -54,13 +54,14 @@ struct CParser {
     CUnit &Unit() { return unit; }
 
     // The whole unit: declarations, function definitions, and the #pragma
-    // pack lines between them.
+    // pack lines between them, then the function bodies.
     CUnit &ParseUnit() {
         while (!AtEnd()) {
             if (Cur().kind == PP_PRAGMA) { Pragma(Cur()); pos++; continue; }
             if (Is(";")) { pos++; continue; }
             ExternalDeclaration();
         }
+        ParseBodies();
         return unit;
     }
 
@@ -106,6 +107,14 @@ struct CParser {
         d->file = at.file;
         d->line = at.line;
         return d;
+    }
+    Stmt *NewStmt(StmtKind k, const PPToken &at) {
+        stmts.push_back(make_unique<Stmt>());
+        auto s = stmts.back().get();
+        s->kind = k;
+        s->file = at.file;
+        s->line = at.line;
+        return s;
     }
 
     // ---- Tokens
@@ -454,9 +463,12 @@ struct CParser {
             break;
         }
         if (Is("(") && !IsTypeStart(Peek()) && !Is(Peek(), ")")) {
+            // The suffixes after the group apply to what the group's inner
+            // declarator derives from; the parameters named are those of the
+            // function declarator next to the name, which is inside.
             auto inner = pos;
             SkipBalanced();
-            auto t = Suffixes(base, paramnames);
+            auto t = Suffixes(base, nullptr);
             auto after = pos;
             pos = inner + 1;
             auto r = Declarator(t, name, abstract, paramnames);
@@ -612,6 +624,7 @@ struct CParser {
                 Error(at, cat("conflicting declarations of '", name, "'"));
             d = s->second.decl;
             if (t->IsComplete()) { d->type = t; s->second.type = t; }
+            if (!ds.isextern) d->isextern = false;   // `extern int x; int x;` defines x
         } else {
             d = NewDecl(at);
             d->kind = D_VAR;
@@ -633,6 +646,274 @@ struct CParser {
         }
         if (!d->type->IsComplete() && !d->isextern)
             Error(at, cat("variable '", name, "' has incomplete type ", TypeName(d->type)));
+    }
+
+    // ---- Statements
+
+    // Every defined function's body. Static locals and file-scope compound
+    // literals append to the unit's declarations while bodies parse, hence
+    // the index loop.
+    void ParseBodies() {
+        for (size_t i = 0; i < unit.decls.size(); i++) {
+            auto d = unit.decls[i];
+            if (d->kind == D_FUNC && d->defined && !d->body) ParseBody(d);
+        }
+    }
+
+    void ParseBody(CDecl *fn) {
+        auto &at = toks[fn->bodybegin];
+        auto savedpos = pos;
+        auto savedscope = scope;
+        curfn = fn;
+        labels.clear();
+        gotos.clear();
+        switches.clear();
+        PushScope();
+        auto ft = fn->type;
+        for (size_t i = 0; i < ft->params.size(); i++) {
+            if (i >= fn->paramnames.size() || fn->paramnames[i].empty())
+                Error(at, cat("parameter ", i + 1, " of '", fn->name, "' has no name"));
+            auto &name = fn->paramnames[i];
+            auto p = NewDecl(at);
+            p->kind = D_VAR;
+            p->name = name;
+            p->type = ft->params[i];
+            p->islocal = true;
+            fn->params.push_back(p);
+            fn->locals.push_back(p);
+            Bind(at, name, CSym { CSym::S_VAR, p->type, p, 0 });
+        }
+        pos = fn->bodybegin;
+        fn->body = Block(false);
+        if (pos != fn->bodyend) Error(at, "function body ends unexpectedly");
+        for (auto &[label, where] : gotos)
+            if (!labels.count(label)) ErrorAt(where.first, where.second, cat("label '", label, "' is not defined"));
+        PopScope();
+        scope = savedscope;
+        pos = savedpos;
+        curfn = nullptr;
+    }
+
+    void PushScope() {
+        scopes.push_back(make_unique<Scope>());
+        scopes.back()->parent = scope;
+        scope = scopes.back().get();
+    }
+    void PopScope() { scope = scope->parent; }
+
+    // A name in the current scope; redeclaring one there is an error,
+    // shadowing an outer one is not.
+    void Bind(const PPToken &at, const string &name, const CSym &sym) {
+        if (scope->syms.count(name)) Error(at, cat("redefinition of '", name, "'"));
+        scope->syms[name] = sym;
+    }
+
+    // `{ ... }`, in a scope of its own unless the caller opened one (a
+    // function's outermost block shares the parameters' scope).
+    Stmt *Block(bool ownscope) {
+        auto &open = Expect("{");
+        auto st = NewStmt(S_BLOCK, open);
+        if (ownscope) PushScope();
+        while (!Is("}")) {
+            if (AtEnd()) Error(open, "unterminated block");
+            st->items.push_back(Statement());
+        }
+        pos++;
+        if (ownscope) PopScope();
+        return st;
+    }
+
+    Stmt *Statement() {
+        auto &t = Cur();
+        if (t.kind == PP_PRAGMA) { Pragma(t); pos++; return NewStmt(S_EMPTY, t); }
+        if (Is(";")) { pos++; return NewStmt(S_EMPTY, t); }
+        if (Is("{")) return Block(true);
+        if (t.kind == PP_IDENT) {
+            auto &k = t.text;
+            if (k == "if") {
+                pos++;
+                auto st = NewStmt(S_IF, t);
+                st->expr = Condition();
+                st->a = Statement();
+                if (IsKw("else")) { pos++; st->b = Statement(); }
+                return st;
+            }
+            if (k == "while") {
+                pos++;
+                auto st = NewStmt(S_WHILE, t);
+                st->expr = Condition();
+                st->a = Statement();
+                return st;
+            }
+            if (k == "do") {
+                pos++;
+                auto st = NewStmt(S_DO, t);
+                st->a = Statement();
+                if (!IsKw("while")) Error(Cur(), cat("expected 'while', found '", Spelling(Cur()), "'"));
+                pos++;
+                st->expr = Condition();
+                Expect(";");
+                return st;
+            }
+            if (k == "for") {
+                pos++;
+                auto st = NewStmt(S_FOR, t);
+                Expect("(");
+                PushScope();
+                if (Is(";")) st->init = NewStmt(S_EMPTY, toks[pos++]);
+                else if (IsTypeStart()) st->init = Declaration();
+                else {
+                    st->init = NewStmt(S_EXPR, Cur());
+                    st->init->expr = Expression();
+                    Expect(";");
+                }
+                if (!Is(";")) st->expr = Scalar(Expression(), "loop condition");
+                Expect(";");
+                if (!Is(")")) st->step = Expression();
+                Expect(")");
+                st->a = Statement();
+                PopScope();
+                return st;
+            }
+            if (k == "switch") {
+                pos++;
+                auto st = NewStmt(S_SWITCH, t);
+                Expect("(");
+                auto e = Decay(Expression());
+                if (!e->type->IsInteger()) Error(t, cat("switch on a non-integer (", TypeName(e->type), ")"));
+                st->expr = Promote(e);
+                Expect(")");
+                switches.push_back(st);
+                st->a = Statement();
+                switches.pop_back();
+                return st;
+            }
+            if (k == "case" || k == "default") {
+                pos++;
+                if (switches.empty()) Error(t, cat("'", k, "' outside a switch"));
+                auto sw = switches.back();
+                auto st = NewStmt(k == "case" ? S_CASE : S_DEFAULT, t);
+                if (k == "case") {
+                    auto v = ConditionalExpr();
+                    if (!v->IsConst()) Error(t, "case label is not a constant");
+                    st->value = (int64_t)Truncate(v->ival, sw->expr->type);
+                }
+                for (auto c : sw->cases)
+                    if (c->kind == st->kind && (st->kind == S_DEFAULT || c->value == st->value))
+                        Error(t, k == "case" ? cat("duplicate case ", st->value) : "duplicate default");
+                sw->cases.push_back(st);
+                Expect(":");
+                st->a = Statement();
+                return st;
+            }
+            if (k == "break" || k == "continue") {
+                pos++;
+                Expect(";");
+                return NewStmt(k == "break" ? S_BREAK : S_CONTINUE, t);
+            }
+            if (k == "goto") {
+                pos++;
+                auto st = NewStmt(S_GOTO, t);
+                st->label = ExpectIdent().text;
+                gotos.emplace_back(st->label, make_pair(t.file, t.line));
+                Expect(";");
+                return st;
+            }
+            if (k == "return") {
+                pos++;
+                auto st = NewStmt(S_RETURN, t);
+                auto rt = curfn->type->elem;
+                if (!Is(";")) {
+                    auto e = Expression();
+                    if (rt->kind == TK_VOID) Error(t, "return with a value in a void function");
+                    st->expr = ConvertTo(e, rt, t, "return");
+                } else if (rt->kind != TK_VOID) {
+                    Error(t, "return without a value");
+                }
+                Expect(";");
+                return st;
+            }
+            if (Is(Peek(), ":") && !IsTypeStart(t)) {
+                pos += 2;
+                auto st = NewStmt(S_LABEL, t);
+                st->label = k;
+                if (!labels.insert(k).second) Error(t, cat("duplicate label '", k, "'"));
+                st->a = Is("}") ? NewStmt(S_EMPTY, Cur()) : Statement();   // `label: }` as compilers allow
+                return st;
+            }
+            if (IsTypeStart(t)) return Declaration();
+        }
+        auto st = NewStmt(S_EXPR, t);
+        st->expr = Expression();
+        Expect(";");
+        return st;
+    }
+
+    // `( expr )` of a scalar type.
+    Expr *Condition() {
+        auto &open = Expect("(");
+        auto e = Scalar(Expression(), "condition");
+        Expect(")");
+        (void)open;
+        return e;
+    }
+
+    Expr *Scalar(Expr *e, const char *what) {
+        e = Decay(e);
+        if (!e->type->IsScalar()) Error(e, cat(what, " has type ", TypeName(e->type)));
+        return e;
+    }
+
+    // A declaration in a block: locals of the function, in order of their
+    // initialization; typedefs and record definitions in the block's scope;
+    // static locals as objects of the unit; prototypes and externs as the
+    // file-scope declarations they are.
+    Stmt *Declaration() {
+        auto st = NewStmt(S_DECL, Cur());
+        auto ds = ParseDeclSpec();
+        if (Accept(";")) return st;
+        for (;;) {
+            string name;
+            auto &at = Cur();
+            auto t = Declarator(ds.type, &name, false, nullptr);
+            SkipDecorations();
+            if (ds.istypedef) {
+                if (Is("=")) Error(Cur(), "a typedef cannot be initialized");
+                DefineTypedef(at, name, t);
+            } else if (t->kind == TK_FUNC || ds.isextern) {
+                if (Is("{")) Error(Cur(), "function definition in a block");
+                if (Is("=")) Error(Cur(), "an extern declaration cannot be initialized");
+                auto saved = scope;
+                scope = &unit.global;
+                if (t->kind == TK_FUNC) DeclareFunction(at, name, t, ds);
+                else DeclareVariable(at, name, t, ds);
+                scope = saved;
+            } else {
+                if (t->kind == TK_VOID) Error(at, cat("variable '", name, "' has type void"));
+                auto d = NewDecl(at);
+                d->kind = D_VAR;
+                d->name = name;
+                d->type = t;
+                d->isstatic = ds.isstatic;
+                d->istls = ds.istls;
+                d->islocal = !ds.isstatic;
+                if (Accept("=")) {
+                    d->init = ParseInit();
+                    d->defined = true;
+                    d->type = TypeInit(d->init, d->type);
+                }
+                if (!d->type->IsComplete()) Error(at, cat("variable '", name, "' has incomplete type ", TypeName(d->type)));
+                Bind(at, name, CSym { CSym::S_VAR, d->type, d, 0 });
+                if (ds.isstatic) unit.decls.push_back(d);
+                else {
+                    curfn->locals.push_back(d);
+                    st->decls.push_back(d);
+                }
+            }
+            if (!Accept(",")) break;
+        }
+        Expect(";");
+        return st;
     }
 
     // ---- Initializers
@@ -849,9 +1130,19 @@ struct CParser {
         if (op.text == "=") {
             r = ConvertTo(r, l->type, op, "assignment");
         } else {
+            // `a op= b` is done in the type `a op b` would be, which the
+            // operation type records for lowering: the common type for
+            // arithmetic, the promoted left type for shifts, the pointer for
+            // pointer arithmetic. Only b is converted here; a is loaded and
+            // converted by lowering, which has the lvalue.
             r = Decay(r);
             if (r->type->kind == TK_PTR) Error(op, cat("pointer on the right of ", op.text));
-            CheckArith(op, l, r, op.text.substr(0, op.text.size() - 1));
+            auto o = op.text.substr(0, op.text.size() - 1);
+            Expr *lv = l;
+            auto t = CheckArith(op, lv, r, o);
+            if (!t) { e->optype = l->type; r = Promote(r); }
+            else if (o == "<<" || o == ">>") e->optype = Promoted(l->type);
+            else { e->optype = t; r = Cast(r, t); }
         }
         e->b = r;
         e->type = l->type;
@@ -952,6 +1243,8 @@ struct CParser {
         return Declarator(ds.type, nullptr, true, nullptr);
     }
 
+    // A compound literal is an object: a local of the function it is in,
+    // initialized each time it is evaluated, or a static one at file scope.
     Expr *CompoundLiteral(const PPToken &open, CType *t) {
         auto e = NewExpr(E_COMPOUND, open);
         e->init = ParseInit();
@@ -959,6 +1252,20 @@ struct CParser {
         if (!t->IsComplete()) Error(open, cat("compound literal of incomplete type ", TypeName(t)));
         e->type = t;
         e->lvalue = true;
+        auto d = NewDecl(open);
+        d->kind = D_VAR;
+        d->name = cat("(", TypeName(t), "){...}");
+        d->type = t;
+        d->init = e->init;
+        d->defined = true;
+        if (curfn) {
+            d->islocal = true;
+            curfn->locals.push_back(d);
+        } else {
+            d->isstatic = true;
+            unit.decls.push_back(d);
+        }
+        e->decl = d;
         return e;
     }
 
@@ -1538,6 +1845,12 @@ private:
     vector<unique_ptr<Expr>> exprs;
     vector<unique_ptr<Init>> inits;
     vector<unique_ptr<CDecl>> decls;
+    vector<unique_ptr<Stmt>> stmts;
+    vector<unique_ptr<Scope>> scopes;
+    CDecl *curfn = nullptr;                   // the function whose body is being parsed
+    unordered_set<string> labels;             // its labels so far
+    vector<pair<string, pair<int, int>>> gotos;   // its gotos, checked at the end
+    vector<Stmt *> switches;                  // the enclosing switch statements
 };
 
 // ---- Dumps, for the fixtures and for looking at what the parser made.

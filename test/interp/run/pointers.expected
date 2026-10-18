@@ -1,0 +1,53 @@
+q - p = 4
+*(p + 2) = 30
+2[p] = 30
+*(q - 1) = 40
+p < q = 1
+p == table = 1
+q == table + 4 = 1
+&table[5] - table = 5
+*p after += 3 = 40
+*p after -= 2 = 20
+*p++ = 20
+*--p = 20
+(char *)q - (char *)p = 12
+(uintptr_t) difference = 16
+range test inside = 1
+range test outside = 0
+ptr & 7 = 4
+null is false = 0
+np == 0 = 1
+!np = 1
+grid[2][3] = 23
+(*(grid + 1))[2] = 12
+row[0][1] = 21
+sizeof grid = 48
+sizeof *row = 16
+row - grid = 2
+flat[7] = 13
+items[1].tag = 7
+items[1].id = -42
+items[1].w = 2.500000 (4004000000000000)
+items[1].flag = 1
+sizeof(Item) = 18
+&items[2] - &items[0] = 2
+(uint8_t *)&items[2] - (uint8_t *)items = 36
+ip->id = -42
+ip->id += 2 = -40
+(*ip).flag = 1
+num = 1.500000 (3ff8000000000000)
+bool byte = 1
+num's low byte overwritten = 0
+str len = 5
+str = hello
+sizeof(Json) = 17
+list sum = 6
+(*pp)->value = 2
+a.next->value after relink = 3
+local digits = 1234
+end - local = 4
+*back = 3
+(void *)16 arithmetic = 24
+s[11] = 97
+*s = 112
+s + 11 = a literal

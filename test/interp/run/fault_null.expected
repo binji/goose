@@ -1,0 +1,4 @@
+before
+fault: null pointer access (address 4)
+  in main (fault_null.c:7)
+exit status 134

@@ -1,0 +1,4 @@
+within = 2
+fault: difference of pointers into different segments (static object 'b' (16 bytes) and static object 'a' (16 bytes))
+  in main (fault_segment_diff.c:6)
+exit status 134

@@ -1,0 +1,1 @@
+error: error_redeclared_local.c:3: error: redefinition of 'x'

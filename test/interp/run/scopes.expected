@@ -1,0 +1,14 @@
+global x = 1
+block x = 2
+inner x = 3
+block x again = 2
+global x again = 1
+T as variable = 7
+T as type again = 6
+local record = 0
+local record = 2
+local record = 4
+block typedef = 3
+another Pair = 9
+main's address is not null = 1
+y = 1

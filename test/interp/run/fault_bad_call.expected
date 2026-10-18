@@ -1,0 +1,3 @@
+fault: call through a pointer to static object 'data' (8 bytes)
+  in main (fault_bad_call.c:6)
+exit status 134

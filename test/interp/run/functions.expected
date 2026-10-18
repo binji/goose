@@ -1,0 +1,36 @@
+depth 20000 = 20000
+fib 20 = 6765
+sum_to 10000 = 50005000
+is_even 1001 = 0
+is_odd 1001 = 1
+p.x unchanged = 3
+q.x = 13
+q.y = 24
+manhattan = 7
+stretched manhattan = 17
+original tag = 111
+stretched tag = 115
+chained member of a result = 7
+moved p.y = 5
+arr[1].x = 3
+assigned.y = 8
+arr[0].x = 7
+counter = 101
+counter = 102
+counter = 103
+apply twice = 42
+apply square = 81
+pick(1)(5) = 25
+(*pick(0))(5) = 10
+table[1](6) = 36
+fn == fn = 1
+fn != fn = 0
+null fn pointer = 1
+args once = 1
+evaluated = 3
+compound literal = 11
+compound in call = 5
+literal per iteration = 0
+literal per iteration = 1
+(int){ 9 } = 9
+exit status 7

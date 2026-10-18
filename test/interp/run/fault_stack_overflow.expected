@@ -1,0 +1,4 @@
+last byte = 1
+fault: data stack overflow: 1 bytes at offset 4096 of a stack segment (4096 of 4096 bytes)
+  in main (fault_stack_overflow.c:9)
+exit status 134

@@ -1,0 +1,4 @@
+fault: use after free: 4 bytes at offset 0 of a heap block (4 bytes), freed
+  in read_it (fault_use_after_free.c:5)
+  in main (fault_use_after_free.c:10)
+exit status 134

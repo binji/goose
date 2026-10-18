@@ -1,0 +1,11 @@
+fault: native call stack overflow
+  in down (fault_recursion.c:4)
+  in down (fault_recursion.c:4)
+  in down (fault_recursion.c:4)
+  in down (fault_recursion.c:4)
+  in down (fault_recursion.c:4)
+  in down (fault_recursion.c:4)
+  in down (fault_recursion.c:4)
+  in down (fault_recursion.c:4)
+  ... 131065 more
+exit status 134

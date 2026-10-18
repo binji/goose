@@ -1,0 +1,4 @@
+before = 1
+fault: undefined function 'nothing_defines_this'
+  in main (fault_undefined.c:7)
+exit status 134

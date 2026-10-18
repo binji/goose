@@ -208,8 +208,10 @@ on the handle unchanged:
 * `a - b` on pointers, and the `uintptr_t` difference of a pool's range
   test: both must name one segment (else a fault), and the result is the
   difference of offsets.
-* `==`, `!=` on the whole handle; `<` and friends on the offsets of one
-  segment; `if (p)` is `p != 0`.
+* `==`, `!=`, `<` and friends on the whole handle as unsigned integers,
+  which within one segment orders by offset and across segments by id, so
+  a range test against another object is false as it would be natively
+  rather than a fault; `if (p)` is `p != 0`.
 * Casts between pointers and integers are the identity, as they are
   natively.
 

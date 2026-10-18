@@ -1,0 +1,1 @@
+error: error_return_type.c:4: error: cannot convert struct <anon> to int32_t in return
