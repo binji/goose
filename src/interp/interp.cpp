@@ -46,6 +46,29 @@ extern "C" void *goose_vm_decode(goose_vm *vm, uint64_t handle, uint64_t len) {
     return reinterpret_cast<interp::VM *>(vm)->Access(handle, len);
 }
 
+// A run kept between the host's calls (InterpResumable): everything the VM
+// points into, and the VM.
+struct InterpRun {
+    interp::TypeTable types;
+    vector<interp::PPToken> toks;
+    unique_ptr<interp::CParser> parser;
+    interp::Program prog;
+    unique_ptr<interp::VM> vm;
+};
+static unique_ptr<InterpRun> pending;
+static bool resumable = false;
+
+void InterpResumable(bool on) { resumable = on; }
+bool InterpSuspended() { return pending != nullptr; }
+
+int InterpResume() {
+    if (!pending) return 0;
+    if (!pending->vm->Resume()) return kInterpSuspended;
+    int status = pending->vm->status;
+    pending.reset();
+    return status;
+}
+
 int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs,
               const vector<const goose_thunk *> &thunks) {
     using namespace interp;
@@ -66,15 +89,12 @@ int RunInterp(const string &csrc, const string &progname, const vector<string> &
     // The parser owns the declarations and the types, which the program's
     // functions point at for as long as the VM runs (an external call lays
     // its arguments out by its prototype; a fault report names its file).
-    TypeTable types;
-    vector<PPToken> toks;
-    unique_ptr<CParser> parser;
-    Program prog;
+    auto run = make_unique<InterpRun>();
     try {
-        toks = pp.Run(ResourceDirDefine(progname) + csrc, "<generated C>");
-        parser = make_unique<CParser>(toks, pp.files, types);
-        auto &unit = parser->ParseUnit();
-        prog = Lowerer(unit, pp.files).Run();
+        run->toks = pp.Run(ResourceDirDefine(progname) + csrc, "<generated C>");
+        run->parser = make_unique<CParser>(run->toks, pp.files, run->types);
+        auto &unit = run->parser->ParseUnit();
+        run->prog = Lowerer(unit, pp.files).Run();
     } catch (CompileError &e) {
         throw CompileError { cat("interpreter: ", e.msg) };
     }
@@ -82,16 +102,22 @@ int RunInterp(const string &csrc, const string &progname, const vector<string> &
     // an abort and interleaves with stderr; its setvbuf reaches the VM's
     // adapter, not the process, so the process does the same here.
     setvbuf(stdout, nullptr, _IONBF, 0);
-    VM vm(prog);
+    run->vm = make_unique<VM>(run->prog);
+    auto &vm = *run->vm;
     for (auto table : thunks)
         for (auto t = table; t->name; t++) vm.thunks[t->name] = t;
     vector<string> args;
     args.push_back(progname);
     args.insert(args.end(), progargs.begin(), progargs.end());
     // In pieces, as the page runs it (§9), so that every run exercises the
-    // suspension; natively the pieces just follow one another.
+    // suspension; natively the pieces just follow one another, and for a
+    // host that resumes the run itself the first yield hands it back.
     vm.budget = 1 << 20;
     vm.Start(args);
+    if (resumable) {
+        pending = std::move(run);
+        return InterpResume();
+    }
     while (!vm.Resume()) {}
     return vm.status;
 }

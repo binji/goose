@@ -1606,13 +1606,16 @@ int Main(int argc, char **argv) {
 
 // The thread the compile runs on. The system headers come after the whole
 // compiler, so that none of their macros reach it.
-#ifdef _WIN32
+#if defined(_WIN32)
     #define WIN32_LEAN_AND_MEAN
     #define NOMINMAX
     #include <windows.h>
     #include <process.h>
     #include <io.h>
     #include <fcntl.h>
+#elif defined(__wasi__)
+    // No threads (docs/design/interpreter.md §8): the compile runs on the
+    // one stack, which the link sizes as the compile thread's.
 #else
     #include <pthread.h>
     #include <unistd.h>
@@ -1698,6 +1701,9 @@ static void *CompilerThreadMain(void *t) {
 // what it returned or threw. Where no such thread can be had, fn runs on this
 // one, and nothing checks its depth.
 int RunOnCompilerStack(const function<int()> &fn) {
+    #ifdef __wasi__
+        return fn();
+    #endif
     CompilerThread t { fn };
     #ifdef _WIN32
         // Without the flag, the size would be committed rather than reserved.

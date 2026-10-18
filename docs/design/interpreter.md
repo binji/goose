@@ -523,7 +523,14 @@ each needs in this build:
   it, and wasi-sdk's releases have not always been. This is the first
   thing to verify on the chosen release; if its libc++abi lacks exception
   support, build libc++ and libc++abi from the sdk's own recipe with the
-  flag, once, into the sysroot.
+  flag, once, into the sysroot. (Settled in step 11: wasi-sdk 34 ships
+  libc++abi and libunwind built for exceptions under
+  `lib/wasm32-wasip1/eh/`, which clang picks with `-fwasm-exceptions`; they
+  use the proposal's final form, exnref, where clang 23 still emits the
+  legacy instructions by default and a module may not mix the two, so the
+  build passes `-mllvm -wasm-use-legacy-eh=false` and links `-lunwind`,
+  which the driver leaves out. Node 25 and current browsers run the
+  result.)
 * **The compile thread.** `RunOnCompilerStack` makes a pthread with a 64 MB
   stack for the typechecker's recursion (§1). WASI has no threads; the
   function already falls back to running on the calling thread when no
@@ -550,10 +557,15 @@ each needs in this build:
   caps it below Wasm's 4 GB unless the link says so.
 * **Entry.** A WASI *command* runs `_start` once and exits; the page needs
   to call in repeatedly (section 7.2), so the module is built as a
-  *reactor* (`-mexec-model=reactor`) that exports a few functions: `goose_run`
-  taking a command line, which splits it into `argv` and calls `Main` as
-  `main` does, `goose_resume`, and the input-event entry points of the gfx
-  layer. A 30-line `web_entry.cpp`.
+  *reactor* (`-mexec-model=reactor`) that exports a few functions:
+  `goose_argbuf` giving room for a command line, `goose_run`, which splits
+  the line into `argv` and calls `Main` as `main` does, `goose_resume`, and
+  later the input-event entry points of the gfx layer. `goose_run` returns
+  the exit status, or `kInterpSuspended` (-2) with the program parked at
+  its first yield, which the driver's interpreter path hands back when
+  `web_entry.cpp` has asked for it (`InterpResumable`); each `goose_resume`
+  continues the run and returns the same until the status comes. A
+  60-line `web_entry.cpp`.
 * **What is left as is.** `shaderc.c` and `cute_spirv` are portable C and
   keep `embed_shader` working, which the gfx binary needs for its blobs.
   `std::filesystem` is in wasi-sdk's libc++. `isatty` and `getenv` exist

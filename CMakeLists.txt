@@ -12,7 +12,6 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
 add_executable(goose
     src/main.cpp
-    src/process.cpp
     src/process.h
     src/progress.cpp
     src/progress.h
@@ -102,11 +101,24 @@ elseif(WIN32)
                  "${CMAKE_CURRENT_SOURCE_DIR}/src/goose.manifest")
 endif()
 
-# The compile runs on a thread of its own, with a larger stack (main.cpp).
-find_package(Threads REQUIRED)
-target_link_libraries(goose PRIVATE Threads::Threads)
-# The library the process runner (process.cpp) is built on.
-target_include_directories(goose PRIVATE third_party/subprocess)
+# Other processes (process.h): over third_party/subprocess, except in the
+# Wasm build (docs/design/interpreter.md §8, cmake/wasm32-wasi.cmake), where
+# there are none, and the module is a reactor the page calls into
+# (src/web_entry.cpp) with the one stack sized as the compile thread's.
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+    target_sources(goose PRIVATE src/process_wasi.cpp src/web_entry.cpp)
+    set_target_properties(goose PROPERTIES OUTPUT_NAME goose SUFFIX ".wasm")
+    target_link_options(goose PRIVATE -mexec-model=reactor
+                        "LINKER:-z,stack-size=67108864"
+                        "LINKER:--export=goose_argbuf,--export=goose_run,--export=goose_resume")
+else()
+    target_sources(goose PRIVATE src/process.cpp)
+    # The compile runs on a thread of its own, with a larger stack (main.cpp).
+    find_package(Threads REQUIRED)
+    target_link_libraries(goose PRIVATE Threads::Threads)
+    # The library the process runner (process.cpp) is built on.
+    target_include_directories(goose PRIVATE third_party/subprocess)
+endif()
 
 # A program run in-process runs on the main thread (main.cpp), whose stack the
 # executable sets: 64 MB reserved, as for the compile thread, where Windows

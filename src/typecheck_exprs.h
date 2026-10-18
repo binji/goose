@@ -3276,7 +3276,7 @@ inline bool TypeCheck::UsedAfter(VarDef *v) {
         auto &stmts = bp.block->stmts;
         auto exits = &bp == &blockpos.back() && exitat != SIZE_MAX;
         if (bp.scopeidx >= cut && !exits) continue;
-        auto end = exits ? min(exitat + 1, stmts.size()) : stmts.size();
+        auto end = exits ? min<size_t>(exitat + 1, stmts.size()) : stmts.size();
         for (auto i = bp.idx + 1; i < end; i++)
             if (mentions(stmts[i], fi)) return true;
         if ((!exits || exitat == stmts.size()) && bp.idx < stmts.size() && bp.block->tail &&

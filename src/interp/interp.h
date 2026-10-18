@@ -22,4 +22,14 @@ namespace goose {
 int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs,
               const vector<const goose_thunk *> &thunks);
 
+// In pieces, for a host that calls in repeatedly (the page, §9, through
+// web_entry.cpp): with InterpResumable(true), RunInterp returns
+// kInterpSuspended as soon as the program yields, with the run kept, and
+// each InterpResume continues it, returning the same until the program
+// ends with its status. Natively the driver runs a program whole.
+constexpr int kInterpSuspended = -2;
+void InterpResumable(bool on);
+bool InterpSuspended();
+int InterpResume();
+
 }  // namespace goose

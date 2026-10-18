@@ -2220,6 +2220,23 @@ def main():
                 r.ok(f"interp {f.name}")
         r.show_task(interp_sample, tc.REPO_ROOT / "samples" / "07_sieve.goose")
 
+    # --- Wasm: the compiler built to WebAssembly, run under node ----------
+    # Where wasi-sdk is at hand (WASI_SDK_PATH), test/wasm_build.py builds
+    # goose.wasm and runs two programs through it; elsewhere a skip.
+    def wasm_build():
+        result = subprocess.run([sys.executable, str(HERE / "wasm_build.py")],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        text = tc.decode(result.stdout).rstrip("\n")
+        if result.returncode == 3:
+            r.say(text)
+        elif result.returncode == 0:
+            for line in text.splitlines():
+                r.say(line)
+        else:
+            r.fail("wasm build", text)
+    r.section("the compiler as WebAssembly (wasi-sdk)")
+    r.show_task(wasm_build)
+
     parse_errors = sorted((HERE / "errors").glob("*.goose"))
     parse_runs = r.goose_each(["--parse"], parse_errors)
 

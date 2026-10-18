@@ -61,11 +61,11 @@ static bool StderrIsTerminal() {
 }
 
 static size_t TerminalColumns() {
-    #ifdef _WIN32
+    #if defined(_WIN32)
         CONSOLE_SCREEN_BUFFER_INFO info;
         if (GetConsoleScreenBufferInfo(GetStdHandle(STD_ERROR_HANDLE), &info))
             return (size_t)(info.srWindow.Right - info.srWindow.Left + 1);
-    #else
+    #elif !defined(__wasi__)
         winsize ws;
         if (ioctl(STDERR_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col) return ws.ws_col;
     #endif
@@ -79,7 +79,14 @@ static void Decide(ProgressState &s) {
     if (s.mode >= 0) return;
     auto env = getenv("GOOSE_PROGRESS");
     string want = env ? env : "";
-    s.mode = want == "plain" ? 0 : want == "live" ? 1 : StderrIsTerminal();
+    #ifdef __wasi__
+        // One thread and no terminal to speak of (docs/design/interpreter.md
+        // §8): plain lines, whatever stderr is attached to.
+        (void)want;
+        s.mode = 0;
+    #else
+        s.mode = want == "plain" ? 0 : want == "live" ? 1 : StderrIsTerminal();
+    #endif
 }
 
 static void Write(const string &text) {

@@ -64,7 +64,12 @@ it the fixture is skipped under `--interp`, and runs natively either way.
 The `gfx/`, `ui/`, `physics/` and `audio/` fixtures and the samples that use
 those modules run through the interpreter where their package is compiled
 in (`GOOSE_BUILTIN_LIBS`) and its sidecar names a `thunk_api`, headless
-as the TinyCC runs are; elsewhere they are skipped.
+as the TinyCC runs are; elsewhere they are skipped. Where `WASI_SDK_PATH`
+names a wasi-sdk, `test/wasm_build.py` (a section of the runner, a skip
+without the sdk or node) builds the compiler to WebAssembly with
+`cmake/wasm32-wasi.cmake` and runs the hello-world fixture and the sieve
+sample through `goose.wasm` under node's WASI (`scripts/wasm_run.mjs`),
+against the same blessed output.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose
