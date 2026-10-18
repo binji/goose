@@ -310,7 +310,8 @@ class Fixture:
 
     def __init__(self):
         self.front, self.bce, self.cgen, self.dump = Out(), Out(), Out(), Out()
-        self.debug, self.jit, self.jitdebug, self.interp = Out(), Out(), Out(), Out()
+        self.debug, self.jit, self.jitdebug = Out(), Out(), Out()
+        self.interp, self.interpdebug = Out(), Out()
         self.nativeskips, self.jitskips, self.interpskips = [], [], []
         # What fixture() found and generated, for the rest of the fixture.
         self.line, self.dumped = "", False
@@ -699,6 +700,12 @@ class Runner:
         if self.interp and f.parent.name in INTERP_AREAS:
             with self.into(res.interp):
                 self.interp_program(f, line, res)
+            if debug_fixture(f, line) and f.name not in res.interpskips:
+                with self.into(res.interpdebug):
+                    out = self.check_run(f.stem, f"interp-debug {f.name}",
+                                         *self.goose("-O2", "--interp", "-DGS_DEBUG=1", f))
+                    if out is not None and self.check_stdout(f.stem, f"interp-debug {f.name}", out):
+                        self.ok(f"interp-debug {f.name}")
         if self.cc and res.dumped:
             with self.into(res.dump):
                 self.dump_program(f, res, built.get("dump"))
@@ -1418,6 +1425,8 @@ def main():
         sargs += ["--gpu-jobs", str(args.gpu_jobs)]
     if not jit:
         sargs.append("--no-jit")
+    if args.interp:
+        sargs.append("--interp")
     if args.nocgen:
         sargs.append("--nocgen")
     else:
@@ -2182,9 +2191,10 @@ def main():
     if not args.interp:
         r.show_later(r.say, "skip interpreter runs (--interp runs them)")
     else:
-        for f in tests:
-            if f.parent.name in INTERP_AREAS:
-                r.show(lambda f=f: fixtures[f].result().interp)
+        for kind in ("interp", "interpdebug"):
+            for f in tests:
+                if f.parent.name in INTERP_AREAS:
+                    r.show(lambda f=f, kind=kind: getattr(fixtures[f].result(), kind))
 
         def interp_skips():
             skipped = [name for f in tests for name in fixtures[f].result().interpskips]

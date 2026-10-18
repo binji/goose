@@ -53,8 +53,9 @@ With `--interp`, the runner also runs programs through the interpreter
 (`goose -O0 --interp`, [design/interpreter.md](design/interpreter.md) §11)
 at both levels against the same blessed output, for the fixture areas the
 interpreter has been widened to (`INTERP_AREAS` in the runner; a fixture
-the interpreter refuses, for threads or a native package, is a skip), and
-the sieve sample against its TinyCC run.
+the interpreter refuses, for threads or a native package, is a skip), the
+`GS_DEBUG=1` selection through it as well (`interp-debug`), and the samples
+through `run_samples.py --interp`, which the flag passes on.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose

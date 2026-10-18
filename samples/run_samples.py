@@ -17,10 +17,11 @@ has no GPU device.
 
 Every sample also runs a second way, in JIT mode -- built and run inside the
 compiler process, with no C file and no external toolchain -- and is compared
-against the same expected output.
+against the same expected output; with --interp a third way, through the
+compiler's interpreter (docs/design/interpreter.md).
 
 Used by test/run_tests.py; runnable on its own:
-  python samples/run_samples.py [--exe path/to/goose] [--bless] [--no-jit] [-j N]
+  python samples/run_samples.py [--exe path/to/goose] [--bless] [--no-jit] [--interp] [-j N]
 --bless rewrites the expected outputs from the current runs. The samples are
 worked on --jobs at a time, and their lines print in file order.
 """
@@ -62,6 +63,8 @@ def main():
                     help="require this C toolchain instead of optional auto-discovery")
     ap.add_argument("--no-jit", action="store_true",
                     help="skip the in-process TinyCC runs even where they are available")
+    ap.add_argument("--interp", action="store_true",
+                    help="also run the samples through the interpreter (goose --interp)")
     ap.add_argument("-j", "--jobs", type=int, default=min(os.cpu_count() or 1, 32),
                     help="how many samples are worked on at once; 1 runs them in order")
     ap.add_argument("--gpu-jobs", type=int, default=0,
@@ -86,6 +89,7 @@ def main():
     # Blessing rewrites the expected outputs from the compiled run, so the
     # JIT comparison against them has nothing to say until that has happened.
     jit = not args.no_jit and not args.bless
+    interp = args.interp and not args.bless
 
     gendir = tc.REPO_ROOT / "build" / "gen" / args.profile / "samples"
     gendir.mkdir(parents=True, exist_ok=True)
@@ -106,7 +110,7 @@ def main():
         """Everything done with one sample, its two runs one after the other:
         a sample may write a file in this directory. Returns what it printed,
         its failures, and the names of the samples skipped."""
-        lines, failures, jitskips, nativeskips = [], 0, [], []
+        lines, failures, jitskips, nativeskips, interpskips = [], 0, [], [], []
         say = lines.append
         # The number prefix orders the files for reading; outputs, data and
         # headers go by the bare name.
@@ -127,7 +131,7 @@ def main():
         # compiled in; the compiler would otherwise build the package.
         if any(not native[m] for m in modules):
             nativeskips.append(f.name)
-            return lines, failures, jitskips, nativeskips
+            return lines, failures, jitskips, nativeskips, interpskips
         if jit:
             # Same source, same expected output, no C file and no external
             # compiler: the sample built and run inside the compiler process.
@@ -151,18 +155,39 @@ def main():
                     failures += 1
                 else:
                     say(f"ok   sample-jit {f.name}")
+        if interp:
+            # And through the interpreter, against the same expected output:
+            # a sample it cannot run yet (threads) is a skip, like the JIT's.
+            with gpu(modules):
+                code, out, err = tc.run_capture([exe] + gargs + ["--interp", str(f), "--"] + progargs,
+                                                cwd=HERE,
+                                                stdin_path=infile if infile.exists() else None)
+            if code != 0 and tc.INTERP_UNSUPPORTED in err:
+                interpskips.append(f.name)
+            elif code != 0 or tc.sanitizer_failure(err):
+                say("\n".join(err.splitlines()[-3:]))
+                say(f"FAIL sample-interp {f.name} (exit {code})")
+                failures += 1
+            else:
+                want = normalized(expfile)
+                if want is not None and out.rstrip("\n") != want.rstrip("\n"):
+                    say(f"FAIL sample-interp-expected {f.name}")
+                    say(f"--- got:\n{out}\n--- want:\n{want}")
+                    failures += 1
+                else:
+                    say(f"ok   sample-interp {f.name}")
         gargs += ["-o", str(cfile)] if cc else ["--check"]
         code, out, err = tc.run_capture([exe] + gargs + [str(f)])
         if code != 0:
             say((out + err).rstrip("\n"))
             say(f"FAIL sample-compile {f.name}")
-            return lines, failures + 1, jitskips, nativeskips
+            return lines, failures + 1, jitskips, nativeskips, interpskips
         if not cc:
             say(f"ok   sample-check {f.name}")
-            return lines, failures, jitskips, nativeskips
+            return lines, failures, jitskips, nativeskips, interpskips
         if any(not native[m] for m in modules):
             nativeskips.append(f.name)
-            return lines, failures, jitskips, nativeskips
+            return lines, failures, jitskips, nativeskips, interpskips
         if args.profile == "baseline":
             # Built as a user builds: the compiler finds the C compiler, the
             # runtime object and the packages' link inputs itself.
@@ -177,7 +202,7 @@ def main():
         if not ok:
             say("\n".join(log.splitlines()[:8]))
             say(f"FAIL sample-cc {f.name}")
-            return lines, failures + 1, jitskips, nativeskips
+            return lines, failures + 1, jitskips, nativeskips, interpskips
         outfile, errfile = gendir / f"{name}.out", gendir / f"{name}.err"
         with gpu(modules):
             code, out, err = tc.run_capture([efile] + progargs, cwd=HERE,
@@ -186,23 +211,23 @@ def main():
         tc.write_text(errfile, err)
         if "gfx" in modules and tc.GFX_NO_DEVICE in err:
             nativeskips.append(f.name)
-            return lines, failures, jitskips, nativeskips
+            return lines, failures, jitskips, nativeskips, interpskips
         if code != 0 or tc.sanitizer_failure(err):
             say("\n".join(err.splitlines()[:3]))
             say(f"FAIL sample-run {f.name} (exit {code})")
-            return lines, failures + 1, jitskips, nativeskips
+            return lines, failures + 1, jitskips, nativeskips, interpskips
         got = normalized(outfile)
         if args.bless:
             tc.write_text(expfile, got)
             say(f"ok   sample-blessed {f.name}")
-            return lines, failures, jitskips, nativeskips
+            return lines, failures, jitskips, nativeskips, interpskips
         want = normalized(expfile)
         if want is not None and got != want:
             say(f"FAIL sample-expected {f.name}")
             say(f"--- got:\n{got}\n--- want:\n{want}")
-            return lines, failures + 1, jitskips, nativeskips
+            return lines, failures + 1, jitskips, nativeskips, interpskips
         say(f"ok   sample {f.name}")
-        return lines, failures, jitskips, nativeskips
+        return lines, failures, jitskips, nativeskips, interpskips
 
     # Each sample's lines print as soon as it and the samples before it are
     # done, in the same order whatever the number of jobs.
@@ -212,16 +237,19 @@ def main():
         results = pool.map(sample, files)
     else:
         results = map(sample, files)
-    failures, jitskips, nativeskips = 0, [], []
-    for lines, fails, jskips, nskips in results:
+    failures, jitskips, nativeskips, interpskips = 0, [], [], []
+    for lines, fails, jskips, nskips, iskips in results:
         if lines:
             print("\n".join(lines), flush=True)
         failures += fails
         jitskips += jskips
         nativeskips += nskips
+        interpskips += iskips
 
     if jitskips:
         print("skip JIT for sample(s) the backend cannot run yet: " + ", ".join(jitskips))
+    if interpskips:
+        print("skip the interpreter for sample(s) it cannot run yet: " + ", ".join(interpskips))
     if nativeskips:
         print("skip audio, gfx, physics or ui sample(s) (no layer for them, or no GPU device): " +
               ", ".join(sorted(set(nativeskips))))

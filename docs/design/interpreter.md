@@ -777,10 +777,13 @@ backend proceeds in its own repository in parallel from step 12 on.
    gaps it closed; findings about codegen or the runtime, if any, are
    commits of their own on `master`, not here.
 8. **Suspension and the time budget.** `goose_resume`-style re-entry of
-   the VM loop, the depth cap reported as native stack overflow, and the
-   instruction-count check that yields after a time budget. Test: a
-   fixture that recurses past the cap prints the runtime's message and
-   exits 1; a unit test resumes a suspended run to completion.
+   the VM loop and the instruction-count check that yields after a time
+   budget. (The depth cap reported as native stack overflow, and a data
+   stack grown past its reservation reported through `gs_data_overflow`,
+   came with step 7, where the runtime fixtures that expect the messages
+   asked for them: the VM abandons the instruction and calls the
+   runtime's reporter.) Test: a unit test resumes a suspended run to
+   completion.
 
 **Part three: native packages, natively**
 

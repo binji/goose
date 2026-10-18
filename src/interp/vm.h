@@ -32,6 +32,11 @@ struct Fault { string msg; };
 // exit() from the program.
 struct Exit { int status; };
 
+// An overflow the runtime reports itself (§5, §10): the VM abandons the
+// instruction and calls the runtime's reporter, which writes the message
+// the native build writes and exits.
+struct Reroute { int fn; vector<uint64_t> args; };
+
 enum SegKind { SEG_STATIC, SEG_FRAME, SEG_HEAP, SEG_STACK, SEG_FUNC };
 
 struct Segment {
@@ -85,6 +90,10 @@ struct VM {
         statichandles.assign(prog.statics.size(), 0);
         funchandles.assign(prog.funcs.size(), 0);
         natives.assign(prog.funcs.size(), nullptr);
+        for (size_t i = 0; i < prog.funcs.size(); i++) {
+            if (prog.funcs[i].name == "gs_native_overflow") nativeoverflow = (int)i;
+            if (prog.funcs[i].name == "gs_data_overflow") dataoverflow = (int)i;
+        }
         for (int fd = 0; fd < 3; fd++) {
             auto h = Handle(NewSeg(SEG_STATIC, fd == 0 ? "stdin" : fd == 1 ? "stdout" : "stderr", 1), 0);
             streams[h].fd = fd;
@@ -134,6 +143,11 @@ struct VM {
     vector<Segment> segs;
     uint32_t frameseg = 0;
     uint64_t frametop = 0;
+    // The runtime's reporters of the two overflows, where the program has
+    // them (the GS_INTERP branch of runtime_impl.h), and whether one is
+    // running, which lifts the frame limit for it.
+    int nativeoverflow = -1, dataoverflow = -1;
+    bool reporting = false;
 
     uint32_t NewSeg(SegKind kind, string name, uint64_t size) {
         if (segs.size() >= 0xffffffffu) throw Fault { "too many segments" };
@@ -188,9 +202,10 @@ struct VM {
             throw Fault { cat("access of ", n, " bytes at offset ", SOffOf(h), ", before the start of ", Describe(s)) };
         if (off + n > s.size) {
             if (s.kind == SEG_STACK && off + n <= s.limit) Grow(s, off + n);
-            else if (s.kind == SEG_STACK)
+            else if (s.kind == SEG_STACK) {
+                if (dataoverflow >= 0) throw Reroute { dataoverflow, { Handle(SegOf(h), 0) } };
                 throw Fault { cat("data stack overflow: ", n, " bytes at offset ", off, " of a ", Describe(s)) };
-            else
+            } else
                 throw Fault { cat("access of ", n, " bytes at offset ", off, " past the end of ", Describe(s)) };
         }
         return s.mem.data() + off;
@@ -216,8 +231,12 @@ struct VM {
         auto &s = segs[id];
         auto off = SOffOf(p) + delta;
         auto lim = s.kind == SEG_STACK ? s.limit : s.size;
-        if (off < INT32_MIN || off > (int64_t)lim)
+        if (off < INT32_MIN || off > (int64_t)lim) {
+            // A data stack's top bumped past its reservation is the overflow
+            // the runtime reports, as the write there would be.
+            if (s.kind == SEG_STACK && off >= 0 && dataoverflow >= 0) throw Reroute { dataoverflow, { Handle(id, 0) } };
             throw Fault { cat("pointer arithmetic leaves ", Describe(s), ": offset ", off) };
+        }
         return Handle(id, (uint64_t)off);
     }
 
@@ -332,7 +351,10 @@ struct VM {
         auto &fs = segs[frameseg];
         auto fp = RoundUp((int64_t)frametop, 8);
         auto top = (uint64_t)fp + (uint64_t)f.framesize;
-        if (top > fs.limit) throw Fault { "native call stack overflow" };
+        if (top > fs.limit && !reporting) {
+            if (nativeoverflow >= 0) throw Reroute { nativeoverflow, {} };
+            throw Fault { "native call stack overflow" };
+        }
         if (top > fs.mem.size()) fs.mem.resize(max(top, (uint64_t)fs.mem.size() * 2));
         fs.size = top;
         auto frame = fs.mem.data() + fp;
@@ -513,6 +535,12 @@ struct VM {
                 fr.pc = pc;
                 this->sp = (size_t)(sp - base);
                 throw;
+            } catch (Reroute &r) {
+                fr.pc = pc;
+                this->sp = (size_t)(sp - base);
+                reporting = true;
+                for (auto a : r.args) Push(a);
+                Enter(prog.funcs[(size_t)r.fn], (int)r.args.size());
             }
         reload:;
         }
