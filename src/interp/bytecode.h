@@ -65,6 +65,9 @@ enum Op : uint8_t {
     OP_POP,
     OP_DUP,
     OP_LOCAL,      // imm: offset; pushes the handle of a frame slot
+    OP_LLOAD,      // t, imm: offset; pushes the value of a frame slot (LOCAL then LOAD)
+    OP_LSTORE,     // t, imm: offset; pops a value into a frame slot (LOCAL, value, STORE)
+    OP_LSTOREK,    // t, imm: as LSTORE, and pushes the value back
     OP_GLOBAL,     // imm: static object index; pushes its handle
     OP_FUNC,       // imm: function index; pushes its handle
     OP_LOAD,       // t: pops an address, pushes the value there
@@ -86,18 +89,22 @@ enum Op : uint8_t {
     OP_JMP,        // imm: target
     OP_JZ,         // imm: target; pops, jumps if zero
     OP_JNZ,        // imm: target; pops, jumps if not zero
-    OP_CALL,       // imm: function index, t2: argument count; the arguments are the top slots
-    OP_CALLI,      // t2: argument count; the callee's handle is below the arguments
+    OP_JCMP,       // t, imm: target, t2: a comparison op; pops b then a, jumps if a <op> b (a
+                   // comparison and the jump on it fused)
+    OP_CALL,       // imm: function index, t2: argument count, t: the result type (VT_VOID: none,
+                   // or sret); the arguments are the top slots
+    OP_CALLI,      // t, t2: as CALL; the callee's handle is below the arguments
     OP_RET,        // t: the result type (VT_VOID for none); pops the result
     OP_UNREACHABLE,
 };
 
 inline const char *OpName(Op op) {
     static const char *names[] = {
-        "nop", "push", "pop", "dup", "local", "global", "func", "load", "store", "storek", "copy",
+        "nop", "push", "pop", "dup", "local", "lload", "lstore", "lstorek", "global", "func", "load",
+        "store", "storek", "copy",
         "zero", "offset", "ptradd", "ptrsub", "ptrdiff", "incdec", "neg", "not", "lnot", "tobool",
         "add", "sub", "mul", "div", "mod", "and", "or", "xor", "shl", "shr",
-        "eq", "ne", "lt", "le", "gt", "ge", "cvt", "jmp", "jz", "jnz", "call", "calli",
+        "eq", "ne", "lt", "le", "gt", "ge", "cvt", "jmp", "jz", "jnz", "jcmp", "call", "calli",
         "ret", "unreachable",
     };
     return names[op];
@@ -124,6 +131,7 @@ struct Function {
     CDecl *decl = nullptr;
     vector<Insn> code;           // empty for an external
     int64_t framesize = 0;
+    int64_t maxstack = 0;        // operand slots the code needs at most, which a call reserves
     vector<Param> params;        // the hidden result pointer first where sret
     bool sret = false;           // returns a record through a pointer the caller passes
     VT ret = VT_VOID;            // the result type on the stack (VT_VOID: none, or sret)
@@ -157,7 +165,7 @@ struct Program {
 
 // A listing, for the fixtures that look at lowering and for debugging.
 inline string Disasm(const Program &p, const Function &f) {
-    string s = cat(f.name, " frame ", f.framesize, f.sret ? " sret" : "", "\n");
+    string s = cat(f.name, " frame ", f.framesize, " stack ", f.maxstack, f.sret ? " sret" : "", "\n");
     for (size_t i = 0; i < f.code.size(); i++) {
         auto &in = f.code[i];
         Append(s, "  ", i, ": ", OpName(in.op));
@@ -169,10 +177,12 @@ inline string Disasm(const Program &p, const Function &f) {
             case OP_PTRDIFF: case OP_JMP: case OP_JZ: case OP_JNZ:
                 Append(s, " ", in.imm);
                 break;
+            case OP_LLOAD: case OP_LSTORE: case OP_LSTOREK: Append(s, ".", VTName(in.t), " ", in.imm); break;
+            case OP_JCMP: Append(s, ".", OpName((Op)in.t2), ".", VTName(in.t), " ", in.imm); break;
             case OP_GLOBAL: Append(s, " ", in.imm, " (", p.statics[(size_t)in.imm].name, ")"); break;
             case OP_FUNC: Append(s, " ", in.imm, " (", p.funcs[(size_t)in.imm].name, ")"); break;
-            case OP_CALL: Append(s, " ", p.funcs[(size_t)in.imm].name, " ", (int)in.t2); break;
-            case OP_CALLI: Append(s, " ", (int)in.t2); break;
+            case OP_CALL: Append(s, ".", VTName(in.t), " ", p.funcs[(size_t)in.imm].name, " ", (int)in.t2); break;
+            case OP_CALLI: Append(s, ".", VTName(in.t), " ", (int)in.t2); break;
             case OP_INCDEC:
                 Append(s, ".", VTName(in.t), " ", in.imm, (in.t2 & 1) ? " post" : "", (in.t2 & 2) ? " ptr" : "");
                 break;

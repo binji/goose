@@ -638,7 +638,13 @@ compiled code.
   whatever frame rate the interpreted Goose side allows, with the layer's
   draws themselves at native speed. The page should offer smaller
   arguments and say what to expect. `-O2` helps, since inlining removes
-  interpreted calls. If it matters later, the usual steps apply in order:
+  interpreted calls. The cheap steps are taken: the loop keeps the frame's
+  state in locals and addresses the operand stack through a pointer, a
+  function's stack need is computed by lowering so calls reserve it once,
+  loads and stores of a scalar at a fixed frame offset (a local, or a
+  field of a local record) are one instruction, and a comparison fuses
+  with the jump on it; with them the sieve runs some 15 times slower than
+  TinyCC's code. If it matters later, the usual steps apply in order:
   keep scalar locals in VM registers instead of the frame segment,
   superinstructions for `load`-`op`-`store` on fields, and a cache of the
   last decoded segment.

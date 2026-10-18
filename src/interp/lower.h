@@ -62,10 +62,12 @@ private:
     Function *fn = nullptr;
     int curline = 0;
     vector<int64_t> labels;                  // label id -> pc, or -1 while unplaced
+    int64_t lastplaced = -1;                 // the pc the last label was placed at
     vector<int> breaks, continues;           // the enclosing loop or switch exits
     unordered_map<string, int> namedlabels;
     unordered_map<const Stmt *, int> caselabels;
     int64_t frametop = 0;
+    int depth = 0, maxdepth = 0;             // the operand stack's height, followed in emission order
 
     [[noreturn]] void Error(int line, string_view msg) const {
         throw CompileError { cat(files[fn && fn->decl ? fn->decl->file : 0], ":", line, ": error: ", msg) };
@@ -93,16 +95,64 @@ private:
         in.imm = imm;
         in.line = curline;
         fn->code.push_back(in);
+        depth += Effect(in);
+        maxdepth = max(maxdepth, depth);
+    }
+
+    // What an instruction does to the operand stack's height. Followed in
+    // emission order this bounds the height the code reaches: a jump's
+    // target is never deeper than the code before the jump, since
+    // statements leave the stack where they found it and the expressions
+    // that branch (?:, &&, ||) join at equal heights.
+    static int Effect(const Insn &in) {
+        switch (in.op) {
+            case OP_PUSH: case OP_DUP: case OP_LOCAL: case OP_LLOAD: case OP_GLOBAL: case OP_FUNC: return 1;
+            case OP_POP: case OP_LSTORE: case OP_ZERO: case OP_PTRADD: case OP_PTRSUB: case OP_PTRDIFF:
+            case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+            case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR:
+            case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE:
+            case OP_JZ: case OP_JNZ:
+                return -1;
+            case OP_STORE: case OP_COPY: case OP_JCMP: return -2;
+            case OP_CALL: return (in.t != VT_VOID) - (int)in.t2;
+            case OP_CALLI: return (in.t != VT_VOID) - (int)in.t2 - 1;
+            case OP_RET: return in.t != VT_VOID ? -1 : 0;
+            default: return 0;
+        }
     }
     int NewLabel() {
         labels.push_back(-1);
         return (int)labels.size() - 1;
     }
-    void Place(int label) { labels[(size_t)label] = (int64_t)fn->code.size(); }
-    void Jump(Op op, int label) { Emit(op, VT_VOID, label); }
+    void Place(int label) { labels[(size_t)label] = lastplaced = (int64_t)fn->code.size(); }
+
+    // A jump; on a comparison just emitted that nothing jumps to, the two
+    // fuse into one compare-and-jump, the jump's sense folded into the
+    // comparison.
+    void Jump(Op op, int label) {
+        auto &code = fn->code;
+        if ((op == OP_JZ || op == OP_JNZ) && !code.empty() && lastplaced != (int64_t)code.size()) {
+            auto &last = code.back();
+            if (last.op >= OP_EQ && last.op <= OP_GE) {
+                static const Op inverse[] = { OP_NE, OP_EQ, OP_GE, OP_GT, OP_LE, OP_LT };
+                auto cmp = op == OP_JNZ ? last.op : inverse[last.op - OP_EQ];
+                // Comparing floats, `!(a < b)` is not `a >= b` when one is a NaN.
+                if (!IsFloat(last.t) || op == OP_JNZ) {
+                    last.op = OP_JCMP;
+                    last.t2 = (uint8_t)cmp;
+                    last.imm = label;
+                    depth -= 1;   // the jump's pop; the comparison's push is undone
+                    return;
+                }
+            }
+        }
+        Emit(op, VT_VOID, label);
+    }
 
     void Begin(Function *f) {
         fn = f;
+        depth = maxdepth = 0;
+        lastplaced = -1;
         labels.clear();
         breaks.clear();
         continues.clear();
@@ -114,12 +164,14 @@ private:
     // Resolves the jumps and sizes the frame.
     void End() {
         for (auto &in : fn->code)
-            if (in.op == OP_JMP || in.op == OP_JZ || in.op == OP_JNZ) {
+            if (in.op == OP_JMP || in.op == OP_JZ || in.op == OP_JNZ || in.op == OP_JCMP) {
                 auto target = labels[(size_t)in.imm];
                 assert(target >= 0);
                 in.imm = target;
             }
         fn->framesize = RoundUp(frametop, 8);
+        // A slot or two of slack for what a native call pushes.
+        fn->maxstack = maxdepth + 2;
         fn = nullptr;
     }
 
@@ -296,9 +348,28 @@ private:
     // A conditional jump on a scalar: a float compares against zero first,
     // since a negative zero's bits are not zero.
     void Branch(Expr *e, Op op, int label) {
+        // A condition's integer casts of a 0-or-1 value change nothing, and
+        // `!x` is the other jump on x: the `if (!(a <= b))` codegen writes
+        // for a loop's exit becomes a compare and one jump.
+        while (e->kind == E_CAST && e->type->IsInteger() && IsBoolean(e->a)) e = e->a;
+        if (e->kind == E_UNARY && e->op == "!") {
+            Branch(e->a, op == OP_JZ ? OP_JNZ : OP_JZ, label);
+            return;
+        }
         Value(e);
         if (IsFloat(VTOf(e->type))) Emit(OP_TOBOOL, VTOf(e->type));
         Jump(op, label);
+    }
+
+    // An expression whose value is 0 or 1: a comparison, a logical operator,
+    // or an integer cast of one.
+    static bool IsBoolean(const Expr *e) {
+        if (e->kind == E_UNARY) return e->op == "!";
+        if (e->kind == E_BINARY)
+            return e->op == "==" || e->op == "!=" || e->op == "<" || e->op == "<=" || e->op == ">" ||
+                   e->op == ">=" || e->op == "&&" || e->op == "||";
+        if (e->kind == E_CAST) return e->type->IsInteger() && IsBoolean(e->a);
+        return false;
     }
 
     // ---- Objects and initializers
@@ -312,6 +383,12 @@ private:
     // first, then every written item is stored.
     void InitObject(CDecl *d) {
         if (!d->init) return;
+        if (d->islocal && !d->init->IsList() && d->type->IsScalar()) {
+            curline = d->init->expr->line;
+            Value(d->init->expr);
+            Emit(OP_LSTORE, VTOf(d->type), d->frameoff);
+            return;
+        }
         auto base = [&] { ObjAddr(d); };
         if (d->init->IsList()) {
             base();
@@ -414,6 +491,7 @@ private:
                 return;
             case E_VAR:
                 if (!want) return;
+                if (IsSlotLocal(e)) { Emit(OP_LLOAD, VTOf(e->type), SlotOf(e)); return; }
                 Addr(e);
                 Load(e->type);
                 return;
@@ -443,12 +521,29 @@ private:
             case E_BINARY: Binary(e, want); return;
             case E_ASSIGN: Assign(e, want); return;
             case E_INCDEC: {
-                // t2: bit 0 post, bit 1 pointer (checked arithmetic).
-                Addr(e->a);
                 bool ptr = e->type->kind == TK_PTR;
                 int64_t delta = ptr ? e->type->elem->size : 1;
                 if (e->op == "--") delta = -delta;
-                Emit(OP_INCDEC, VTOf(e->type), delta, (uint8_t)((e->post ? 1 : 0) | (ptr ? 2 : 0)));
+                auto t = VTOf(e->type);
+                if (IsSlotLocal(e->a)) {
+                    // On a local: load, add, store, with the old value kept
+                    // under the new one where a postfix form's is wanted.
+                    auto off = SlotOf(e->a);
+                    Emit(OP_LLOAD, t, off);
+                    if (want && e->post) Emit(OP_DUP);
+                    if (ptr) {
+                        Emit(OP_PUSH, VT_VOID, 1);
+                        Emit(OP_PTRADD, VT_VOID, delta);
+                    } else {
+                        Emit(OP_PUSH, VT_VOID, IsFloat(t) ? (int64_t)bit_cast<uint64_t>((double)delta) : delta);
+                        Emit(OP_ADD, t);
+                    }
+                    Emit(want && !e->post ? OP_LSTOREK : OP_LSTORE, t, off);
+                    return;
+                }
+                // t2: bit 0 post, bit 1 pointer (checked arithmetic).
+                Addr(e->a);
+                Emit(OP_INCDEC, t, delta, (uint8_t)((e->post ? 1 : 0) | (ptr ? 2 : 0)));
                 if (!want) Emit(OP_POP);
                 return;
             }
@@ -490,7 +585,10 @@ private:
 
     void Convert(CType *from, CType *to) {
         auto f = VTOf(from), t = VTOf(to);
-        if (f != t) Emit(OP_CVT, f, 0, t);
+        if (f == t) return;
+        // The 64-bit integers and pointers share one slot form.
+        if ((f == VT_I64 || f == VT_U64) && (t == VT_I64 || t == VT_U64)) return;
+        Emit(OP_CVT, f, 0, t);
     }
 
     void Truth(Expr *e) {
@@ -517,6 +615,13 @@ private:
             return;
         }
         auto at = e->a->type, bt = e->b->type;
+        // `i * 1` and `p + 0`, which codegen writes for byte-sized elements
+        // and a first field, are their left operand.
+        if (e->b->kind == E_INT && at->IsInteger() && bt->IsInteger() &&
+            ((o == "*" && e->b->ival == 1) || ((o == "+" || o == "-") && e->b->ival == 0))) {
+            Value(e->a);
+            return;
+        }
         Value(e->a);
         Value(e->b);
         curline = e->line;
@@ -540,9 +645,40 @@ private:
         Emit(it->second, VTOf(at));
     }
 
+    // A scalar at a fixed place in the frame, which the fused local
+    // instructions reach without an address: a local or parameter, or a
+    // field of a local record, however deep.
+    static bool IsSlotLocal(const Expr *e) {
+        int64_t off;
+        return e->type->IsScalar() && FrameSlot(e, off);
+    }
+    static bool FrameSlot(const Expr *e, int64_t &off) {
+        if (e->kind == E_VAR) {
+            if (e->decl->kind != D_VAR || !e->decl->islocal) return false;
+            off = e->decl->frameoff;
+            return true;
+        }
+        if (e->kind == E_FIELD && FrameSlot(e->a, off)) {
+            off += e->field->offset;
+            return true;
+        }
+        return false;
+    }
+    static int64_t SlotOf(const Expr *e) {
+        int64_t off = 0;
+        FrameSlot(e, off);
+        return off;
+    }
+
     void Assign(Expr *e, bool want) {
         auto lt = e->a->type;
+        bool local = IsSlotLocal(e->a);
         if (e->op == "=") {
+            if (local) {
+                Value(e->b);
+                Emit(want ? OP_LSTOREK : OP_LSTORE, VTOf(lt), SlotOf(e->a));
+                return;
+            }
             Addr(e->a);
             if (lt->IsRecord()) {
                 if (want) Emit(OP_DUP);
@@ -557,9 +693,13 @@ private:
         // a op= b: load a, do the operation in optype, convert back, store.
         auto o = e->op.substr(0, e->op.size() - 1);
         auto ot = e->optype;
-        Addr(e->a);
-        Emit(OP_DUP);
-        Emit(OP_LOAD, VTOf(lt));
+        if (local) {
+            Emit(OP_LLOAD, VTOf(lt), SlotOf(e->a));
+        } else {
+            Addr(e->a);
+            Emit(OP_DUP);
+            Emit(OP_LOAD, VTOf(lt));
+        }
         if (ot->kind == TK_PTR) {
             Value(e->b);
             Emit(o == "+" ? OP_PTRADD : OP_PTRSUB, VT_VOID, ot->elem->size);
@@ -574,7 +714,8 @@ private:
             Emit(ops.at(o), VTOf(ot));
             Convert(ot, lt);
         }
-        Emit(want ? OP_STOREK : OP_STORE, VTOf(lt));
+        if (local) Emit(want ? OP_LSTOREK : OP_LSTORE, VTOf(lt), SlotOf(e->a));
+        else Emit(want ? OP_STOREK : OP_STORE, VTOf(lt));
     }
 
     void Call(Expr *e, bool want) {
@@ -597,8 +738,10 @@ private:
         }
         if (nargs > 255) Error(e->line, "too many arguments");
         curline = e->line;
-        if (direct) Emit(OP_CALL, VT_VOID, funcidx.at(direct), (uint8_t)nargs);
-        else Emit(OP_CALLI, VT_VOID, 0, (uint8_t)nargs);
+        // The result type on the stack: none for void or a record (sret).
+        auto rt = ft->elem->IsScalar() ? VTOf(ft->elem) : VT_VOID;
+        if (direct) Emit(OP_CALL, rt, funcidx.at(direct), (uint8_t)nargs);
+        else Emit(OP_CALLI, rt, 0, (uint8_t)nargs);
         if (sret >= 0) {
             if (want) Emit(OP_LOCAL, VT_VOID, sret);
         } else if (ft->elem->kind != TK_VOID && !want) {

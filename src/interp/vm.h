@@ -14,6 +14,14 @@
 
 #include <errno.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define GS_NOINLINE_ATTR __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define GS_NOINLINE_ATTR __declspec(noinline)
+#else
+#define GS_NOINLINE_ATTR
+#endif
+
 namespace goose {
 namespace interp {
 
@@ -47,7 +55,7 @@ struct Frame {
     const Function *fn;
     size_t pc;
     uint64_t fp;                 // the frame's offset in the frame segment
-    size_t sp;                   // the operand stack's height on entry, after the arguments
+    size_t sp;                   // the operand stack's height on entry, after the arguments were taken
 };
 
 struct VM {
@@ -153,7 +161,19 @@ struct VM {
 
     // The bytes of an access: `n` bytes at the handle, which must be within
     // a live segment, or within a stack segment's limit, which grows it.
+    // The common case, within a live segment's size, is decided here; the
+    // rest, the growth and every fault, in AccessSlow.
     uint8_t *Access(uint64_t h, uint64_t n) {
+        auto id = SegOf(h);
+        if (id != 0 && id < segs.size()) {
+            auto &s = segs[id];
+            auto off = OffOf(h);
+            if (s.alive && off + n <= s.size) return s.mem.data() + off;
+        }
+        return AccessSlow(h, n);
+    }
+
+    GS_NOINLINE_ATTR uint8_t *AccessSlow(uint64_t h, uint64_t n) {
         auto &s = Seg(h);
         auto off = OffOf(h);
         if (!s.alive) throw Fault { cat("use after free: ", n, " bytes at offset ", off, " of a ", Describe(s)) };
@@ -199,45 +219,54 @@ struct VM {
         return ((int64_t)OffOf(a) - (int64_t)OffOf(b)) / size;
     }
 
-    // ---- Values in memory, little-endian
+    // ---- Values in memory, little-endian, as the host is
+
+    static_assert(endian::native == endian::little, "the interpreter's hosts are little-endian");
 
     static uint64_t LoadVal(const uint8_t *p, VT t) {
-        if (t == VT_F32) {
-            uint32_t bits = 0;
-            for (int i = 0; i < 4; i++) bits |= (uint32_t)p[i] << (8 * i);
-            return bit_cast<uint64_t>((double)bit_cast<float>(bits));
+        switch (t) {
+            case VT_I8: return (uint64_t)(int64_t)(int8_t)p[0];
+            case VT_U8: return p[0];
+            case VT_BOOL: return p[0] != 0;
+            case VT_I16: { int16_t v; memcpy(&v, p, 2); return (uint64_t)(int64_t)v; }
+            case VT_U16: { uint16_t v; memcpy(&v, p, 2); return v; }
+            case VT_I32: { int32_t v; memcpy(&v, p, 4); return (uint64_t)(int64_t)v; }
+            case VT_U32: { uint32_t v; memcpy(&v, p, 4); return v; }
+            case VT_F32: { float v; memcpy(&v, p, 4); return bit_cast<uint64_t>((double)v); }
+            default: { uint64_t v; memcpy(&v, p, 8); return v; }
         }
-        uint64_t v = 0;
-        int n = VTSize(t);
-        for (int i = 0; i < n; i++) v |= (uint64_t)p[i] << (8 * i);
-        return Normalize(v, t);
     }
 
     static void StoreVal(uint8_t *p, VT t, uint64_t v) {
-        if (t == VT_F32) {
-            auto bits = bit_cast<uint32_t>((float)bit_cast<double>(v));
-            for (int i = 0; i < 4; i++) p[i] = (uint8_t)(bits >> (8 * i));
-            return;
+        switch (t) {
+            case VT_I8: case VT_U8: case VT_BOOL: p[0] = (uint8_t)v; break;
+            case VT_I16: case VT_U16: { uint16_t x = (uint16_t)v; memcpy(p, &x, 2); break; }
+            case VT_I32: case VT_U32: { uint32_t x = (uint32_t)v; memcpy(p, &x, 4); break; }
+            case VT_F32: { float x = (float)bit_cast<double>(v); memcpy(p, &x, 4); break; }
+            default: memcpy(p, &v, 8); break;
         }
-        int n = VTSize(t);
-        for (int i = 0; i < n; i++) p[i] = (uint8_t)(v >> (8 * i));
     }
 
     // ---- The operand stack and frames
 
-    vector<uint64_t> stack;
+    // The operand stack is one block, addressed by index here and through a
+    // pointer in the loop; a call makes room for what its callee's code can
+    // push (Function::maxstack), so nothing else checks.
+    vector<uint64_t> stack = vector<uint64_t>(4096);
+    size_t sp = 0;
     vector<Frame> frames;
     vector<uint64_t> statichandles, funchandles;
     vector<Native> natives;
 
-    void Push(uint64_t v) { stack.push_back(v); }
-    uint64_t Pop() {
-        assert(!stack.empty());
-        auto v = stack.back();
-        stack.pop_back();
-        return v;
+    void Push(uint64_t v) {
+        if (sp == stack.size()) stack.resize(stack.size() * 2);
+        stack[sp++] = v;
     }
-    uint64_t &Top() { return stack.back(); }
+    uint64_t Pop() {
+        assert(sp > 0);
+        return stack[--sp];
+    }
+    uint64_t &Top() { return stack[sp - 1]; }
 
     uint64_t StaticHandle(size_t i) {
         auto &h = statichandles[i];
@@ -280,14 +309,16 @@ struct VM {
                 if (it == library.end()) throw Fault { cat("undefined function '", f.name, "'") };
                 fp = it->second;
             }
-            auto args = stack.data() + stack.size() - (size_t)nargs;
+            auto args = stack.data() + sp - (size_t)nargs;
             auto r = fp(*this, args, nargs);
-            stack.resize(stack.size() - (size_t)nargs);
+            sp -= (size_t)nargs;
             if (f.ret != VT_VOID) Push(Normalize(r, f.ret));
             return false;
         }
         if ((size_t)nargs != f.params.size())
             throw Fault { cat("'", f.name, "' called with ", nargs, " arguments, declared with ", f.params.size()) };
+        if (sp + (size_t)f.maxstack > stack.size())
+            stack.resize(max(stack.size() * 2, sp + (size_t)f.maxstack));
         auto &fs = segs[frameseg];
         auto fp = RoundUp((int64_t)frametop, 8);
         auto top = (uint64_t)fp + (uint64_t)f.framesize;
@@ -295,14 +326,14 @@ struct VM {
         if (top > fs.mem.size()) fs.mem.resize(max(top, (uint64_t)fs.mem.size() * 2));
         fs.size = top;
         auto frame = fs.mem.data() + fp;
-        auto args = stack.data() + stack.size() - (size_t)nargs;
+        auto args = stack.data() + sp - (size_t)nargs;
         for (size_t i = 0; i < f.params.size(); i++) {
             auto &p = f.params[i];
             if (p.size) memmove(frame + p.off, Access(args[i], (uint64_t)p.size), (size_t)p.size);
             else StoreVal(frame + p.off, p.t, args[i]);
         }
-        stack.resize(stack.size() - (size_t)nargs);
-        frames.push_back(Frame { &f, 0, (uint64_t)fp, stack.size() });
+        sp -= (size_t)nargs;
+        frames.push_back(Frame { &f, 0, (uint64_t)fp, sp });
         frametop = top;
         return true;
     }
@@ -310,7 +341,7 @@ struct VM {
     void Ret(VT t) {
         uint64_t v = t == VT_VOID ? 0 : Pop();
         auto &fr = frames.back();
-        if (stack.size() != fr.sp) throw Fault { cat("internal: operand stack imbalance in '", fr.fn->name, "'") };
+        if (sp != fr.sp) throw Fault { cat("internal: operand stack imbalance in '", fr.fn->name, "'") };
         frametop = fr.fp;
         segs[frameseg].size = frametop;
         frames.pop_back();
@@ -320,115 +351,161 @@ struct VM {
 
     // ---- The loop
 
+    // Runs until no frame is left. The top frame's state lives in locals
+    // while its code runs and goes back to the frame at a call, a return
+    // or a fault, whose report reads the frames.
     void Loop() {
-        while (!frames.empty()) Step();
-    }
-
-    void Step() {
-        auto &fr = frames.back();
-        auto &in = fr.fn->code[fr.pc];
-        switch (in.op) {
-            case OP_NOP: break;
-            case OP_PUSH: Push((uint64_t)in.imm); break;
-            case OP_POP: Pop(); break;
-            case OP_DUP: Push(Top()); break;
-            case OP_LOCAL: Push(Handle(frameseg, fr.fp + (uint64_t)in.imm)); break;
-            case OP_GLOBAL: Push(StaticHandle((size_t)in.imm)); break;
-            case OP_FUNC: Push(FuncHandle((size_t)in.imm)); break;
-            case OP_LOAD: Top() = LoadVal(Access(Top(), (uint64_t)VTSize(in.t)), in.t); break;
-            case OP_STORE:
-            case OP_STOREK: {
-                auto v = Pop();
-                auto a = Pop();
-                StoreVal(Access(a, (uint64_t)VTSize(in.t)), in.t, v);
-                if (in.op == OP_STOREK) Push(v);
-                break;
-            }
-            case OP_COPY: {
-                auto src = Pop(), dst = Pop();
-                auto n = (uint64_t)in.imm;
-                if (n) {
-                    // Both accesses before either copy, since the second may
-                    // grow a stack segment and move the first.
-                    Access(dst, n);
-                    auto s = Access(src, n);
-                    auto d = Access(dst, n);
-                    memmove(d, s, n);
+        while (!frames.empty()) {
+            auto &fr = frames.back();
+            const Function *fn = fr.fn;
+            const Insn *code = fn->code.data();
+            size_t pc = fr.pc;
+            uint64_t fp = fr.fp;
+            uint8_t *frame = segs[frameseg].mem.data() + fp;
+            uint64_t *base = stack.data();
+            uint64_t *sp = base + this->sp;
+            try {
+                for (;;) {
+                    auto &in = code[pc];
+                    switch (in.op) {
+                        case OP_NOP: break;
+                        case OP_PUSH: *sp++ = (uint64_t)in.imm; break;
+                        case OP_POP: sp--; break;
+                        case OP_DUP: sp[0] = sp[-1]; sp++; break;
+                        case OP_LOCAL: *sp++ = Handle(frameseg, fp + (uint64_t)in.imm); break;
+                        case OP_LLOAD: *sp++ = LoadVal(frame + in.imm, in.t); break;
+                        case OP_LSTORE: StoreVal(frame + in.imm, in.t, *--sp); break;
+                        case OP_LSTOREK: StoreVal(frame + in.imm, in.t, sp[-1]); break;
+                        case OP_GLOBAL: *sp++ = StaticHandle((size_t)in.imm); break;
+                        case OP_FUNC: *sp++ = FuncHandle((size_t)in.imm); break;
+                        case OP_LOAD: sp[-1] = LoadVal(Access(sp[-1], (uint64_t)VTSize(in.t)), in.t); break;
+                        case OP_STORE:
+                        case OP_STOREK: {
+                            auto v = sp[-1], a = sp[-2];
+                            StoreVal(Access(a, (uint64_t)VTSize(in.t)), in.t, v);
+                            sp -= in.op == OP_STOREK ? 1 : 2;
+                            if (in.op == OP_STOREK) sp[-1] = v;
+                            break;
+                        }
+                        case OP_COPY: {
+                            auto src = sp[-1], dst = sp[-2];
+                            sp -= 2;
+                            auto n = (uint64_t)in.imm;
+                            if (n) {
+                                // Both accesses before either copy, since the
+                                // second may grow a stack segment and move the first.
+                                Access(dst, n);
+                                auto s = Access(src, n);
+                                auto d = Access(dst, n);
+                                memmove(d, s, n);
+                            }
+                            break;
+                        }
+                        case OP_ZERO: {
+                            auto a = *--sp;
+                            if (in.imm) memset(Access(a, (uint64_t)in.imm), 0, (size_t)in.imm);
+                            break;
+                        }
+                        case OP_OFFSET: sp[-1] = PtrAdd(sp[-1], in.imm); break;
+                        case OP_PTRADD:
+                        case OP_PTRSUB: {
+                            auto i = (int64_t)*--sp;
+                            auto delta = i * in.imm;
+                            sp[-1] = PtrAdd(sp[-1], in.op == OP_PTRADD ? delta : -delta);
+                            break;
+                        }
+                        case OP_PTRDIFF: {
+                            auto b = *--sp;
+                            sp[-1] = (uint64_t)PtrDiff(sp[-1], b, in.imm);
+                            break;
+                        }
+                        case OP_INCDEC: {
+                            auto a = sp[-1];
+                            auto p = Access(a, (uint64_t)VTSize(in.t));
+                            auto old = LoadVal(p, in.t);
+                            uint64_t nv;
+                            if (in.t2 & 2) nv = PtrAdd(old, in.imm);
+                            else if (IsFloat(in.t)) nv = FloatBits(bit_cast<double>(old) + (double)in.imm, in.t);
+                            else nv = Normalize(old + (uint64_t)in.imm, in.t);
+                            StoreVal(Access(a, (uint64_t)VTSize(in.t)), in.t, nv);
+                            sp[-1] = (in.t2 & 1) ? old : nv;
+                            break;
+                        }
+                        case OP_NEG:
+                            if (IsFloat(in.t)) sp[-1] = FloatBits(-bit_cast<double>(sp[-1]), in.t);
+                            else sp[-1] = Normalize(0 - sp[-1], in.t);
+                            break;
+                        case OP_NOT: sp[-1] = Normalize(~sp[-1], in.t); break;
+                        case OP_LNOT: sp[-1] = !Truth(sp[-1], in.t); break;
+                        case OP_TOBOOL: sp[-1] = Truth(sp[-1], in.t); break;
+                        case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+                        case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR: {
+                            auto b = *--sp;
+                            sp[-1] = Arith(in.op, in.t, sp[-1], b);
+                            break;
+                        }
+                        case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE: {
+                            auto b = *--sp;
+                            sp[-1] = Compare(in.op, in.t, sp[-1], b);
+                            break;
+                        }
+                        case OP_CVT: sp[-1] = Convert(sp[-1], in.t, (VT)in.t2); break;
+                        case OP_JMP: pc = (size_t)in.imm; continue;
+                        case OP_JZ:
+                            if (*--sp == 0) { pc = (size_t)in.imm; continue; }
+                            break;
+                        case OP_JNZ:
+                            if (*--sp != 0) { pc = (size_t)in.imm; continue; }
+                            break;
+                        case OP_JCMP: {
+                            auto b = sp[-1], a = sp[-2];
+                            sp -= 2;
+                            if (Compare((Op)in.t2, in.t, a, b)) { pc = (size_t)in.imm; continue; }
+                            break;
+                        }
+                        case OP_CALL:
+                            fr.pc = pc;
+                            this->sp = (size_t)(sp - base);
+                            if (Enter(prog.funcs[(size_t)in.imm], in.t2)) goto reload;
+                            // A native ran: the stack block stays, the frame
+                            // segment may have moved.
+                            sp = stack.data() + this->sp;
+                            base = stack.data();
+                            frame = segs[frameseg].mem.data() + fp;
+                            break;
+                        case OP_CALLI: {
+                            auto h = sp[-1 - in.t2];
+                            auto &s = Seg(h);
+                            if (s.kind != SEG_FUNC || OffOf(h) != 0)
+                                throw Fault { cat("call through a pointer to ", Describe(s)) };
+                            // The callee's handle sits below the arguments: move them down over it.
+                            memmove(sp - 1 - in.t2, sp - in.t2, in.t2 * sizeof *sp);
+                            sp--;
+                            fr.pc = pc;
+                            this->sp = (size_t)(sp - base);
+                            if (Enter(prog.funcs[(size_t)s.func], in.t2)) goto reload;
+                            sp = stack.data() + this->sp;
+                            base = stack.data();
+                            frame = segs[frameseg].mem.data() + fp;
+                            break;
+                        }
+                        case OP_RET:
+                            fr.pc = pc;
+                            this->sp = (size_t)(sp - base);
+                            Ret(in.t);
+                            goto reload;
+                        case OP_UNREACHABLE: throw Fault { "unreachable code reached" };
+                    }
+                    pc++;
                 }
-                break;
+            } catch (Fault &) {
+                // The report reads the frames, so the top one gets its place.
+                fr.pc = pc;
+                this->sp = (size_t)(sp - base);
+                throw;
             }
-            case OP_ZERO: {
-                auto a = Pop();
-                if (in.imm) memset(Access(a, (uint64_t)in.imm), 0, (size_t)in.imm);
-                break;
-            }
-            case OP_OFFSET: Top() = PtrAdd(Top(), in.imm); break;
-            case OP_PTRADD:
-            case OP_PTRSUB: {
-                auto i = (int64_t)Pop();
-                auto delta = i * in.imm;
-                Top() = PtrAdd(Top(), in.op == OP_PTRADD ? delta : -delta);
-                break;
-            }
-            case OP_PTRDIFF: {
-                auto b = Pop();
-                Top() = (uint64_t)PtrDiff(Top(), b, in.imm);
-                break;
-            }
-            case OP_INCDEC: {
-                auto a = Pop();
-                auto p = Access(a, (uint64_t)VTSize(in.t));
-                auto old = LoadVal(p, in.t);
-                uint64_t nv;
-                if (in.t2 & 2) nv = PtrAdd(old, in.imm);
-                else if (IsFloat(in.t)) nv = bit_cast<uint64_t>(bit_cast<double>(old) + (double)in.imm);
-                else nv = Normalize(old + (uint64_t)in.imm, in.t);
-                StoreVal(Access(a, (uint64_t)VTSize(in.t)), in.t, nv);
-                Push((in.t2 & 1) ? old : nv);
-                break;
-            }
-            case OP_NEG:
-                if (IsFloat(in.t)) Top() = FloatBits(-bit_cast<double>(Top()), in.t);
-                else Top() = Normalize(0 - Top(), in.t);
-                break;
-            case OP_NOT: Top() = Normalize(~Top(), in.t); break;
-            case OP_LNOT: Top() = !Truth(Top(), in.t); break;
-            case OP_TOBOOL: Top() = Truth(Top(), in.t); break;
-            case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
-            case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR: {
-                auto b = Pop();
-                Top() = Arith(in.op, in.t, Top(), b);
-                break;
-            }
-            case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE: {
-                auto b = Pop();
-                Top() = Compare(in.op, in.t, Top(), b);
-                break;
-            }
-            case OP_CVT: Top() = Convert(Top(), in.t, (VT)in.t2); break;
-            case OP_JMP: fr.pc = (size_t)in.imm; return;
-            case OP_JZ:
-                if (Pop() == 0) { fr.pc = (size_t)in.imm; return; }
-                break;
-            case OP_JNZ:
-                if (Pop() != 0) { fr.pc = (size_t)in.imm; return; }
-                break;
-            case OP_CALL:
-                if (Enter(prog.funcs[(size_t)in.imm], in.t2)) return;
-                break;
-            case OP_CALLI: {
-                auto h = stack[stack.size() - 1 - in.t2];
-                auto &s = Seg(h);
-                if (s.kind != SEG_FUNC || OffOf(h) != 0) throw Fault { cat("call through a pointer to ", Describe(s)) };
-                // The callee's handle sits below the arguments: move them down over it.
-                stack.erase(stack.end() - 1 - in.t2);
-                if (Enter(prog.funcs[(size_t)s.func], in.t2)) return;
-                break;
-            }
-            case OP_RET: Ret(in.t); return;
-            case OP_UNREACHABLE: throw Fault { "unreachable code reached" };
+        reload:;
         }
-        fr.pc++;
     }
 
     // ---- Arithmetic
