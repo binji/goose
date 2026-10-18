@@ -201,6 +201,7 @@ void *realloc(void *p, size_t n);
 void free(void *p);
 void exit(int status);
 void _exit(int status);
+void _Exit(int status);
 void abort(void);
 char *getenv(const char *name);
 int abs(int x);

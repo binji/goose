@@ -344,6 +344,7 @@ inline void VM::Library() {
     // -- Process
     library["exit"] = [](VM &, const uint64_t *a, int) -> uint64_t { throw Exit { (int)a[0] }; };
     library["_exit"] = library["exit"];
+    library["_Exit"] = library["exit"];
     library["abort"] = [](VM &, const uint64_t *, int) -> uint64_t { throw Fault { "abort() called" }; };
     library["getenv"] = [](VM &vm, const uint64_t *a, int) -> uint64_t {
         auto v = getenv(vm.CStr(a[0]).c_str());

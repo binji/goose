@@ -11,7 +11,10 @@
    still ask; it needs nothing below. It reports no more workers than the
    data stack budget holds beside the main program (gs_rt_start), so a pool
    sized by it never runs the program out of address space. */
-#ifdef _WIN32
+#ifdef GS_INTERP
+/* The interpreter runs one thread program (docs/design/interpreter.md §10). */
+static int64_t gs_os_threads(void) { return 1; }
+#elif defined(_WIN32)
 /* The CPUs the process may run on, which `start /affinity` or a job object
    can make fewer than the machine has. */
 static int64_t gs_os_threads(void) {
@@ -75,6 +78,10 @@ GS_API void gs_stack_stats(int64_t stacks) {
 }
 
 #if GS_NEED_THREADS
+
+#ifdef GS_INTERP
+#error "the interpreter does not run threads; a program that spawns them needs the JIT or a build"
+#endif
 
 #ifdef _WIN32
 

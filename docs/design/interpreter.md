@@ -572,8 +572,9 @@ BCE, codegen, standard library and `jit.h` are untouched.
    fault filter or handler); the new branch defines them over two
    interpreter functions, `gs_host_reserve(usable)` returning a fresh stack
    segment and `gs_host_release(base)`, with no fault handler, since the VM
-   reports overruns and native overflow itself through `gs_overflow_text`
-   and a `gs_native_overflow` this branch adds. The region registry, the
+   reports overruns and native overflow itself through two functions this
+   branch adds, `gs_data_overflow(base)` over `gs_overflow_text` and
+   `gs_native_overflow()`. The region registry, the
    halving retry of `gs_reserve_region` and the stats stay as they are.
    `runtime_os.h`'s branch declares `gs_os_*` over plain POSIX calls, and
    `runtime_threads.h`'s `gs_os_threads` returns 1. Roughly 100 lines.

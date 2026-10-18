@@ -5,6 +5,7 @@
 #ifndef _WIN32
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #ifdef __APPLE__

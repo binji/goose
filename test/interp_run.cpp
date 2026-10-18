@@ -124,6 +124,52 @@ static string RunFixture(const fs::path &f, const fs::path &dir, bool dump) {
     return Relative(Relative(out, dir), tmp);
 }
 
+// The runtime under GS_INTERP (docs/design/interpreter.md §10, step 5): the
+// text a JIT run assembles, with a stand-in for codegen's type block,
+// preprocesses through the prelude, parses and lowers, and every external
+// function it calls is one the library binds. Nothing runs it yet.
+static void Runtime(const fs::path &root) {
+    auto rt = root / "src" / "runtime";
+    string text = "#define GS_INTERP 1\n";
+    for (auto name : { "runtime.h", "runtime_impl.h", "runtime_threads.h" })
+        text += ReadAll(rt / name);
+    // What codegen's head always has of the types the extern support is
+    // written against (CodeGen::EmitCoreTypes), and sl_u8 as a program that
+    // uses it gets it.
+    text +=
+        "#pragma pack(push, 1)\n"
+        "typedef struct { uint8_t *base; int64_t len; } gs_rhdr;\n"
+        "typedef struct { gs_rhdr *hdr; gs_stack *stk; } gs_rref;\n"
+        "typedef struct { gs_rhdr *hdr; gs_stack *stk; gs_rhdr *fl; gs_stack *flstk; } gs_pref;\n"
+        "typedef struct { uint8_t *data; int64_t len; } sl_u8;\n"
+        "#pragma pack(pop)\n";
+    for (auto name : { "runtime_ext.h", "runtime_os.h" }) text += ReadAll(rt / name);
+    try {
+        Preprocessor pp(PreludeIncluder());
+        auto toks = pp.Run(text, "runtime");
+        TypeTable types;
+        CParser parser(toks, pp.files, types);
+        auto &unit = parser.ParseUnit();
+        auto prog = Lowerer(unit, pp.files).Run();
+        VM vm(prog);
+        // The externals some function calls or takes the address of; the
+        // thread entry points runtime.h declares stay unused without
+        // GS_NEED_THREADS.
+        vector<bool> used(prog.funcs.size());
+        for (auto &f : prog.funcs)
+            for (auto &in : f.code)
+                if (in.op == OP_CALL || in.op == OP_FUNC) used[(size_t)in.imm] = true;
+        string missing;
+        for (size_t i = 0; i < prog.funcs.size(); i++)
+            if (prog.funcs[i].external && used[i] && !vm.library.count(prog.funcs[i].name))
+                Append(missing, " ", prog.funcs[i].name);
+        if (!missing.empty()) Fail("runtime", cat("calls functions the library lacks:", missing));
+        else printf("ok runtime (%zu functions)\n", prog.funcs.size());
+    } catch (CompileError &e) {
+        Fail("runtime", e.msg);
+    }
+}
+
 int main(int argc, char **argv) {
     bool bless = false;
     string only;
@@ -171,6 +217,7 @@ int main(int argc, char **argv) {
         if (want != got) Fail(name, cat("expected:\n", want, "got:\n", got));
         else printf("ok %s\n", name.c_str());
     }
+    Runtime(here.parent_path());
     if (failures) printf("%d failure(s)\n", failures);
     return failures ? 1 : 0;
 }

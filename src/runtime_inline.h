@@ -1169,8 +1169,13 @@ static const char *gs_errmsgs[] = {
    instead. */
 static GS_NORETURN void gs_end(int code);
 
+#ifdef GS_INTERP
+/* The interpreter runs one thread program (docs/design/interpreter.md §10):
+   no worker is contained, so nothing jumps. */
+typedef int jmp_buf;
+#define gs_longjmp(b, v) gs_end(1)
+#else
 #include <setjmp.h>
-#include <stdarg.h>
 /* No abort is raised in a signal handler, so the jump leaves the signal
    state alone. */
 #ifdef _WIN32
@@ -1179,6 +1184,7 @@ static GS_NORETURN void gs_end(int code);
 #else
 #define gs_setjmp(b)  _setjmp(b)
 #define gs_longjmp    _longjmp
+#endif
 #endif
 
 GS_API GS_NORETURN void gs_panic(const char *msg) {
@@ -1225,14 +1231,12 @@ static GS_NORETURN void gs_fail(const void *msg, int64_t len, const char *file, 
     gs_end(1);
 }
 
-/* gs_fail with the message printf formats. */
-static GS_NORETURN void gs_failf(const char *file, int line, const char *fmt, ...) {
-    char buf[512];
-    va_list ap;
-    va_start(ap, fmt);
-    int n = vsnprintf(buf, sizeof buf, fmt, ap);
-    va_end(ap);
-    gs_fail(buf, n < 0 ? 0 : n < (int)sizeof buf ? n : (int)sizeof buf - 1, file, line);
+/* gs_fail with the message snprintf returned `n` for, in a buffer of
+   GS_FAIL_TEXT bytes. Not variadic itself, as the interpreter defines no
+   variadic function. */
+#define GS_FAIL_TEXT 512
+static GS_NORETURN void gs_failn(const char *buf, int n, const char *file, int line) {
+    gs_fail(buf, n < 0 ? 0 : n < GS_FAIL_TEXT ? n : GS_FAIL_TEXT - 1, file, line);
 }
 
 GS_API GS_NORETURN void gs_abort(int err, const char *file, int line) {
@@ -1249,31 +1253,40 @@ GS_API GS_NORETURN void gs_exit(int64_t code) {
 }
 
 GS_API GS_NORETURN void gs_idxfail(int64_t i, int64_t n, const char *file, int line) {
-    gs_failf(file, line, "index %lld out of bounds (length %lld)", (long long)i, (long long)n);
+    char buf[GS_FAIL_TEXT];
+    gs_failn(buf, snprintf(buf, sizeof buf, "index %lld out of bounds (length %lld)",
+                           (long long)i, (long long)n), file, line);
 }
 
 GS_API GS_NORETURN void gs_divfail(const char *file, int line) {
-    gs_failf(file, line, "division by zero");
+    static const char msg[] = "division by zero";
+    gs_fail(msg, sizeof msg - 1, file, line);
 }
 
 GS_API GS_NORETURN void gs_divovf(const char *file, int line) {
-    gs_failf(file, line, "integer overflow in division");
+    static const char msg[] = "integer overflow in division";
+    gs_fail(msg, sizeof msg - 1, file, line);
 }
 
 GS_API GS_NORETURN void gs_ovf(int64_t a, const char *op, int64_t b, const char *type,
                                const char *file, int line) {
-    gs_failf(file, line, "integer overflow (debug): %lld %s %lld at %s", (long long)a, op,
-             (long long)b, type);
+    char buf[GS_FAIL_TEXT];
+    gs_failn(buf, snprintf(buf, sizeof buf, "integer overflow (debug): %lld %s %lld at %s",
+                           (long long)a, op, (long long)b, type), file, line);
 }
 
 GS_API GS_NORETURN void gs_ovf_neg(int64_t a, const char *type, const char *file, int line) {
-    gs_failf(file, line, "integer overflow (debug): -(%lld) at %s", (long long)a, type);
+    char buf[GS_FAIL_TEXT];
+    gs_failn(buf, snprintf(buf, sizeof buf, "integer overflow (debug): -(%lld) at %s",
+                           (long long)a, type), file, line);
 }
 
 /* The message of a failing `as` check, with the source value as text. */
 static GS_NORETURN void gs_asfail(const char *why, const char *num, const char *type,
                                   const char *file, int line) {
-    gs_failf(file, line, "as conversion %s (debug): %s as %s", why, num, type);
+    char buf[GS_FAIL_TEXT];
+    gs_failn(buf, snprintf(buf, sizeof buf, "as conversion %s (debug): %s as %s", why, num,
+                           type), file, line);
 }
 
 GS_API GS_NORETURN void gs_asfail_i(const char *why, int64_t v, const char *type,
@@ -1314,7 +1327,8 @@ static char **gs_argv;
    platform refuses one (gs_reserve_region), and the guard gap behind it;
    and the usable part as configured, for the reports. */
 static size_t gs_region_usable, gs_region_gap, gs_region_reserve;
-/* The worker running on this thread, main's being -1 (runtime_threads.h). */
+)GSRT"
+R"GSRT(/* The worker running on this thread, main's being -1 (runtime_threads.h). */
 static GS_TLS int64_t gs_current_thread_id = -1;
 /* The program's address space budget for regions and the most regions its
    main program and any one worker can hold, as gs_rt_start was told, and
@@ -1328,8 +1342,7 @@ static int64_t gs_thread_cap = INT64_MAX;
    halved the size are larger than those after. */
 typedef struct {
     uint8_t *base;
-)GSRT"
-R"GSRT(    size_t usable, size;    /* size: with the guard gap */
+    size_t usable, size;    /* size: with the guard gap */
 } gs_region;
 static GS_TLS gs_region *gs_regions;
 static GS_TLS volatile long gs_nregions;
@@ -1417,7 +1430,57 @@ GS_API void gs_release_regions(void) {
     gs_native_stack_free();
 }
 
-#ifdef _WIN32
+#ifdef GS_INTERP
+
+/* The interpreter (docs/design/interpreter.md §5, §10): a data stack is a
+   segment the VM grows on access up to its reservation, so there is no
+   guard gap to protect, nothing to commit and no fault handler to install.
+   The two functions declared here are the VM's. It reports a stack growing
+   past its reservation, and the interpreted call depth reaching what the
+   native stack would hold, by calling the two defined below in place of
+   the fault handler. */
+uint8_t *gs_host_reserve(size_t usable);
+void gs_host_release(uint8_t *base);
+
+static void gs_regions_init(void) {}
+static void gs_native_stack_init(void) {}
+static void gs_native_stack_free(void) {}
+
+static uint8_t *gs_os_reserve(size_t usable, size_t size) {
+    (void)size;
+    return gs_host_reserve(usable);
+}
+
+static void gs_release_region(const gs_region *r) { gs_host_release(r->base); }
+
+/* A data stack overran its reservation: the report the fault handler
+   writes natively, for the region the stack's base names. */
+GS_API GS_NORETURN void gs_data_overflow(const uint8_t *base) {
+    char msg[GS_OVERFLOW_TEXT];
+    for (long i = 0; i < gs_nregions; i++) {
+        const gs_region *r = &gs_regions[i];
+        if (r->base == base) {
+            fwrite(msg, 1, gs_overflow_text(msg, r), stderr);
+            _exit(1);
+        }
+    }
+    fputs("goose runtime error: data stack overflow\n", stderr);
+    _exit(1);
+}
+
+GS_API GS_NORETURN void gs_native_overflow(void) {
+    fputs("goose runtime error: native call stack overflow\n", stderr);
+    _exit(1);
+}
+
+/* One thread program: gs_end runs once, and nothing waits in gs_park. */
+static int gs_end_first(void) {
+    static int ended;
+    return !ended++;
+}
+static GS_NORETURN void gs_park(void) { _exit(1); }
+
+#elif defined(_WIN32)
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -1480,7 +1543,8 @@ static void gs_regions_init(void) {
    does not list SetThreadStackGuarantee, so a program it builds looks it up. */
 static void gs_native_stack_init(void) {
     ULONG room = GS_STACK_GUARANTEE;
-    #ifdef __TINYC__
+)GSRT"
+R"GSRT(    #ifdef __TINYC__
         BOOL (WINAPI *guarantee)(PULONG) = (BOOL (WINAPI *)(PULONG))GetProcAddress(
             GetModuleHandleA("kernel32.dll"), "SetThreadStackGuarantee");
         if (guarantee) guarantee(&room);
@@ -1545,8 +1609,7 @@ static void gs_fault_handler(int sig, siginfo_t *info, void *ctx) {
         }
     }
     if ((uintptr_t)hit - gs_native_lo < gs_native_hi - gs_native_lo) {
-)GSRT"
-R"GSRT(        static const char msg[] = "goose runtime error: native call stack overflow\n";
+        static const char msg[] = "goose runtime error: native call stack overflow\n";
         ssize_t w = write(2, msg, sizeof(msg) - 1);
         (void)w;
         _exit(1);
@@ -1702,7 +1765,8 @@ GS_API uint8_t *gs_reserve_region(void) {
         gs_region_usable = usable;
     }
     long i = gs_nregions;
-    gs_regions[i].base = p;
+)GSRT"
+R"GSRT(    gs_regions[i].base = p;
     gs_regions[i].usable = usable;
     gs_regions[i].size = usable + gs_region_gap;
     gs_nregions = i + 1;  /* Publish only the initialized entry. */
@@ -1752,8 +1816,7 @@ typedef struct {
 
 static int64_t gs_sp_newnode(gs_sppath *p) {
     int64_t i = GS_SPHEAD(p)->chain;
-)GSRT"
-R"GSRT(    if (i) {
+    if (i) {
         GS_SPHEAD(p)->chain = GS_SPLEAF(p, i)->link;
         return i;
     }
@@ -1924,7 +1987,8 @@ static void gs_sp_insert(gs_sppath *p, int64_t k, int64_t idx, int64_t cnt) {
     o->n++;
     if (!nn) {
         gs_sp_fix(p, p->h);
-    } else if (p->h == 0) {
+)GSRT"
+R"GSRT(    } else if (p->h == 0) {
         gs_sp_newroot(p, p->node[0], nn, 1);
     } else {
         gs_sp_fix(p, p->h);
@@ -1987,8 +2051,7 @@ static void gs_sp_take(gs_sppath *p, int64_t k, int64_t cnt) {
    than best: in index order it packs runs toward the start and leaves the
    end free. */
 GS_API int64_t gs_spans_alloc(uint8_t *base, int64_t *n, uint8_t **top, int64_t len,
-)GSRT"
-R"GSRT(                              int64_t cnt) {
+                              int64_t cnt) {
     gs_sppath p;
     int64_t l, i, k, idx;
     gs_spleaf *lf;
@@ -2153,7 +2216,8 @@ GS_API int64_t gs_spans_regrow(uint8_t *base, int64_t *n, uint8_t **top, int64_t
 #define GS_MAY_ALIAS
 #endif
 #pragma pack(push, 1)
-typedef struct {
+)GSRT"
+R"GSRT(typedef struct {
     uint8_t members[256];
     uint8_t kind, invert, bytes[3], lo[16], hi[16];
 } GS_MAY_ALIAS gs_byteset;
@@ -2343,7 +2407,8 @@ static int64_t gs_scan_pair_blocks(const uint8_t *p, int64_t np, const gs_bytese
     switch (a->kind * 4 + b->kind) {
         GS_PAIR_CASE(1, 1) GS_PAIR_CASE(1, 2) GS_PAIR_CASE(1, 3) GS_PAIR_CASE(1, 4)
         GS_PAIR_CASE(2, 1) GS_PAIR_CASE(2, 2) GS_PAIR_CASE(2, 3) GS_PAIR_CASE(2, 4)
-        GS_PAIR_CASE(3, 1) GS_PAIR_CASE(3, 2) GS_PAIR_CASE(3, 3) GS_PAIR_CASE(3, 4)
+)GSRT"
+R"GSRT(        GS_PAIR_CASE(3, 1) GS_PAIR_CASE(3, 2) GS_PAIR_CASE(3, 3) GS_PAIR_CASE(3, 4)
         GS_PAIR_CASE(4, 1) GS_PAIR_CASE(4, 2) GS_PAIR_CASE(4, 3)
         default: return gs_scan_pair_k(p, np, a, d, b, 4, 4);
     }
@@ -2550,7 +2615,8 @@ static int gs_float_digits(uint64_t f, int e, int bits, int emin, char *dig, int
     /* Below a power of two, the gap to the next float down is half the gap up. */
     int asym = f == (uint64_t)1 << (bits - 1) && e > emin;
     int up = e > 0 ? e : 0, lg = e - 1, n = 0, c;
-    /* The value is r / s, and what reads back as it reaches from (r - *mm) / s
+)GSRT"
+R"GSRT(    /* The value is r / s, and what reads back as it reaches from (r - *mm) / s
        to (r + mp) / s: half the gap to each neighbour. */
     gs_big *mm = asym ? &mlo : &mp;
     gs_big_set(&r, f, up + 1 + asym);
@@ -2739,7 +2805,10 @@ R"GSRT(/* Goose runtime — threads and typed queues (§11.2), as runtime.h decl
    still ask; it needs nothing below. It reports no more workers than the
    data stack budget holds beside the main program (gs_rt_start), so a pool
    sized by it never runs the program out of address space. */
-#ifdef _WIN32
+#ifdef GS_INTERP
+/* The interpreter runs one thread program (docs/design/interpreter.md §10). */
+static int64_t gs_os_threads(void) { return 1; }
+#elif defined(_WIN32)
 /* The CPUs the process may run on, which `start /affinity` or a job object
    can make fewer than the machine has. */
 static int64_t gs_os_threads(void) {
@@ -2803,6 +2872,10 @@ GS_API void gs_stack_stats(int64_t stacks) {
 }
 
 #if GS_NEED_THREADS
+
+#ifdef GS_INTERP
+#error "the interpreter does not run threads; a program that spawns them needs the JIT or a build"
+#endif
 
 #ifdef _WIN32
 
@@ -2935,12 +3008,12 @@ static void *gs_thread_main(void *p)
 
 GS_API int64_t gs_thread_start(void (*run)(void (*)(uint8_t *), uint8_t *),
                                void (*release)(void), void (*entry)(uint8_t *),
-                               const void *args, int64_t argsize, int contained) {
+)GSRT"
+R"GSRT(                               const void *args, int64_t argsize, int contained) {
     if (argsize < 0 || (uint64_t)argsize > SIZE_MAX)
         gs_panic("invalid thread argument size");
     gs_thread *t = (gs_thread *)malloc(sizeof(gs_thread));
-)GSRT"
-R"GSRT(    if (!t) gs_panic("out of memory spawning thread");
+    if (!t) gs_panic("out of memory spawning thread");
     t->run = run;
     t->release = release;
     t->entry = entry;
@@ -3337,6 +3410,7 @@ R"GSRT(/* Goose runtime: the OS primitives behind stdlib/os.goose (spec §7.10),
 #ifndef _WIN32
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #ifdef __APPLE__
