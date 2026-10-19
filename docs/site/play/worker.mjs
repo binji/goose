@@ -2,14 +2,17 @@
 // goose.wasm off the main thread. The page posts the compiled module, the
 // tree's files and the command line; the worker instantiates the module on
 // the WASI shim, runs the command, resuming the VM piece after piece
-// without pause, and posts the output as it goes and the exit status at
-// the end, with the files the page asked to read back. Stop is the page
-// terminating the worker, so nothing here reads a second message, and the
-// VM's step budget matters only as the cadence of the output flushes.
+// without pause, or, for a command with --wasm, running the program's own
+// module on goose.wasm's exports (docs/design/wasm_backend.md §6), and
+// posts the output as it goes and the exit status at the end, with the
+// files the page asked to read back. Stop is the page terminating the
+// worker, so nothing here reads a second message, and the VM's step budget
+// matters only as the cadence of the output flushes; a compiled run posts
+// its output as the shim's writes fill the batch.
 //
 // The worker's port is its global in a browser; under node (wasi_test.mjs)
 // it is worker_threads' parentPort, which takes the same calls.
-import { WasiShim, Tree, SUSPENDED } from "./wasi.mjs";
+import { WasiShim, Tree, runCommand } from "./wasi.mjs";
 
 const port = typeof self !== "undefined" ? self : (await import("node:worker_threads")).parentPort;
 
@@ -51,25 +54,22 @@ function run({ module, files, cmdline, stdin = "", env = {}, readback = [] }) {
         err += `cannot start goose.wasm: ${e.message}\n`;
         return done(1);
     }
-    const { memory, goose_argbuf, goose_run, goose_resume } = instance.exports;
-    const line = new TextEncoder().encode(cmdline);
-    const buf = goose_argbuf(line.length);
-    new Uint8Array(memory.buffer, buf, line.length + 1).set(line);
+    let running = false;
+    const started = () => {
+        flush();
+        if (running) return true;
+        running = true;
+        port.postMessage({ type: "status", text: "running…" });
+        return true;
+    };
     // An exit inside the module is a ProcExit the shim recorded; anything
     // else thrown is the module failing.
-    const call = f => {
-        try {
-            return f();
-        } catch (e) {
-            if (shim.exitCode === null) err += `goose.wasm failed: ${e.message}\n`;
-            return shim.exitCode ?? 1;
-        }
-    };
-    let code = call(() => goose_run(buf));
-    if (code === SUSPENDED) port.postMessage({ type: "status", text: "running…" });
-    while (code === SUSPENDED) {
-        flush();
-        code = call(goose_resume);
+    let code;
+    try {
+        code = runCommand(instance, cmdline, started, { onStart: started });
+    } catch (e) {
+        if (shim.exitCode === null) err += `goose.wasm failed: ${e.message}\n`;
+        code = shim.exitCode ?? 1;
     }
     done(code);
 }

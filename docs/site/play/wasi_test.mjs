@@ -3,7 +3,8 @@
 // goose.wasm is given, the hello-world fixture and the generated-C tab's
 // command through the shim end to end, and then the same through the
 // playground's worker (worker.mjs) on node's worker threads, whose port
-// takes the browser's messages.
+// takes the browser's messages, interpreted and compiled to WebAssembly
+// (--wasm).
 //
 //     node docs/site/play/wasi_test.mjs [goose.wasm]
 //
@@ -197,6 +198,23 @@ if (wasm) {
     files["/bad.goose"] = "fn main() { let x: i64 = \"no\"; }\n";
     const r4 = await viaWorker("--check /bad.goose --stdlib /stdlib");
     check("a type error through the worker", r4.code === 1 && /error/.test(r4.err), `exit ${r4.code}, err ${r4.err.slice(0, 200)}`);
+    // The compiled path (docs/design/wasm_backend.md §6): the program's
+    // module runs on goose.wasm's exports, its stop read back through
+    // goose_wasm_finish.
+    const r5 = await viaWorker("run /prog.goose --wasm --stdlib /stdlib");
+    check("hello world compiled to WebAssembly", r5.code === 0 && r5.out === "Hello, world!\n" && r5.status.includes("running…"),
+          `exit ${r5.code}, status ${r5.status}, out ${JSON.stringify(r5.out)}, err ${r5.err.slice(0, 200)}`);
+    const r6 = await viaWorker("run /loop.goose -O2 --wasm --stdlib /stdlib");
+    check("a loop compiled to WebAssembly", r6.code === 0 && r6.out === "4499998500000\n",
+          `exit ${r6.code}, out ${JSON.stringify(r6.out)}, err ${r6.err.slice(0, 200)}`);
+    files["/abort.goose"] = "fn main() { print(\"before\"); abort(\"custom failure\"); }\n";
+    const r7 = await viaWorker("run /abort.goose --wasm --stdlib /stdlib");
+    check("an abort compiled to WebAssembly keeps the output before it", r7.code !== 0 && r7.out === "before\n" && /custom failure/.test(r7.err),
+          `exit ${r7.code}, out ${JSON.stringify(r7.out)}, err ${r7.err.slice(0, 200)}`);
+    files["/deep.goose"] = "recursive fn down(n: i64) -> i64 { if n == 0 { 0 } else { 1 + down(n - 1) } }\nfn main() { print(down(100000000)); }\n";
+    const r8 = await viaWorker("run /deep.goose --wasm --stdlib /stdlib");
+    check("a stack overflow compiled to WebAssembly is reported", r8.code !== 0 && /stack/.test(r8.err),
+          `exit ${r8.code}, out ${JSON.stringify(r8.out)}, err ${r8.err.slice(0, 200)}`);
 } else {
     console.log("skip the end-to-end checks: no goose.wasm given");
 }

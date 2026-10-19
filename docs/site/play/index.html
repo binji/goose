@@ -25,6 +25,7 @@
   <div class="bar">
     <label>Sample <select id="sample"><option value="">(your program)</option></select></label>
     <label>Optimize <select id="opt"><option>-O0</option><option>-O1</option><option selected>-O2</option></select></label>
+    <label>Run as <select id="engine"><option value="--wasm" selected>WebAssembly</option><option value="">interpreted</option></select></label>
     <label>Arguments <input id="args" type="text" placeholder="program arguments" spellcheck="false"></label>
     <button id="run" disabled>Run</button>
     <button id="stop" disabled>Stop</button>
@@ -48,10 +49,11 @@
       <pre id="cfile" class="view"></pre>
     </section>
   </div>
-  <p class="note">The compiler runs in your browser as WebAssembly, in a worker, and its interpreter runs the
-  program (<a href="../docs/design/interpreter.html">how</a>). Programs run some 15 to 30 times slower than a
-  native build, so the samples that time themselves take a few seconds; Stop ends a run at once.
-  Standard input is empty; <code>-o /out.c</code> is what the Generated C button runs.</p>
+  <p class="note">The compiler runs in your browser as WebAssembly, in a worker, and compiles the program to a
+  WebAssembly module of its own (<a href="../docs/design/wasm_backend.html">how</a>), which runs within a few
+  times of a native build; run interpreted (<a href="../docs/design/interpreter.html">how</a>), a program is some
+  15 to 30 times slower than native. Stop ends a run at once. Standard input is empty; <code>-o /out.c</code> is
+  what the Generated C button runs.</p>
 </main>
 <script type="module" src="play.mjs"></script>
 </body>

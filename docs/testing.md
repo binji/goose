@@ -83,7 +83,9 @@ own WASI shim (`docs/site/play/wasi.mjs`) is tested too
 a `build/wasm/goose.wasm` at hand the hello-world fixture, a generated-C
 run and a type error through the shim end to end, and the same runs
 through the playground's worker (`worker.mjs`) under node's worker
-threads, which take the browser's messages.
+threads, which take the browser's messages, then a hello world, a loop,
+an abort and a stack overflow compiled to WebAssembly (`--wasm`) through
+the worker.
 
 Most of those runs, and those of the `errors/` and `errors_tc/` fixtures,
 share a compiler process with others: `goose --multi-test <flags> a.goose

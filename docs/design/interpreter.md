@@ -610,7 +610,11 @@ binary a canvas.
   terminates the worker, which ends the run at once whatever it is doing,
   and the VM's step budget only sets the cadence of the output. A fresh
   instance per run is right anyway, since a run leaves its state behind and
-  the compiler is not written to run twice in one process. (Step 13 first
+  the compiler is not written to run twice in one process. (Since the
+  WebAssembly backend, wasm_backend.md, Run adds `--wasm` unless the page's
+  engine picker says "interpreted": the worker then runs the program's own
+  module on `goose.wasm`'s exports, synchronously, with the output posted
+  as the shim's writes fill a batch.) (Step 13 first
   ran the module on the main thread, resuming from `requestAnimationFrame`
   with Stop a flag the next piece saw. The worker did not change the
   speed: a sieve of ten million takes about ten seconds in Chrome 147

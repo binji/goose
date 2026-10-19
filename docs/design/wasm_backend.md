@@ -33,20 +33,23 @@ they are. The speed figures in section 3 are measurements taken on October
 twice as slow and the ratios the same); those in section 9 are estimates
 derived from them, followed by what the implementation measured.
 
-**Status.** Steps 1 to 5 of the plan (§13) and the first three items of
+**Status.** Steps 1 to 6 of the plan (§13) and the first three items of
 §8 are implemented, in `src/interp/wasmgen.h` and the host side of
 `vm.h` and `interp.cpp`: `goose.wasm` compiles a program's bytecode to a
 module and runs it on its own exports under `--wasm`, natively `-o`
 writes the module, `test/wasm_backend.py` runs the interpreter's C
 fixtures through it, and `test/run_tests.py --wasm` runs the text areas'
-fixtures and the samples. Two departures from the design as written: the
+fixtures and the samples. The playground's Run compiles by default, with
+"interpreted" a choice on the page; the compiled path is one function of
+the shim module, `runCompiled` in `docs/site/play/wasi.mjs`, which the
+worker and `scripts/wasm_run.mjs` share. Two departures from the design as written: the
 operand stack is followed symbolically during emission, so that a frame
 record's or a static object's fields are accessed without a decode
 (§4 item 7 covered only the function's own scalar slots); and hoisting
 keeps a pair of locals per origin and region, refreshed after calls, in
 place of the sync-extent analysis sketched in §8, which needed none of
-codegen's analyses. Step 6 (the page) and items 4 and 5 of §8 (typed
-slots) are not started, nor is the frame yield of §7.
+codegen's analyses. Items 4 and 5 of §8 (typed slots) are not started,
+nor is the frame yield of §7.
 
 ## 1. The goal
 

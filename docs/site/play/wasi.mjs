@@ -460,18 +460,64 @@ export class WasiShim {
 // Runs a command line through an instantiated goose.wasm: writes it into
 // the module and calls goose_run, then goose_resume while the program is
 // suspended, `onYield` between the pieces (false from it stops the run).
-// Returns the exit status, or null when stopped.
-export const SUSPENDED = -2;
+// Returns the exit status, or null when stopped. A command with --wasm
+// compiles the program to a module instead of interpreting it
+// (docs/design/wasm_backend.md §6): goose_run returns READY with the
+// module's bytes in memory, and runCompiled below runs them.
+export const SUSPENDED = -2, READY = -3, REPORT = -4;
 
-export function runCommand(instance, cmdline, onYield = () => true) {
-    const { memory, goose_argbuf, goose_run, goose_resume } = instance.exports;
-    const line = encoder.encode(cmdline);
-    const buf = goose_argbuf(line.length);
-    new Uint8Array(memory.buffer, buf, line.length + 1).set(line);
-    let code = goose_run(buf);
+// Writes a string into the module's argument buffer and returns its address.
+function writeText(exports, s) {
+    const bytes = encoder.encode(s);
+    const buf = exports.goose_argbuf(bytes.length);
+    new Uint8Array(exports.memory.buffer, buf, bytes.length + 1).set(bytes);
+    return buf;
+}
+
+export function runCommand(instance, cmdline, onYield = () => true, compiled = {}) {
+    const { goose_run, goose_resume } = instance.exports;
+    let code = goose_run(writeText(instance.exports, cmdline));
     while (code === SUSPENDED) {
         if (!onYield()) return null;
         code = goose_resume();
+    }
+    if (code === READY) code = runCompiled(instance, compiled);
+    return code;
+}
+
+// Runs the module goose_run left in memory: instantiates it on goose.wasm's
+// exports, which it imports as the module "goose", runs its _start, and
+// asks goose_wasm_finish what ended it, with the engine's message where
+// the run ended in a trap the host did not record; while the answer is
+// REPORT, calls the overflow reporter the host names and asks again.
+// `onReady(bytes)` sees the module's bytes before they are compiled, and
+// `onStart()` is called before the program runs.
+export function runCompiled(instance, { onReady, onStart } = {}) {
+    const ex = instance.exports;
+    const bytes = new Uint8Array(ex.memory.buffer, ex.goose_module_ptr(), ex.goose_module_len()).slice();
+    if (onReady) onReady(bytes);
+    const imports = { goose: { memory: ex.memory } };
+    for (const name of ["native", "access_slow", "static_handle", "func_handle", "info", "stop", "fault"])
+        imports.goose[name] = ex["goose_" + name];
+    const prog = new WebAssembly.Instance(new WebAssembly.Module(bytes), imports);
+    // Every stop is a trap after the host records the reason, so an
+    // `unreachable` says nothing the host does not know; any other trap is
+    // the engine's own, reported by its message.
+    const run = f => {
+        try {
+            f();
+            return 0;
+        } catch (e) {
+            const own = e instanceof WebAssembly.RuntimeError && /unreachable/.test(e.message);
+            return own ? 0 : writeText(ex, `${e.name}: ${e.message}`);
+        }
+    };
+    if (onStart) onStart();
+    let code = ex.goose_wasm_finish(run(() => prog.exports._start()));
+    while (code === REPORT) {
+        const name = decoder.decode(new Uint8Array(ex.memory.buffer, ex.goose_wasm_report_name(), 64)).split("\0")[0];
+        const reporter = prog.exports[name];
+        code = ex.goose_wasm_finish(reporter ? run(() => reporter(ex.goose_wasm_report_arg())) : 0);
     }
     return code;
 }
