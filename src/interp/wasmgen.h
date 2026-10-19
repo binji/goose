@@ -239,6 +239,27 @@ private:
         Helpers();
     }
 
+    // Where a pointer value came from, as far as it is known (§8 item 3): a
+    // promoted local, a pointer-sized frame slot it was loaded from, or a
+    // static object. Pointer arithmetic keeps it, since it keeps the
+    // segment; a decode of a value with a known origin can use the base
+    // and size hoisted for that origin where they are current.
+    struct Origin {
+        enum Kind : uint8_t { NONE, LOCAL, SLOT, STATIC } kind = NONE;
+        int64_t off = 0;                 // LOCAL, SLOT: the frame offset; STATIC: the object
+        bool operator==(const Origin &o) const { return kind == o.kind && off == o.off; }
+    };
+    struct Sym {
+        enum Kind : uint8_t { VALUE, FRAME, STATIC } kind = VALUE;
+        int64_t off = 0;
+        int idx = -1;                    // STATIC: the object
+        Origin origin;
+    };
+    vector<Sym> syms;
+    // A promoted local's value's origin, where it was stored in this block
+    // from a value with one.
+    unordered_map<int64_t, Origin> localtag;
+
     // ---- A function
 
     // The function being emitted and its code.
@@ -315,21 +336,34 @@ private:
         spill.clear();
         for (int i = 0; i < maxheight; i++) spill.push_back(nlocals++);
         Promote();
-        Prologue();
-        ctx.clear();
-        DoTree(0);
-        // Every path ends in a return; this makes the function's end
-        // unreachable for validation.
-        Emit(WO_UNREACHABLE);
-        Emit(WO_END);
+        Regions();
+        pairlocals = nlocals + npromoted;
+        npairs = 0;
+        // Twice: the first finds the pairs each region needs.
+        for (int pass = 0; pass < 2; pass++) {
+            collecting = pass == 0;
+            code = WasmBuf();
+            ctx.clear();
+            Prologue();
+            Activate(0);
+            LoadRegionPairs(0);
+            DoTree(0);
+            // Every path ends in a return; this makes the function's end
+            // unreachable for validation.
+            Emit(WO_UNREACHABLE);
+            Emit(WO_END);
+        }
         // The locals: fpoff, fp (i32), fh, t1, t2, t3 (i64), ta, cond
-        // (i32), then the argument and stack spills (i64).
+        // (i32), the argument and stack spills and the promoted locals
+        // (i64), then the pairs' bases (i32) and sizes (i64).
         WasmBuf body;
-        body.Uleb(4);
+        body.Uleb(6);
         body.Uleb(2); body.U8(W_I32);
         body.Uleb(4); body.U8(W_I64);
         body.Uleb(2); body.U8(W_I32);
         body.Uleb(argspill.size() + spill.size() + npromoted); body.U8(W_I64);
+        body.Uleb((uint64_t)npairs); body.U8(W_I32);
+        body.Uleb((uint64_t)npairs); body.U8(W_I64);
         body.Bytes(code.b);
         bodies.push_back(std::move(body));
     }
@@ -538,7 +572,14 @@ private:
 
     void DoTree(int b) {
         auto &bb = bbs[(size_t)b];
-        if (bb.loop) { Block(WO_LOOP, -1); ctx.push_back({ Ctx::LOOP, b }); }
+        if (bb.loop) {
+            // The loop's pairs, loaded before it: a back edge does not
+            // come this way.
+            for (size_t r = 1; r < regions.size(); r++)
+                if (regions[r].header == b) LoadRegionPairs((int)r);
+            Block(WO_LOOP, -1);
+            ctx.push_back({ Ctx::LOOP, b });
+        }
         vector<int> merges;
         for (auto c : bb.children) if (bbs[(size_t)c].merge) merges.push_back(c);
         sort(merges.begin(), merges.end(), [&](int x, int y) { return bbs[(size_t)x].rpo > bbs[(size_t)y].rpo; });
@@ -573,6 +614,7 @@ private:
         for (int i = h - 1; i >= 0; i--) LocalSet(spill[(size_t)i]);
     }
     void Reload(int h) {
+        localtag.clear();
         syms.assign((size_t)h, Sym {});
         for (int i = 0; i < h; i++) LocalGet(spill[(size_t)i]);
     }
@@ -580,6 +622,7 @@ private:
     void BlockCode(int b) {
         auto &bb = bbs[(size_t)b];
         auto &code = fn->code;
+        Activate(b);
         Reload(bb.height);
         int h = bb.height;
         auto &last = code[bb.end - 1];
@@ -708,7 +751,54 @@ private:
 
     // The handle on top becomes the address of n bytes at it: the VM's
     // Access (§5), with its slow path the host's.
-    void Decode(int64_t n) {
+    void Decode(int64_t n) { Decode(n, Origin()); }
+    void Decode(int64_t n, Origin origin) {
+        if (origin.kind == Origin::STATIC) {
+            // A static object: its size is known and its address never
+            // changes.
+            LocalSet(L_T1);
+            LocalGet(L_T1);
+            I64(0xffffffffll);
+            Emit(WO_I64_AND);
+            I64(n);
+            Emit(WO_I64_ADD);
+            I64(prog.statics[(size_t)origin.off].size);
+            Emit(WO_I64_GT_U);
+            Block(WO_IF, W_I32);
+            LocalGet(L_T1);
+            I32((int32_t)n);
+            CallImport(IMP_ACCESS_SLOW);
+            RefreshPairs();
+            Emit(WO_ELSE);
+            GlobalGet(staticbase[(size_t)origin.off]);
+            LocalGet(L_T1);
+            Emit(WO_I32_WRAP_I64);
+            Emit(WO_I32_ADD);
+            Emit(WO_END);
+            return;
+        }
+        if (auto pair = PairFor(origin)) {
+            LocalSet(L_T1);
+            LocalGet(L_T1);
+            I64(0xffffffffll);
+            Emit(WO_I64_AND);
+            I64(n);
+            Emit(WO_I64_ADD);
+            LocalGet(PairSize(*pair));
+            Emit(WO_I64_GT_U);
+            Block(WO_IF, W_I32);
+            LocalGet(L_T1);
+            I32((int32_t)n);
+            CallImport(IMP_ACCESS_SLOW);
+            RefreshPairs();
+            Emit(WO_ELSE);
+            LocalGet(PairBase(*pair));
+            LocalGet(L_T1);
+            Emit(WO_I32_WRAP_I64);
+            Emit(WO_I32_ADD);
+            Emit(WO_END);
+            return;
+        }
         LocalSet(L_T1);
         // The entry's offset in the table: id * 8, an i32 that must be
         // within the table's capacity (a garbage id reads nothing).
@@ -740,6 +830,7 @@ private:
             LocalGet(L_T1);
             I32((int32_t)n);
             CallImport(IMP_ACCESS_SLOW);
+            RefreshPairs();
         }
         Emit(WO_ELSE);
         {
@@ -752,6 +843,160 @@ private:
             Emit(WO_I32_ADD);
         }
         Emit(WO_END);
+    }
+
+    // ---- Hoisted decodes (§8 item 3)
+
+    // A region is the whole function or a loop's body. An origin whose
+    // handle nothing in the region changes gets a pair of locals there,
+    // its segment's base and size, loaded on entry to the region and after
+    // anything that can grow or free a segment: a call, or a decode's slow
+    // path. A decode of a value with that origin then checks against the
+    // pair and adds the base, with no table reads. Which origins a region
+    // needs is found in a first emission of the function, whose output is
+    // discarded; the second has the pairs.
+    struct Pair { Origin origin; int base = 0, size = 0; };
+    struct Region {
+        int header = -1;                 // -1: the function
+        vector<char> inbody;             // per block
+        vector<pair<int64_t, int64_t>> writes;   // frame ranges stored to within the body
+        vector<Pair> pairs;
+    };
+    vector<Region> regions;
+    vector<int> active;                  // the regions holding the block being emitted, outermost first
+    vector<pair<int64_t, int64_t>> escapes;   // frame objects whose address something other than a read takes
+    bool collecting = false;
+    int npairs = 0;
+    int pairlocals = 0;                  // the first pair local; bases, then sizes
+
+    static bool Overlaps(const vector<pair<int64_t, int64_t>> &ranges, int64_t off, int64_t size) {
+        for (auto &[o, n] : ranges) if (off < o + n && o < off + size) return true;
+        return false;
+    }
+
+    bool Invariant(const Region &r, Origin o) const {
+        switch (o.kind) {
+            case Origin::LOCAL: return !Overlaps(r.writes, o.off, 1);
+            case Origin::SLOT: return !Overlaps(r.writes, o.off, 8) && !Overlaps(escapes, o.off, 8);
+            default: return false;
+        }
+    }
+
+    void Regions() {
+        regions.clear();
+        escapes.clear();
+        auto &code = fn->code;
+        auto objof = [&](int64_t off) -> const FrameObj * {
+            for (auto &o : fn->locals) if (off >= o.off && off < o.off + max<int64_t>(o.size, 1)) return &o;
+            return nullptr;
+        };
+        // An address taken for anything but a plain load escapes: the
+        // object may be written by anyone from then on.
+        for (size_t i = 0; i < code.size(); i++) {
+            if (code[i].op != OP_LOCAL) continue;
+            size_t j = i + 1;
+            while (j < code.size() && code[j].op == OP_OFFSET) j++;
+            if (j < code.size() && code[j].op == OP_LOAD) continue;
+            if (auto o = objof(code[i].imm)) escapes.push_back({ o->off, max<int64_t>(o->size, 1) });
+        }
+        // The function, then each loop: its header and what reaches a back
+        // edge's source without passing the header.
+        Region whole;
+        whole.inbody.assign(bbs.size(), 1);
+        regions.push_back(whole);
+        for (auto h : order) {
+            auto &hb = bbs[(size_t)h];
+            if (!hb.loop) continue;
+            Region r;
+            r.header = h;
+            r.inbody.assign(bbs.size(), 0);
+            r.inbody[(size_t)h] = 1;
+            vector<int> work;
+            for (auto p : hb.pred)
+                if (bbs[(size_t)p].rpo >= hb.rpo && bbs[(size_t)p].rpo >= 0 && !r.inbody[(size_t)p]) { r.inbody[(size_t)p] = 1; work.push_back(p); }
+            while (!work.empty()) {
+                auto b = work.back();
+                work.pop_back();
+                for (auto p : bbs[(size_t)b].pred)
+                    if (bbs[(size_t)p].rpo >= 0 && !r.inbody[(size_t)p]) { r.inbody[(size_t)p] = 1; work.push_back(p); }
+            }
+            regions.push_back(r);
+        }
+        for (auto &r : regions)
+            for (size_t b = 0; b < bbs.size(); b++) {
+                if (!r.inbody[b] || bbs[b].rpo < 0) continue;
+                for (size_t i = bbs[b].start; i < bbs[b].end; i++) {
+                    auto &in = code[i];
+                    if (in.op == OP_LSTORE || in.op == OP_LSTOREK) r.writes.push_back({ in.imm, VTSize(in.t) });
+                }
+            }
+        // Outer loops first: a larger body is an enclosing one.
+        sort(regions.begin() + 1, regions.end(), [](const Region &a, const Region &b) {
+            return count(a.inbody.begin(), a.inbody.end(), 1) > count(b.inbody.begin(), b.inbody.end(), 1);
+        });
+    }
+
+    void Activate(int b) {
+        active.clear();
+        for (size_t r = 0; r < regions.size(); r++) if (regions[r].inbody[(size_t)b]) active.push_back((int)r);
+    }
+
+    // The pair for an origin in the outermost active region where it is
+    // invariant, made on the first emission.
+    const Pair *PairFor(Origin o) {
+        if (o.kind == Origin::NONE) return nullptr;
+        for (auto ri : active) {
+            auto &r = regions[(size_t)ri];
+            if (!Invariant(r, o)) continue;
+            for (auto &p : r.pairs) if (p.origin == o) return &p;
+            if (!collecting) return nullptr;
+            Pair p;
+            p.origin = o;
+            p.base = npairs;
+            p.size = npairs;
+            npairs++;
+            r.pairs.push_back(p);
+            return &r.pairs.back();
+        }
+        return nullptr;
+    }
+
+    // The pair's locals, numbered after the first emission.
+    int PairBase(const Pair &p) const { return pairlocals + p.base; }
+    int PairSize(const Pair &p) const { return pairlocals + npairs + p.size; }
+
+    // Loads a pair from the table: the origin's handle now, its entry, at
+    // the sentinel past the table for an id beyond it.
+    void LoadPair(const Pair &p) {
+        if (p.origin.kind == Origin::LOCAL) LocalGet(promoted.at(p.origin.off));
+        else { LocalGet(L_FP); Mem(WO_I64_LOAD, p.origin.off); }
+        I64(32);
+        Emit(WO_I64_SHR_U);
+        Emit(WO_I32_WRAP_I64);
+        I32(kSegEntryShift);
+        Emit(WO_I32_SHL);
+        LocalTee(L_TA);
+        I32((int32_t)(kSegEntry * kMaxSegments));
+        LocalGet(L_TA);
+        I32((int32_t)(kSegEntry * kMaxSegments));
+        Emit(WO_I32_LT_U);
+        Emit(WO_SELECT);
+        GlobalGet(G_SEGTAB);
+        Emit(WO_I32_ADD);
+        LocalTee(L_TA);
+        Mem(WO_I32_LOAD, 0);
+        LocalSet(PairBase(p));
+        LocalGet(L_TA);
+        Mem(WO_I64_LOAD32_U, 4);
+        LocalSet(PairSize(p));
+    }
+
+    // After a call or a slow path: every pair of the regions the block is in.
+    void RefreshPairs() {
+        for (auto ri : active) for (auto &p : regions[(size_t)ri].pairs) LoadPair(p);
+    }
+    void LoadRegionPairs(int ri) {
+        for (auto &p : regions[(size_t)ri].pairs) LoadPair(p);
     }
 
     // A typed load from the address on top, as the VM's LoadVal: the value
@@ -935,12 +1180,6 @@ private:
     // frame and a global are read and written without a decode. A static
     // object's is direct where the offset is within the object, which is
     // known here; any other use materializes the entry as the handle it is.
-    struct Sym {
-        enum Kind : uint8_t { VALUE, FRAME, STATIC } kind = VALUE;
-        int64_t off = 0;
-        int idx = -1;                    // STATIC: the object
-    };
-    vector<Sym> syms;
 
     bool Direct(const Sym &s, int64_t n) const {
         if (s.kind == Sym::FRAME) return true;
@@ -954,7 +1193,11 @@ private:
         for (int k = 0; k < above; k++) LocalSet(spill[(size_t)k]);
         auto &s = syms[idx];
         if (s.kind == Sym::FRAME) { LocalGet(L_FH); I64(s.off); Emit(WO_I64_ADD); }
-        else { GlobalGet(staticglobal[(size_t)s.idx]); if (s.off) { I64(s.off); PtrAdd(); } }
+        else {
+            GlobalGet(staticglobal[(size_t)s.idx]);
+            if (s.off) { I64(s.off); PtrAdd(); }
+            s.origin = Origin { Origin::STATIC, s.idx };
+        }
         for (int k = above - 1; k >= 0; k--) LocalGet(spill[(size_t)k]);
         s.kind = Sym::VALUE;
     }
@@ -1012,10 +1255,32 @@ private:
             case OP_DUP: if (Deferred(0)) { result = syms.back(); deferred = true; } break;
             default: break;
         }
+        // The result's origin, and what a store into a promoted local says
+        // about the local's.
+        if (!deferred) switch (in.op) {
+            case OP_LLOAD:
+                if (promoted.count(in.imm)) {
+                    auto it = localtag.find(in.imm);
+                    result.origin = it != localtag.end() ? it->second : Origin { Origin::LOCAL, in.imm };
+                }
+                break;
+            case OP_LOAD:
+                if (syms.back().kind == Sym::FRAME && in.t == VT_U64) result.origin = Origin { Origin::SLOT, syms.back().off };
+                break;
+            case OP_OFFSET: case OP_DUP: result.origin = syms.back().origin; break;
+            case OP_PTRADD: case OP_PTRSUB: result.origin = syms[syms.size() - 2].origin; break;
+            case OP_LSTORE: case OP_LSTOREK:
+                if (promoted.count(in.imm)) {
+                    if (syms.back().origin.kind != Origin::NONE) localtag[in.imm] = syms.back().origin;
+                    else localtag.erase(in.imm);
+                }
+                result.origin = syms.back().origin;
+                break;
+            default: break;
+        }
         if (!deferred) Code(in);
-        else if (in.op == OP_OFFSET) {}
         for (int i = 0; i < pops; i++) syms.pop_back();
-        for (int i = 0; i < pushes; i++) syms.push_back(deferred ? result : Sym {});
+        for (int i = 0; i < pushes; i++) syms.push_back(result);
     }
 
     void Code(const struct Insn &in) {
@@ -1051,7 +1316,7 @@ private:
             case OP_FUNC: GlobalGet(funcglobal[(size_t)in.imm]); break;
             case OP_LOAD:
                 if (Deferred(0)) { DirectBase(0); Load(in.t, DirectOff(0)); break; }
-                Decode(VTSize(in.t));
+                Decode(VTSize(in.t), syms.back().origin);
                 Load(in.t, 0);
                 break;
             case OP_STORE:
@@ -1060,7 +1325,7 @@ private:
                 // decodes, then stored at it.
                 LocalSet(L_T2);
                 if (Deferred(1)) { DirectBase(1); LocalGet(L_T2); Store(in.t, DirectOff(1)); }
-                else { Decode(VTSize(in.t)); LocalGet(L_T2); Store(in.t, 0); }
+                else { Decode(VTSize(in.t), syms[syms.size() - 2].origin); LocalGet(L_T2); Store(in.t, 0); }
                 if (in.op == OP_STOREK) LocalGet(L_T2);
                 break;
             case OP_COPY: {
@@ -1073,12 +1338,12 @@ private:
                 if (!src) LocalSet(L_T3);  // the source
                 if (!dst) {
                     LocalTee(L_T2);        // the destination
-                    Decode(n);
+                    Decode(n, syms[syms.size() - 2].origin);
                     Emit(WO_DROP);
                     LocalGet(L_T2);
-                    Decode(n);
+                    Decode(n, syms[syms.size() - 2].origin);
                 } else DirectAddr(1);
-                if (!src) { LocalGet(L_T3); Decode(n); }
+                if (!src) { LocalGet(L_T3); Decode(n, syms.back().origin); }
                 else DirectAddr(0);
                 I32((int32_t)n);
                 OpFC(WFC_MEMORY_COPY); code.U8(0); code.U8(0);
@@ -1087,7 +1352,7 @@ private:
             case OP_ZERO:
                 if (!in.imm) { if (!Deferred(0)) Emit(WO_DROP); break; }
                 if (Deferred(0)) DirectAddr(0);
-                else Decode(in.imm);
+                else Decode(in.imm, syms.back().origin);
                 I32(0);
                 I32((int32_t)in.imm);
                 OpFC(WFC_MEMORY_FILL); code.U8(0);
@@ -1123,7 +1388,7 @@ private:
                 break;
             case OP_INCDEC: {
                 if (Deferred(0)) DirectAddr(0);
-                else Decode(VTSize(in.t));
+                else Decode(VTSize(in.t), syms.back().origin);
                 LocalTee(L_TA);
                 Load(in.t, 0);
                 LocalTee(L_T1);            // the old value
@@ -1162,7 +1427,7 @@ private:
                 auto &callee = prog.funcs[(size_t)in.imm];
                 // The runtime's portable popcount, a loop, is one instruction here.
                 if (callee.name == "gs_popcount" && in.t2 == 1 && in.t == VT_I64) { Emit(WO_I64_POPCNT); break; }
-                if (!callee.external) { Call(wasmidx[(size_t)in.imm]); break; }
+                if (!callee.external) { Call(wasmidx[(size_t)in.imm]); RefreshPairs(); break; }
                 // An external: the arguments spilled past the frame, the
                 // host called with the unit's index of the function.
                 for (int i = (int)in.t2 - 1; i >= 0; i--) {
@@ -1179,6 +1444,7 @@ private:
                 CallImport(IMP_NATIVE);
                 if (in.t == VT_VOID) Emit(WO_DROP);
                 else Normalize(in.t);
+                RefreshPairs();
                 break;
             }
             case OP_CALLI: {
@@ -1223,6 +1489,7 @@ private:
                 Emit(WO_CALL_INDIRECT);
                 code.Uleb((uint64_t)SlotSig(in.t2, in.t != VT_VOID));
                 code.U8(0);
+                RefreshPairs();
                 break;
             }
             case OP_RET:

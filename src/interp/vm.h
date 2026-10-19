@@ -90,7 +90,9 @@ struct VM {
     const bool compiled;
 
     explicit VM(const Program &prog, bool compiled = false) : prog(prog), compiled(compiled) {
-        if (compiled) segtab.assign(4 * (size_t)kMaxSegments, 0);
+        // With a zero entry past the end, which a hoisted decode clamps an
+        // id beyond the table to (wasmgen.h).
+        if (compiled) segtab.assign(4 * ((size_t)kMaxSegments + 1), 0);
         segs.emplace_back();   // id 0 is null
         frameseg = NewSeg(SEG_FRAME, "the frame segment", 0);
         segs[frameseg].limit = framelimit;

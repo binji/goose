@@ -2282,8 +2282,8 @@ def main():
             # and relative ones against this directory.
             rel = lambda p: "/" + Path(p).resolve().relative_to(tc.REPO_ROOT).as_posix()
             argv = [node, "--no-warnings", "--stack-size=4000", str(wasm_runner), str(wasm_exe),
-                    str(tc.REPO_ROOT)] + ["-D" + d for d in runtime_defines(f)] + \
-                   ["run", rel(f), "-O2", "--stdlib", "/stdlib", "--wasm"]
+                    str(tc.REPO_ROOT), "run", rel(f), "-O2", "--stdlib", "/stdlib", "--wasm"] + \
+                   ["-D" + d for d in runtime_defines(f)]
             env = dict(os.environ)
             try:
                 env["WASM_RUN_CWD"] = rel(os.getcwd())
