@@ -9,6 +9,7 @@
 #include "includes.h"
 #include "utils.h"
 #include "interp/interp.h"
+#include <unistd.h>
 
 namespace goose {
 int Main(int argc, char **argv);
@@ -48,6 +49,9 @@ int goose_run(const char *cmdline) {
         }
     }
     if (inword) args.push_back(cur);
+    // The working directory the program's relative paths resolve against,
+    // which WASI has no notion of: wasi-libc keeps one in the module.
+    if (auto cwd = getenv("GOOSE_CWD")) (void)chdir(cwd);
     std::vector<char *> argv;
     for (auto &a : args) argv.push_back(a.data());
     argv.push_back(nullptr);
@@ -64,5 +68,23 @@ int goose_resume(void) {
     fflush(stderr);
     return code;
 }
+
+// A compiled run (docs/design/wasm_backend.md §6): goose_run returned
+// kWasmReady with the module here; the page instantiates it on this
+// module's exports and runs its _start, then asks goose_wasm_finish, with
+// the engine's message where the run ended in a trap, for the status, or
+// for the reporter to call first.
+const char *goose_module_ptr(void) { return goose::InterpModule().data(); }
+size_t goose_module_len(void) { return goose::InterpModule().size(); }
+
+int goose_wasm_finish(const char *trap) {
+    int code = goose::InterpWasmFinish(trap);
+    fflush(stdout);
+    fflush(stderr);
+    return code;
+}
+
+const char *goose_wasm_report_name(void) { return goose::InterpWasmReportName(); }
+uint64_t goose_wasm_report_arg(void) { return goose::InterpWasmReportArg(); }
 
 }  // extern "C"

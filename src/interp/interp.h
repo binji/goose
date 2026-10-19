@@ -20,7 +20,8 @@ namespace goose {
 // rather than in the program; a fault during the run is reported on stderr
 // and exits with 134, as an abort would.
 int RunInterp(const string &csrc, const string &progname, const vector<string> &progargs,
-              const vector<const goose_thunk *> &thunks);
+              const vector<const goose_thunk *> &thunks, const string &cname = "<generated C>",
+              const string &argv0 = "");
 
 // In pieces, for a host that calls in repeatedly (the page, §9, through
 // web_entry.cpp): with InterpResumable(true), RunInterp returns
@@ -31,5 +32,25 @@ constexpr int kInterpSuspended = -2;
 void InterpResumable(bool on);
 bool InterpSuspended();
 int InterpResume();
+
+// The WebAssembly backend (wasmgen.h, docs/design/wasm_backend.md): the
+// same text compiled to a module over the bytecode. EmitWasm writes the
+// module's bytes; with InterpCompiled(true), RunInterp emits them instead
+// of running the loop, sets the run up and returns kWasmReady, and the
+// host (web_entry.cpp) instantiates the module on the exports of §6 and
+// runs its _start. What ends the run is a trap after the host recorded
+// why; InterpWasmFinish then gives the status, printing a fault's message,
+// or kWasmReport, asking the host to call the exported reporter
+// InterpWasmReportName names with InterpWasmReportArg and finish again.
+// `trap` is the engine's message where the run ended in a trap the host
+// did not record, or null.
+string EmitWasm(const string &csrc, const string &progname, const string &cname = "<generated C>");
+void InterpCompiled(bool on);
+constexpr int kWasmReady = -3;
+constexpr int kWasmReport = -4;
+const string &InterpModule();
+int InterpWasmFinish(const char *trap);
+const char *InterpWasmReportName();
+uint64_t InterpWasmReportArg();
 
 }  // namespace goose

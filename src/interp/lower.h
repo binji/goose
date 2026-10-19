@@ -99,27 +99,12 @@ private:
         maxdepth = max(maxdepth, depth);
     }
 
-    // What an instruction does to the operand stack's height. Followed in
-    // emission order this bounds the height the code reaches: a jump's
-    // target is never deeper than the code before the jump, since
-    // statements leave the stack where they found it and the expressions
-    // that branch (?:, &&, ||) join at equal heights.
-    static int Effect(const Insn &in) {
-        switch (in.op) {
-            case OP_PUSH: case OP_DUP: case OP_LOCAL: case OP_LLOAD: case OP_GLOBAL: case OP_FUNC: return 1;
-            case OP_POP: case OP_LSTORE: case OP_ZERO: case OP_PTRADD: case OP_PTRSUB: case OP_PTRDIFF:
-            case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
-            case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR:
-            case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE:
-            case OP_JZ: case OP_JNZ:
-                return -1;
-            case OP_STORE: case OP_COPY: case OP_JCMP: return -2;
-            case OP_CALL: return (in.t != VT_VOID) - (int)in.t2;
-            case OP_CALLI: return (in.t != VT_VOID) - (int)in.t2 - 1;
-            case OP_RET: return in.t != VT_VOID ? -1 : 0;
-            default: return 0;
-        }
-    }
+    // The operand stack's height, followed in emission order (StackEffect,
+    // bytecode.h), bounds the height the code reaches: a jump's target is
+    // never deeper than the code before the jump, since statements leave
+    // the stack where they found it and the expressions that branch (?:,
+    // &&, ||) join at equal heights.
+    static int Effect(const Insn &in) { return StackEffect(in); }
     int NewLabel() {
         labels.push_back(-1);
         return (int)labels.size() - 1;

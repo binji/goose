@@ -118,6 +118,26 @@ struct Insn {
     int64_t imm = 0;
 };
 
+// What an instruction does to the operand stack's height: what it pushes
+// less what it pops. A jump's is after the operands it pops.
+inline int StackEffect(const Insn &in) {
+    switch (in.op) {
+        case OP_PUSH: case OP_DUP: case OP_LOCAL: case OP_LLOAD: case OP_GLOBAL: case OP_FUNC: return 1;
+        case OP_POP: case OP_LSTORE: case OP_ZERO: case OP_PTRADD: case OP_PTRSUB: case OP_PTRDIFF:
+        case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+        case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR:
+        case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE:
+        case OP_JZ: case OP_JNZ:
+            return -1;
+        case OP_STORE: case OP_COPY: case OP_JCMP: return -2;
+        case OP_STOREK: return -1;
+        case OP_CALL: return (in.t != VT_VOID) - (int)in.t2;
+        case OP_CALLI: return (in.t != VT_VOID) - (int)in.t2 - 1;
+        case OP_RET: return in.t != VT_VOID ? -1 : 0;
+        default: return 0;
+    }
+}
+
 // A parameter's slot in the callee's frame. A record parameter is passed as
 // the address of the caller's copy and copied into its slot on entry.
 struct Param {
@@ -149,6 +169,10 @@ struct StaticObj {
     CDecl *decl = nullptr;
     bool isextern = false;
 };
+
+// The most segments a run can have: the capacity of the flat segment table
+// the VM keeps for compiled code (vm.h, wasmgen.h; docs/design/wasm_backend.md §5).
+constexpr uint32_t kMaxSegments = 1u << 18;
 
 struct Program {
     vector<Function> funcs;

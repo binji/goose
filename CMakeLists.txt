@@ -80,6 +80,7 @@ add_executable(goose
     src/interp/vm.h
     src/interp/prelude.h
     src/interp/clib.h
+    src/interp/wasmgen.h
     src/runtime/runtime.h
     src/runtime/runtime_impl.h
     src/runtime/runtime_threads.h
@@ -110,7 +111,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
     set_target_properties(goose PROPERTIES OUTPUT_NAME goose SUFFIX ".wasm")
     target_link_options(goose PRIVATE -mexec-model=reactor
                         "LINKER:-z,stack-size=67108864"
-                        "LINKER:--export=goose_argbuf,--export=goose_run,--export=goose_resume")
+                        "LINKER:--export=goose_argbuf,--export=goose_run,--export=goose_resume"
+                        # The compiled run's entry points and the host functions a
+                        # program module imports (docs/design/wasm_backend.md §6).
+                        "LINKER:--export=goose_module_ptr,--export=goose_module_len,--export=goose_wasm_finish"
+                        "LINKER:--export=goose_wasm_report_name,--export=goose_wasm_report_arg"
+                        "LINKER:--export=goose_native,--export=goose_access_slow,--export=goose_static_handle"
+                        "LINKER:--export=goose_func_handle,--export=goose_info,--export=goose_stop,--export=goose_fault")
 else()
     target_sources(goose PRIVATE src/process.cpp)
     # The compile runs on a thread of its own, with a larger stack (main.cpp).

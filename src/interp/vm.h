@@ -83,7 +83,14 @@ struct VM {
     // The frame segment's limit: the native stack size, which caps recursion.
     uint64_t framelimit = 8u << 20;
 
-    explicit VM(const Program &prog) : prog(prog) {
+    // For compiled code (wasmgen.h, docs/design/wasm_backend.md §5) the VM
+    // is the host: it keeps the flat segment table the code decodes
+    // through, its frame segment never moves, and Start sets the run up
+    // without running it; the loop is never entered.
+    const bool compiled;
+
+    explicit VM(const Program &prog, bool compiled = false) : prog(prog), compiled(compiled) {
+        if (compiled) segtab.assign(4 * (size_t)kMaxSegments, 0);
         segs.emplace_back();   // id 0 is null
         frameseg = NewSeg(SEG_FRAME, "the frame segment", 0);
         segs[frameseg].limit = framelimit;
@@ -119,7 +126,18 @@ struct VM {
     void Start(const vector<string> &args) {
         try {
             segs[frameseg].limit = framelimit;
-            if (prog.init >= 0) {
+            if (compiled) {
+                // The whole frame segment at once, so that compiled frames
+                // address it without a decode; the handles into it pass
+                // the table's check at any offset.
+                auto &fs = segs[frameseg];
+                // With room past the limit for the arguments an external
+                // called through a pointer spills past the top.
+                fs.mem.assign(framelimit + 4096, 0);
+                fs.size = framelimit;
+                Mirror(frameseg);
+            }
+            if (prog.init >= 0 && !compiled) {
                 // Static initializers run whole: nothing in them is worth
                 // yielding over.
                 auto saved = budget;
@@ -138,10 +156,14 @@ struct VM {
                     memcpy(segs[s].mem.data(), args[i].c_str(), args[i].size() + 1);
                     StoreVal(segs[argv].mem.data() + 8 * i, VT_U64, Handle(s, 0));
                 }
-                Push((uint64_t)args.size());
-                Push(Handle(argv, 0));
+                argc = (uint64_t)args.size();
+                argvh = Handle(argv, 0);
+                if (compiled) return;
+                Push(argc);
+                Push(argvh);
                 if (mainfn->params.size() > 2) Push(0);
             }
+            if (compiled) return;
             Enter(*mainfn, (int)mainfn->params.size());
         } catch (Exit &e) {
             Finish(e.status);
@@ -166,6 +188,9 @@ struct VM {
         }
         return true;
     }
+
+    // What compiled code's _start asks for (wasmgen.h): main's arguments.
+    uint64_t argc = 0, argvh = 0;
 
     // The whole run at once: the exit status.
     int Run(const vector<string> &args) {
@@ -193,6 +218,11 @@ public:
     // ---- Segments
 
     vector<Segment> segs;
+    // The table compiled code decodes through: { base, size, kind, 0 } per
+    // id, the base an address in this process (the module's memory, in the
+    // Wasm build), kept in step with segs by Mirror. Sized once, at the
+    // capacity the code checks ids against, so it never moves.
+    vector<uint32_t> segtab;
     uint32_t frameseg = 0;
     uint64_t frametop = 0;
     // The runtime's reporters of the two overflows, where the program has
@@ -202,7 +232,7 @@ public:
     bool reporting = false;
 
     uint32_t NewSeg(SegKind kind, string name, uint64_t size) {
-        if (segs.size() >= 0xffffffffu) throw Fault { "too many segments" };
+        if (segs.size() >= kMaxSegments) throw Fault { "too many segments" };
         Segment s;
         s.kind = kind;
         s.name = std::move(name);
@@ -210,7 +240,23 @@ public:
         s.limit = size;
         s.mem.resize(size);
         segs.push_back(std::move(s));
-        return (uint32_t)segs.size() - 1;
+        auto id = (uint32_t)segs.size() - 1;
+        Mirror(id);
+        return id;
+    }
+
+    // A segment's table entry, after anything that changes its bytes'
+    // place or its size: a function segment's base is its table index,
+    // which FuncHandle sets; a dead segment's size is 0, so every access
+    // takes the slow path, which reports it.
+    void Mirror(uint32_t id) {
+        if (!compiled) return;
+        auto &s = segs[id];
+        auto e = &segtab[4 * (size_t)id];
+        auto base = s.kind == SEG_FUNC ? e[0] : (uint32_t)(uintptr_t)s.mem.data();
+        e[0] = s.alive ? base : 0;
+        e[1] = s.alive && s.kind != SEG_FUNC ? (uint32_t)s.size : 0;
+        e[2] = s.alive ? (uint32_t)s.kind : 0;
     }
 
     string Describe(const Segment &s) const {
@@ -253,7 +299,7 @@ public:
         if (SOffOf(h) < 0)
             throw Fault { cat("access of ", n, " bytes at offset ", SOffOf(h), ", before the start of ", Describe(s)) };
         if (off + n > s.size) {
-            if (s.kind == SEG_STACK && off + n <= s.limit) Grow(s, off + n);
+            if (s.kind == SEG_STACK && off + n <= s.limit) Grow(SegOf(h), off + n);
             else if (s.kind == SEG_STACK) {
                 if (dataoverflow >= 0) throw Reroute { dataoverflow, { Handle(SegOf(h), 0) } };
                 throw Fault { cat("data stack overflow: ", n, " bytes at offset ", off, " of a ", Describe(s)) };
@@ -265,11 +311,13 @@ public:
 
     // A stack segment doubles, zero-filled, up to its limit; the block may
     // move, which no handle notices.
-    static void Grow(Segment &s, uint64_t needed) {
+    void Grow(uint32_t id, uint64_t needed) {
+        auto &s = segs[id];
         auto size = max<uint64_t>(max(s.size * 2, needed), 4096);
         size = min(size, s.limit);
         s.mem.resize(size);
         s.size = size;
+        Mirror(id);
     }
 
     // Pointer arithmetic stays within reach of the segment: up to its
@@ -368,14 +416,32 @@ public:
         return h;
     }
 
-    uint64_t FuncHandle(size_t i) {
+    // A function's handle; for compiled code, with the function's index in
+    // the module's table, which an indirect call reads from the entry.
+    uint64_t FuncHandle(size_t i, uint32_t tableidx = 0) {
         auto &h = funchandles[i];
         if (!h) {
             auto id = NewSeg(SEG_FUNC, prog.funcs[i].name, 0);
             segs[id].func = (int)i;
+            if (compiled) { segtab[4 * (size_t)id] = tableidx; Mirror(id); }
             h = Handle(id, 0);
         }
         return h;
+    }
+
+    // A call of an external function with its arguments in slots: the C
+    // library's adapter, or a native package's thunk. The result, or 0.
+    uint64_t CallExternal(const Function &f, const uint64_t *args, int nargs) {
+        auto &fp = natives[(size_t)(&f - prog.funcs.data())];
+        if (!fp) {
+            auto it = library.find(f.name);
+            if (it == library.end()) {
+                if (auto th = thunks.find(f.name); th != thunks.end()) return CallThunk(f, th->second, args, nargs);
+                throw Fault { cat("undefined function '", f.name, "'") };
+            }
+            fp = it->second;
+        }
+        return fp(*this, args, nargs);
     }
 
     // Calls a function with the top `nargs` slots as its arguments: a native
@@ -384,20 +450,7 @@ public:
     // continues. Returns whether a frame was pushed.
     bool Enter(const Function &f, int nargs) {
         if (f.external) {
-            auto &fp = natives[(size_t)(&f - prog.funcs.data())];
-            if (!fp) {
-                auto it = library.find(f.name);
-                if (it == library.end()) {
-                    if (auto th = thunks.find(f.name); th != thunks.end()) {
-                        CallThunk(f, th->second, nargs);
-                        return false;
-                    }
-                    throw Fault { cat("undefined function '", f.name, "'") };
-                }
-                fp = it->second;
-            }
-            auto args = stack.data() + sp - (size_t)nargs;
-            auto r = fp(*this, args, nargs);
+            auto r = CallExternal(f, stack.data() + sp - (size_t)nargs, nargs);
             sp -= (size_t)nargs;
             if (f.ret != VT_VOID) Push(Normalize(r, f.ret));
             return false;
@@ -433,12 +486,11 @@ public:
     // 8-byte slot in the generated C's own layout (a scalar as its size, a
     // record as its bytes, a pointer as its handle), the result read back
     // by the return type, into the hidden result pointer for a record.
-    void CallThunk(const Function &f, const goose_thunk *t, int nargs) {
+    uint64_t CallThunk(const Function &f, const goose_thunk *t, const uint64_t *args, int nargs) {
         auto ft = f.decl->type;
         size_t first = f.sret ? 1 : 0;
         if ((size_t)nargs != ft->params.size() + first)
             throw Fault { cat("'", f.name, "' called with ", nargs - first, " arguments, declared with ", ft->params.size()) };
-        auto args = stack.data() + sp - (size_t)nargs;
         vector<uint8_t> buf;
         for (size_t i = 0; i < ft->params.size(); i++) {
             auto pt = ft->params[i];
@@ -459,8 +511,7 @@ public:
         t->fn(reinterpret_cast<goose_vm *>(this), buf.data(), ret.data());
         if (t->yields) RequestYield();
         if (f.sret) memcpy(Access(args[0], (uint64_t)rt->size), ret.data(), (size_t)rt->size);
-        sp -= (size_t)nargs;
-        if (f.ret != VT_VOID) Push(Normalize(LoadVal(ret.data(), f.ret), f.ret));
+        return f.ret != VT_VOID ? LoadVal(ret.data(), f.ret) : 0;
     }
 
     void Ret(VT t) {
@@ -905,6 +956,7 @@ public:
         if (OffOf(h) != 0) throw Fault { cat("free of an interior pointer (offset ", SOffOf(h), ") of ", Describe(s)) };
         s.alive = false;
         s.mem = {};
+        Mirror(SegOf(h));
     }
 };
 

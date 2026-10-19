@@ -829,6 +829,8 @@ Options:
   --include header.h    Have the C include this header (may be repeated).
   --jit                 Also run the program in this process.
   --interp              Run it in the interpreter rather than with TinyCC.
+  --wasm                Compile the C to a WebAssembly module over the
+                        interpreter's bytecode, written where -o says.
   --emit-runtime out.c  Write the runtime's C.
   --<package>-link msvc|cc
                         Print the response file that links the native part of
@@ -857,6 +859,8 @@ Options:
   --unsafe-no-rf-check  Leave out the checks after calls that a `return ...
                         from` can pass through: unsound, for pricing them only.
   --gen-runtime-header  Regenerate src/runtime_inline.h from src/runtime/.
+  --run-c file.c        Run a C file through the interpreter, or with --wasm
+                        the backend, in place of a program: its fixtures.
 )");
     return "";
 }
@@ -1032,6 +1036,11 @@ int Main(int argc, char **argv) {
     auto nobce = false, bcetest = false, bcelines = false, norfcheck = false;
     auto stacks = false;
     auto forcejit = false, standalone = false;
+    // The WebAssembly backend over the interpreter's bytecode
+    // (docs/design/wasm_backend.md): natively it writes the module -o
+    // names; under goose.wasm the host runs it (web_entry.cpp).
+    auto wasm = false;
+    string runcfile;
     // The interpreter in place of TinyCC (docs/design/interpreter.md): what a
     // compiler built without TinyCC always runs with.
     #ifdef GOOSE_NO_JIT
@@ -1086,6 +1095,8 @@ int Main(int argc, char **argv) {
         else if (arg == "--unsafe-no-rf-check") norfcheck = true;
         else if (arg == "--jit") forcejit = true;
         else if (arg == "--interp") interp = true;
+        else if (arg == "--wasm") wasm = interp = true;
+        else if (arg == "--run-c" && i + 1 < argc) runcfile = argv[++i];
         else if (arg == "--standalone") standalone = true;
         else if (arg == "--multi-test") multitest = true;
         else if (arg == "--gen-runtime-header") { GenRuntimeHeader(exe.c_str()); return 0; }
@@ -1203,6 +1214,29 @@ int Main(int argc, char **argv) {
         }
         return 0;
     }
+    // A C file in place of a program (the interpreter's fixtures): run as
+    // the generated C would be, or compiled to a module.
+    if (!runcfile.empty()) {
+        string text;
+        if (!LoadFile(runcfile, text)) {
+            fprintf(stderr, "cannot read %s\n", runcfile.c_str());
+            return 1;
+        }
+        try {
+            if (wasm && !outname.empty()) {
+                auto module = EmitWasm(text, runcfile, runcfile);
+                if (!WriteFileMakingDirs(outname, module)) throw CompileError { cat("cannot write output file: ", outname) };
+                return 0;
+            }
+            if (wasm) InterpCompiled(true);
+            // Named as test/interp_run.cpp names a fixture, so the expected
+            // output is the same.
+            return RunInterp(text, runcfile, progargs, {}, runcfile, "fixture");
+        } catch (CompileError &e) {
+            fprintf(stderr, "%s\n", e.msg.c_str());
+            return 1;
+        }
+    }
     if (files.empty()) {
         auto help = HelpText(verb);
         fprintf(stderr, "%s\n%s\n", help.substr(0, help.find("\n\n") + 1).c_str(),
@@ -1218,7 +1252,7 @@ int Main(int argc, char **argv) {
     // the text the interpreter gets is one a C compiler could also build;
     // only for a run in this process, so that -o writes the C a native
     // build gets whichever backend this compiler runs programs with.
-    if (interp && jit) cdefines.push_back("GS_INTERP=1");
+    if (interp && (jit || wasm)) cdefines.push_back("GS_INTERP=1");
     if (!headername.empty() && (jit || multitest)) {
         fprintf(stderr, "--header requires C output for a single input file\n");
         return 1;
@@ -1402,7 +1436,13 @@ int Main(int argc, char **argv) {
                        cg.head, RuntimeSections({ "runtime_ext.h", "runtime_os.h" }), cg.result);
             return out;
         };
-        if (!outfile.empty() && !nocgen) {
+        if (!outfile.empty() && !nocgen && wasm) {
+            // The module, from the whole text a run interprets.
+            auto module = EmitWasm(assemble(false), filename);
+            if (!WriteFileMakingDirs(outfile, module))
+                throw CompileError { cat("cannot write output file: ", outfile) };
+            fprintf(msgs, "wrote %s (%d bytes)\n", outfile.c_str(), (int)module.size());
+        } else if (!outfile.empty() && !nocgen) {
             auto out = assemble(!standalone);
             if (!WriteFileMakingDirs(outfile, out))
                 throw CompileError { cat("cannot write output file: ", outfile) };
@@ -1533,6 +1573,7 @@ int Main(int argc, char **argv) {
                     thunks.push_back(table());
                 }
                 fflush(msgs);
+                if (wasm) InterpCompiled(true);
                 return RunInterp(program, filename, progargs, thunks);
             }
             // The native parts the program reaches hand the run their
