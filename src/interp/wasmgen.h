@@ -66,7 +66,7 @@ enum WOp : uint8_t {
     WO_I64_GE_U = 0x5A,
     WO_F64_EQ = 0x61, WO_F64_NE = 0x62, WO_F64_LT = 0x63, WO_F64_GT = 0x64, WO_F64_LE = 0x65, WO_F64_GE = 0x66,
     WO_I32_ADD = 0x6A, WO_I32_SUB = 0x6B, WO_I32_AND = 0x71, WO_I32_OR = 0x72, WO_I32_SHL = 0x74,
-    WO_I64_ADD = 0x7C, WO_I64_SUB = 0x7D, WO_I64_MUL = 0x7E, WO_I64_DIV_S = 0x7F, WO_I64_DIV_U = 0x80,
+    WO_I64_POPCNT = 0x7B, WO_I64_ADD = 0x7C, WO_I64_SUB = 0x7D, WO_I64_MUL = 0x7E, WO_I64_DIV_S = 0x7F, WO_I64_DIV_U = 0x80,
     WO_I64_REM_S = 0x81, WO_I64_REM_U = 0x82, WO_I64_AND = 0x83, WO_I64_OR = 0x84, WO_I64_XOR = 0x85,
     WO_I64_SHL = 0x86, WO_I64_SHR_S = 0x87, WO_I64_SHR_U = 0x88,
     WO_F64_NEG = 0x9A, WO_F64_ADD = 0xA0, WO_F64_SUB = 0xA1, WO_F64_MUL = 0xA2, WO_F64_DIV = 0xA3,
@@ -128,9 +128,12 @@ private:
     vector<int> emitted;                 // the unit's function indices, in module order
     vector<int> wasmidx;                 // function index -> module function index, or -1
     vector<int> staticglobal;            // static object -> its handle's global, or -1
+    vector<int> staticbase;              // static object -> the global holding its address (i32), or -1
     vector<int> funcglobal;              // function -> the global holding its handle (OP_FUNC), or -1
     int nglobals = 0;
+    vector<WasmType> globaltype;
     enum { G_SEGTAB, G_FRAMEBASE, G_FRAMETOP, G_FRAMELIMIT, G_FRAMESEG, G_FIXED };
+    int NewGlobal(WasmType t) { globaltype.push_back(t); return nglobals++; }
 
     // The static initializer, main, and everything they reach by a call or
     // a function handle; the static objects and the function handles those
@@ -138,8 +141,11 @@ private:
     void Reach() {
         wasmidx.assign(prog.funcs.size(), -1);
         staticglobal.assign(prog.statics.size(), -1);
+        staticbase.assign(prog.statics.size(), -1);
         funcglobal.assign(prog.funcs.size(), -1);
-        nglobals = G_FIXED;
+        nglobals = 0;
+        globaltype.clear();
+        for (int g = 0; g < G_FIXED; g++) NewGlobal(g == G_FRAMESEG ? W_I64 : W_I32);
         vector<bool> reached(prog.funcs.size(), false);
         vector<int> work;
         auto mark = [&](int fi) {
@@ -161,9 +167,12 @@ private:
                 if (in.op == OP_CALL) mark((int)in.imm);
                 else if (in.op == OP_FUNC) {
                     mark((int)in.imm);
-                    if (funcglobal[(size_t)in.imm] < 0) funcglobal[(size_t)in.imm] = nglobals++;
+                    if (funcglobal[(size_t)in.imm] < 0) funcglobal[(size_t)in.imm] = NewGlobal(W_I64);
                 } else if (in.op == OP_GLOBAL) {
-                    if (staticglobal[(size_t)in.imm] < 0) staticglobal[(size_t)in.imm] = nglobals++;
+                    if (staticglobal[(size_t)in.imm] < 0) {
+                        staticglobal[(size_t)in.imm] = NewGlobal(W_I64);
+                        staticbase[(size_t)in.imm] = NewGlobal(W_I32);
+                    }
                 }
             }
         }
@@ -919,61 +928,87 @@ private:
     static int Pushes(const struct Insn &in) { return Pops(in) + StackEffect(in); }
 
     // The operand stack as the code has it, in step with Wasm's: an entry
-    // is a value on Wasm's stack, or a frame address nothing has been
-    // emitted for yet (a `local` and the offsets added to it), which the
-    // access that consumes it makes a direct frame access, so that a
-    // record in the frame is read and written without a decode of the
-    // frame segment. Any other use materializes it as the handle it is.
-    struct Sym { bool frame = false; int64_t off = 0; };
+    // is a value on Wasm's stack, or an address nothing has been emitted
+    // for yet, a `local` or a `global` and the offsets added to it, which
+    // the access that consumes it makes a direct access at the frame
+    // pointer or the static object's address, so that a record in the
+    // frame and a global are read and written without a decode. A static
+    // object's is direct where the offset is within the object, which is
+    // known here; any other use materializes the entry as the handle it is.
+    struct Sym {
+        enum Kind : uint8_t { VALUE, FRAME, STATIC } kind = VALUE;
+        int64_t off = 0;
+        int idx = -1;                    // STATIC: the object
+    };
     vector<Sym> syms;
+
+    bool Direct(const Sym &s, int64_t n) const {
+        if (s.kind == Sym::FRAME) return true;
+        if (s.kind == Sym::STATIC) return s.off >= 0 && s.off + n <= prog.statics[(size_t)s.idx].size;
+        return false;
+    }
 
     void Materialize(size_t idx) {
         int above = 0;
-        for (size_t j = idx + 1; j < syms.size(); j++) if (!syms[j].frame) above++;
+        for (size_t j = idx + 1; j < syms.size(); j++) if (syms[j].kind == Sym::VALUE) above++;
         for (int k = 0; k < above; k++) LocalSet(spill[(size_t)k]);
-        LocalGet(L_FH);
-        I64(syms[idx].off);
-        Emit(WO_I64_ADD);
+        auto &s = syms[idx];
+        if (s.kind == Sym::FRAME) { LocalGet(L_FH); I64(s.off); Emit(WO_I64_ADD); }
+        else { GlobalGet(staticglobal[(size_t)s.idx]); if (s.off) { I64(s.off); PtrAdd(); } }
         for (int k = above - 1; k >= 0; k--) LocalGet(spill[(size_t)k]);
-        syms[idx].frame = false;
+        s.kind = Sym::VALUE;
     }
 
     // Materializes every deferred entry, or just the popped operands other
-    // than those at the given depths from the top.
+    // than those at the given depths from the top that an access of n
+    // bytes can reach directly.
     void MaterializeAll() {
-        for (size_t i = 0; i < syms.size(); i++) if (syms[i].frame) Materialize(i);
+        for (size_t i = 0; i < syms.size(); i++) if (syms[i].kind != Sym::VALUE) Materialize(i);
     }
-    void MaterializeOperands(int pops, int keep0 = -1, int keep1 = -1) {
+    void MaterializeOperands(int pops, int64_t n = 0, int keep0 = -1, int keep1 = -1) {
         for (int d = 0; d < pops; d++) {
-            if (d == keep0 || d == keep1) continue;
             auto idx = syms.size() - 1 - (size_t)d;
-            if (syms[idx].frame) Materialize(idx);
+            if (syms[idx].kind == Sym::VALUE) continue;
+            if ((d == keep0 || d == keep1) && Direct(syms[idx], n)) continue;
+            Materialize(idx);
         }
     }
-    // The deferred frame address at depth d from the top, as an i32 address.
-    void FrameAddr(int d) {
-        LocalGet(L_FP);
-        I32((int32_t)syms[syms.size() - 1 - (size_t)d].off);
+    // The deferred address at depth d from the top, as an i32 address.
+    void DirectAddr(int d) {
+        auto &s = syms[syms.size() - 1 - (size_t)d];
+        if (s.kind == Sym::FRAME) LocalGet(L_FP);
+        else GlobalGet(staticbase[(size_t)s.idx]);
+        I32((int32_t)s.off);
         Emit(WO_I32_ADD);
     }
-    bool Deferred(int d) const { return syms[syms.size() - 1 - (size_t)d].frame; }
+    bool Deferred(int d) const { return syms[syms.size() - 1 - (size_t)d].kind != Sym::VALUE; }
+    // A direct typed access at the deferred entry at depth d: its base and
+    // the offset for the memarg.
+    void DirectBase(int d) {
+        auto &s = syms[syms.size() - 1 - (size_t)d];
+        if (s.kind == Sym::FRAME) LocalGet(L_FP);
+        else GlobalGet(staticbase[(size_t)s.idx]);
+    }
+    int64_t DirectOff(int d) const { return syms[syms.size() - 1 - (size_t)d].off; }
 
     // ---- Instructions
 
     void Insn(const struct Insn &in) {
         int pops = Pops(in), pushes = Pushes(in);
         switch (in.op) {
-            case OP_LOAD: case OP_ZERO: case OP_INCDEC: case OP_OFFSET: case OP_DUP: case OP_POP:
-                MaterializeOperands(pops, 0); break;
-            case OP_STORE: case OP_STOREK: MaterializeOperands(pops, 1); break;
-            case OP_COPY: MaterializeOperands(pops, 0, 1); break;
+            case OP_LOAD: case OP_INCDEC: MaterializeOperands(pops, VTSize(in.t), 0); break;
+            case OP_ZERO: MaterializeOperands(pops, in.imm, 0); break;
+            case OP_OFFSET: case OP_DUP: case OP_POP: MaterializeOperands(pops, 0, 0); break;
+            case OP_STORE: case OP_STOREK: MaterializeOperands(pops, VTSize(in.t), 1); break;
+            case OP_COPY: MaterializeOperands(pops, in.imm, 0, 1); break;
             default: MaterializeOperands(pops); break;
         }
         Sym result;
         bool deferred = false;
         switch (in.op) {
-            case OP_LOCAL: result = Sym { true, in.imm }; deferred = true; break;
-            case OP_OFFSET: if (Deferred(0)) { result = Sym { true, syms.back().off + in.imm }; deferred = true; } break;
+            case OP_LOCAL: result = Sym { Sym::FRAME, in.imm, -1 }; deferred = true; break;
+            case OP_GLOBAL: result = Sym { Sym::STATIC, 0, (int)in.imm }; deferred = true; break;
+            case OP_OFFSET: if (Deferred(0)) { result = syms.back(); result.off += in.imm; deferred = true; } break;
             case OP_DUP: if (Deferred(0)) { result = syms.back(); deferred = true; } break;
             default: break;
         }
@@ -1015,7 +1050,7 @@ private:
             case OP_GLOBAL: GlobalGet(staticglobal[(size_t)in.imm]); break;
             case OP_FUNC: GlobalGet(funcglobal[(size_t)in.imm]); break;
             case OP_LOAD:
-                if (Deferred(0)) { LocalGet(L_FP); Load(in.t, syms.back().off); break; }
+                if (Deferred(0)) { DirectBase(0); Load(in.t, DirectOff(0)); break; }
                 Decode(VTSize(in.t));
                 Load(in.t, 0);
                 break;
@@ -1024,7 +1059,7 @@ private:
                 // The value above the address: set aside while the address
                 // decodes, then stored at it.
                 LocalSet(L_T2);
-                if (Deferred(1)) { LocalGet(L_FP); LocalGet(L_T2); Store(in.t, syms[syms.size() - 2].off); }
+                if (Deferred(1)) { DirectBase(1); LocalGet(L_T2); Store(in.t, DirectOff(1)); }
                 else { Decode(VTSize(in.t)); LocalGet(L_T2); Store(in.t, 0); }
                 if (in.op == OP_STOREK) LocalGet(L_T2);
                 break;
@@ -1042,16 +1077,16 @@ private:
                     Emit(WO_DROP);
                     LocalGet(L_T2);
                     Decode(n);
-                } else FrameAddr(1);
+                } else DirectAddr(1);
                 if (!src) { LocalGet(L_T3); Decode(n); }
-                else FrameAddr(0);
+                else DirectAddr(0);
                 I32((int32_t)n);
                 OpFC(WFC_MEMORY_COPY); code.U8(0); code.U8(0);
                 break;
             }
             case OP_ZERO:
                 if (!in.imm) { if (!Deferred(0)) Emit(WO_DROP); break; }
-                if (Deferred(0)) FrameAddr(0);
+                if (Deferred(0)) DirectAddr(0);
                 else Decode(in.imm);
                 I32(0);
                 I32((int32_t)in.imm);
@@ -1087,7 +1122,7 @@ private:
                 Emit(WO_I64_DIV_S);
                 break;
             case OP_INCDEC: {
-                if (Deferred(0)) FrameAddr(0);
+                if (Deferred(0)) DirectAddr(0);
                 else Decode(VTSize(in.t));
                 LocalTee(L_TA);
                 Load(in.t, 0);
@@ -1125,6 +1160,8 @@ private:
             case OP_JMP: case OP_JZ: case OP_JNZ: case OP_JCMP: Bad("a jump outside its block"); break;
             case OP_CALL: {
                 auto &callee = prog.funcs[(size_t)in.imm];
+                // The runtime's portable popcount, a loop, is one instruction here.
+                if (callee.name == "gs_popcount" && in.t2 == 1 && in.t == VT_I64) { Emit(WO_I64_POPCNT); break; }
                 if (!callee.external) { Call(wasmidx[(size_t)in.imm]); break; }
                 // An external: the arguments spilled past the frame, the
                 // host called with the unit's index of the function.
@@ -1211,7 +1248,23 @@ private:
         I32(0);
         GlobalSet(G_FRAMETOP);
         for (size_t i = 0; i < prog.statics.size(); i++)
-            if (staticglobal[i] >= 0) { I32((int32_t)i); CallImport(IMP_STATIC_HANDLE); GlobalSet(staticglobal[i]); }
+            if (staticglobal[i] >= 0) {
+                I32((int32_t)i);
+                CallImport(IMP_STATIC_HANDLE);
+                GlobalSet(staticglobal[i]);
+                // Its address, which never changes: a static segment is
+                // neither grown nor freed. The table's entry for the handle.
+                GlobalGet(staticglobal[i]);
+                I64(32);
+                Emit(WO_I64_SHR_U);
+                Emit(WO_I32_WRAP_I64);
+                I32(kSegEntryShift);
+                Emit(WO_I32_SHL);
+                GlobalGet(G_SEGTAB);
+                Emit(WO_I32_ADD);
+                Mem(WO_I32_LOAD, 0);
+                GlobalSet(staticbase[i]);
+            }
         for (size_t i = 0; i < prog.funcs.size(); i++)
             if (funcglobal[i] >= 0) {
                 I32((int32_t)i);
@@ -1332,16 +1385,15 @@ private:
             s.Uleb(emitted.size());
             section(4, s);
         }
-        // Globals: the fixed ones (i32 but the frame segment's handle), then
-        // a handle per static object and function handle.
+        // Globals: the fixed ones, then a handle and an address per static
+        // object and a handle per function handle, all mutable, set by _start.
         {
             WasmBuf s;
             s.Uleb((uint64_t)nglobals);
             for (int g = 0; g < nglobals; g++) {
-                bool i32 = g < G_FIXED && g != G_FRAMESEG;
-                s.U8(i32 ? W_I32 : W_I64);
+                s.U8(globaltype[(size_t)g]);
                 s.U8(0x01);
-                s.U8(i32 ? WO_I32_CONST : WO_I64_CONST);
+                s.U8(globaltype[(size_t)g] == W_I32 ? WO_I32_CONST : WO_I64_CONST);
                 s.Sleb(0);
                 s.U8(WO_END);
             }

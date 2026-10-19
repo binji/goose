@@ -70,7 +70,14 @@ names a wasi-sdk or `build/wasm` is configured already, `test/wasm_build.py`
 with `--fetch`, it lets the toolchain file fetch the sdk) builds the compiler to WebAssembly with
 `cmake/wasm32-wasi.cmake` and runs the hello-world fixture and the sieve
 sample through `goose.wasm` under node's WASI (`scripts/wasm_run.mjs`),
-against the same blessed output. Where node is installed, the playground's
+against the same blessed output. With `--wasm`, and a `build/wasm/goose.wasm`
+at hand, the fixtures of the text areas (`codegen/`, `runtime/`,
+`stdlib/`, `storage/`, `lifetimes/`, `optimizer/`) also run through the
+WebAssembly backend (design/wasm_backend.md §11): `goose.wasm` compiles
+each to a module under node and runs it, against the same blessed output,
+and `test/wasm_backend.py` runs the interpreter's C fixtures
+(`test/interp/run/`) the same way, with the VM's call stack left out of
+a fault's expected message. Where node is installed, the playground's
 own WASI shim (`docs/site/play/wasi.mjs`) is tested too
 (`wasi_test.mjs`): its file calls through a memory of their own, and with
 a `build/wasm/goose.wasm` at hand the hello-world fixture, a generated-C

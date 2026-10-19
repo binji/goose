@@ -142,6 +142,10 @@ def runtime_defines(source):
 # interpreter has been widened to (docs/design/interpreter.md §14, step 7).
 INTERP_AREAS = ("codegen", "runtime", "stdlib", "storage", "lifetimes", "optimizer", "packages",
                 "gfx", "ui", "physics", "audio")
+# The areas the WebAssembly backend runs under --wasm, through goose.wasm
+# under node (docs/design/wasm_backend.md §11): those without a native
+# package, which the browser build has none of.
+WASM_AREAS = ("codegen", "runtime", "stdlib", "storage", "lifetimes", "optimizer")
 
 
 # What `goose --multi-test` ends each file's part of stdout and of stderr
@@ -1367,6 +1371,9 @@ def main():
     ap.add_argument("--interp", action="store_true",
                     help="also run programs through the interpreter (goose --interp) and "
                          "compare with the TinyCC runs")
+    ap.add_argument("--wasm", action="store_true",
+                    help="also run programs through the WebAssembly backend (goose.wasm --wasm "
+                         "under node) against the same expected output")
     ap.add_argument("--goose-in-goose-only", action="store_true",
                     help="run only the multi-stage Goose-written compiler regression")
     ap.add_argument("-j", "--jobs", type=int, default=default_jobs(),
@@ -2238,6 +2245,72 @@ def main():
             r.fail("wasm build", text)
     r.section("the compiler as WebAssembly (wasi-sdk)")
     wasm_built = r.show_task(wasm_build)
+
+    # --- The WebAssembly backend: the same programs compiled to a module ----
+    # by goose.wasm and run on it under node (docs/design/wasm_backend.md
+    # §11), against the same blessed output, for the text areas; and the
+    # interpreter's C fixtures through test/wasm_backend.py. After
+    # wasm_build, which may be relinking the module.
+    r.section("the WebAssembly backend (node)")
+    if not args.wasm:
+        r.show_later(r.say, "skip WebAssembly backend runs (--wasm runs them)")
+    else:
+        wasm_exe = tc.REPO_ROOT / "build" / "wasm" / "goose.wasm"
+        wasm_runner = tc.REPO_ROOT / "scripts" / "wasm_run.mjs"
+
+        def wasm_ready():
+            wasm_built.result()
+            node = shutil.which("node")
+            if not node:
+                r.say("skip the WebAssembly backend runs (no node)")
+                return None
+            if not wasm_exe.exists():
+                r.say("skip the WebAssembly backend runs (no build/wasm/goose.wasm)")
+                return None
+            return node
+        wasm_node = r.show_task(wasm_ready)
+
+        def wasm_program(f):
+            node = wasm_node.result().value
+            if not node:
+                return
+            name = f.stem
+            res = fixtures[f].result()
+            if "no-jit" in res.line or res.modules:
+                return
+            # Paths as the module sees them: the repository preopened as /,
+            # and relative ones against this directory.
+            rel = lambda p: "/" + Path(p).resolve().relative_to(tc.REPO_ROOT).as_posix()
+            argv = [node, "--no-warnings", "--stack-size=4000", str(wasm_runner), str(wasm_exe),
+                    str(tc.REPO_ROOT)] + ["-D" + d for d in runtime_defines(f)] + \
+                   ["run", rel(f), "-O2", "--stdlib", "/stdlib", "--wasm"]
+            env = dict(os.environ)
+            try:
+                env["WASM_RUN_CWD"] = rel(os.getcwd())
+            except ValueError:
+                pass
+            result = subprocess.run(argv, capture_output=True, env=env)
+            code, out, err = result.returncode, tc.decode(result.stdout), tc.decode(result.stderr)
+            if code != 0 and tc.INTERP_UNSUPPORTED in err:
+                return
+            out = r.check_run(name, f"wasm {f.name}", code, out, err)
+            if out is not None and r.check_stdout(name, f"wasm {f.name}", out):
+                r.ok(f"wasm {f.name}")
+        for f in tests:
+            if f.parent.name in WASM_AREAS:
+                r.show_task(wasm_program, f)
+
+        def wasm_fixtures():
+            if not wasm_node.result().value:
+                return
+            result = subprocess.run([sys.executable, str(HERE / "wasm_backend.py"), "--exe", str(wasm_exe)],
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            text = tc.decode(result.stdout).rstrip("\n")
+            if result.returncode == 0:
+                r.ok(f"wasm interpreter fixtures ({text.splitlines()[-1]})")
+            else:
+                r.fail("wasm interpreter fixtures", text)
+        r.show_task(wasm_fixtures)
 
     # The playground's WASI shim (docs/site/play/wasi.mjs) under node, and
     # through goose.wasm where a Wasm build is at hand: once wasm_build is
