@@ -385,7 +385,7 @@ private:
     };
     vector<BB> bbs;
     vector<int> order;                   // blocks in reverse postorder
-    int maxheight = 0;
+    int maxheight = 0;                   // the operand stack's deepest, anywhere
 
     static bool IsJump(Op op) { return op == OP_JMP || op == OP_JZ || op == OP_JNZ || op == OP_JCMP; }
     static bool Ends(Op op) { return IsJump(op) || op == OP_RET || op == OP_UNREACHABLE; }
@@ -454,7 +454,10 @@ private:
             auto &bb = bbs[(size_t)b];
             int h = bb.height;
             if (h < 0) Bad("a block's stack height is unknown");
-            for (size_t i = bb.start; i < bb.end; i++) h += StackEffect(code[i]);
+            for (size_t i = bb.start; i < bb.end; i++) {
+                h += StackEffect(code[i]);
+                maxheight = max(maxheight, h + 2);
+            }
             if (h < 0) Bad("the operand stack underflows");
             for (auto s : bb.succ) {
                 auto &sb = bbs[(size_t)s];
@@ -556,8 +559,14 @@ private:
 
     // The operand stack across an edge: its h values into the spill locals
     // before, and back after.
-    void Spill(int h) { for (int i = h - 1; i >= 0; i--) LocalSet(spill[(size_t)i]); }
-    void Reload(int h) { for (int i = 0; i < h; i++) LocalGet(spill[(size_t)i]); }
+    void Spill(int h) {
+        MaterializeAll();
+        for (int i = h - 1; i >= 0; i--) LocalSet(spill[(size_t)i]);
+    }
+    void Reload(int h) {
+        syms.assign((size_t)h, Sym {});
+        for (int i = 0; i < h; i++) LocalGet(spill[(size_t)i]);
+    }
 
     void BlockCode(int b) {
         auto &bb = bbs[(size_t)b];
@@ -568,7 +577,7 @@ private:
         auto body = Ends(last.op) ? bb.end - 1 : bb.end;
         for (size_t i = bb.start; i < body; i++) { Insn(code[i]); h += StackEffect(code[i]); }
         switch (Ends(last.op) ? last.op : OP_NOP) {
-            case OP_RET: Insn(last); return;
+            case OP_RET: Insn(last); return;   // materializes its operand
             case OP_UNREACHABLE: Emit(WO_UNREACHABLE); return;
             case OP_JMP:
                 Spill(h);
@@ -577,6 +586,7 @@ private:
             case OP_JZ: case OP_JNZ: case OP_JCMP: {
                 // The condition as an i32, set aside while the rest of the
                 // stack spills; then the two edges as the arms of an if.
+                MaterializeAll();
                 if (last.op == OP_JCMP) { Compare((Op)last.t2, last.t); h -= 2; }
                 else { I64(0); Emit(last.op == OP_JZ ? WO_I64_EQ : WO_I64_NE); h -= 1; }
                 if (h) { LocalSet(L_COND); Spill(h); LocalGet(L_COND); }
@@ -886,13 +896,98 @@ private:
         Normalize(to);
     }
 
+    // ---- The operand stack as emitted
+
+    // What each instruction pops and pushes.
+    static int Pops(const struct Insn &in) {
+        switch (in.op) {
+            case OP_POP: case OP_DUP: case OP_LSTORE: case OP_LSTOREK: case OP_LOAD: case OP_ZERO:
+            case OP_OFFSET: case OP_INCDEC: case OP_NEG: case OP_NOT: case OP_LNOT: case OP_TOBOOL:
+            case OP_CVT: case OP_JZ: case OP_JNZ:
+                return 1;
+            case OP_STORE: case OP_STOREK: case OP_COPY: case OP_PTRADD: case OP_PTRSUB: case OP_PTRDIFF:
+            case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+            case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR:
+            case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE: case OP_JCMP:
+                return 2;
+            case OP_CALL: return in.t2;
+            case OP_CALLI: return in.t2 + 1;
+            case OP_RET: return in.t != VT_VOID;
+            default: return 0;
+        }
+    }
+    static int Pushes(const struct Insn &in) { return Pops(in) + StackEffect(in); }
+
+    // The operand stack as the code has it, in step with Wasm's: an entry
+    // is a value on Wasm's stack, or a frame address nothing has been
+    // emitted for yet (a `local` and the offsets added to it), which the
+    // access that consumes it makes a direct frame access, so that a
+    // record in the frame is read and written without a decode of the
+    // frame segment. Any other use materializes it as the handle it is.
+    struct Sym { bool frame = false; int64_t off = 0; };
+    vector<Sym> syms;
+
+    void Materialize(size_t idx) {
+        int above = 0;
+        for (size_t j = idx + 1; j < syms.size(); j++) if (!syms[j].frame) above++;
+        for (int k = 0; k < above; k++) LocalSet(spill[(size_t)k]);
+        LocalGet(L_FH);
+        I64(syms[idx].off);
+        Emit(WO_I64_ADD);
+        for (int k = above - 1; k >= 0; k--) LocalGet(spill[(size_t)k]);
+        syms[idx].frame = false;
+    }
+
+    // Materializes every deferred entry, or just the popped operands other
+    // than those at the given depths from the top.
+    void MaterializeAll() {
+        for (size_t i = 0; i < syms.size(); i++) if (syms[i].frame) Materialize(i);
+    }
+    void MaterializeOperands(int pops, int keep0 = -1, int keep1 = -1) {
+        for (int d = 0; d < pops; d++) {
+            if (d == keep0 || d == keep1) continue;
+            auto idx = syms.size() - 1 - (size_t)d;
+            if (syms[idx].frame) Materialize(idx);
+        }
+    }
+    // The deferred frame address at depth d from the top, as an i32 address.
+    void FrameAddr(int d) {
+        LocalGet(L_FP);
+        I32((int32_t)syms[syms.size() - 1 - (size_t)d].off);
+        Emit(WO_I32_ADD);
+    }
+    bool Deferred(int d) const { return syms[syms.size() - 1 - (size_t)d].frame; }
+
     // ---- Instructions
 
     void Insn(const struct Insn &in) {
+        int pops = Pops(in), pushes = Pushes(in);
+        switch (in.op) {
+            case OP_LOAD: case OP_ZERO: case OP_INCDEC: case OP_OFFSET: case OP_DUP: case OP_POP:
+                MaterializeOperands(pops, 0); break;
+            case OP_STORE: case OP_STOREK: MaterializeOperands(pops, 1); break;
+            case OP_COPY: MaterializeOperands(pops, 0, 1); break;
+            default: MaterializeOperands(pops); break;
+        }
+        Sym result;
+        bool deferred = false;
+        switch (in.op) {
+            case OP_LOCAL: result = Sym { true, in.imm }; deferred = true; break;
+            case OP_OFFSET: if (Deferred(0)) { result = Sym { true, syms.back().off + in.imm }; deferred = true; } break;
+            case OP_DUP: if (Deferred(0)) { result = syms.back(); deferred = true; } break;
+            default: break;
+        }
+        if (!deferred) Code(in);
+        else if (in.op == OP_OFFSET) {}
+        for (int i = 0; i < pops; i++) syms.pop_back();
+        for (int i = 0; i < pushes; i++) syms.push_back(deferred ? result : Sym {});
+    }
+
+    void Code(const struct Insn &in) {
         switch (in.op) {
             case OP_NOP: break;
             case OP_PUSH: I64(in.imm); break;
-            case OP_POP: Emit(WO_DROP); break;
+            case OP_POP: if (!Deferred(0)) Emit(WO_DROP); break;
             case OP_DUP: LocalTee(L_T1); LocalGet(L_T1); break;
             case OP_LOCAL: LocalGet(L_FH); I64(in.imm); Emit(WO_I64_ADD); break;
             case OP_LLOAD:
@@ -919,38 +1014,45 @@ private:
                 break;
             case OP_GLOBAL: GlobalGet(staticglobal[(size_t)in.imm]); break;
             case OP_FUNC: GlobalGet(funcglobal[(size_t)in.imm]); break;
-            case OP_LOAD: Decode(VTSize(in.t)); Load(in.t, 0); break;
+            case OP_LOAD:
+                if (Deferred(0)) { LocalGet(L_FP); Load(in.t, syms.back().off); break; }
+                Decode(VTSize(in.t));
+                Load(in.t, 0);
+                break;
             case OP_STORE:
             case OP_STOREK:
                 // The value above the address: set aside while the address
                 // decodes, then stored at it.
                 LocalSet(L_T2);
-                Decode(VTSize(in.t));
-                LocalGet(L_T2);
-                Store(in.t, 0);
+                if (Deferred(1)) { LocalGet(L_FP); LocalGet(L_T2); Store(in.t, syms[syms.size() - 2].off); }
+                else { Decode(VTSize(in.t)); LocalGet(L_T2); Store(in.t, 0); }
                 if (in.op == OP_STOREK) LocalGet(L_T2);
                 break;
             case OP_COPY: {
                 auto n = in.imm;
-                if (!n) { Emit(WO_DROP); Emit(WO_DROP); break; }
+                bool dst = Deferred(1), src = Deferred(0);
+                if (!n) { if (!src) Emit(WO_DROP); if (!dst) Emit(WO_DROP); break; }
                 // Both accesses before either copy, as the VM does: the
                 // destination's may grow a stack and move the source. The
                 // handles wait in t2 and t3, which Decode leaves alone.
-                LocalSet(L_T3);            // the source
-                LocalTee(L_T2);            // the destination
-                Decode(n);
-                Emit(WO_DROP);
-                LocalGet(L_T2);
-                Decode(n);
-                LocalGet(L_T3);
-                Decode(n);
+                if (!src) LocalSet(L_T3);  // the source
+                if (!dst) {
+                    LocalTee(L_T2);        // the destination
+                    Decode(n);
+                    Emit(WO_DROP);
+                    LocalGet(L_T2);
+                    Decode(n);
+                } else FrameAddr(1);
+                if (!src) { LocalGet(L_T3); Decode(n); }
+                else FrameAddr(0);
                 I32((int32_t)n);
                 OpFC(WFC_MEMORY_COPY); code.U8(0); code.U8(0);
                 break;
             }
             case OP_ZERO:
-                if (!in.imm) { Emit(WO_DROP); break; }
-                Decode(in.imm);
+                if (!in.imm) { if (!Deferred(0)) Emit(WO_DROP); break; }
+                if (Deferred(0)) FrameAddr(0);
+                else Decode(in.imm);
                 I32(0);
                 I32((int32_t)in.imm);
                 OpFC(WFC_MEMORY_FILL); code.U8(0);
@@ -985,7 +1087,8 @@ private:
                 Emit(WO_I64_DIV_S);
                 break;
             case OP_INCDEC: {
-                Decode(VTSize(in.t));
+                if (Deferred(0)) FrameAddr(0);
+                else Decode(VTSize(in.t));
                 LocalTee(L_TA);
                 Load(in.t, 0);
                 LocalTee(L_T1);            // the old value
