@@ -31,7 +31,22 @@ interpreter's memory model, its C library and its native-package thunks as
 they are. The speed figures in section 3 are measurements taken on October
 19, 2026, on a laptop on mains power (on battery every column was about
 twice as slow and the ratios the same); those in section 9 are estimates
-derived from them.
+derived from them, followed by what the implementation measured.
+
+**Status.** Steps 1 to 5 of the plan (§13) and the first three items of
+§8 are implemented, in `src/interp/wasmgen.h` and the host side of
+`vm.h` and `interp.cpp`: `goose.wasm` compiles a program's bytecode to a
+module and runs it on its own exports under `--wasm`, natively `-o`
+writes the module, `test/wasm_backend.py` runs the interpreter's C
+fixtures through it, and `test/run_tests.py --wasm` runs the text areas'
+fixtures and the samples. Two departures from the design as written: the
+operand stack is followed symbolically during emission, so that a frame
+record's or a static object's fields are accessed without a decode
+(§4 item 7 covered only the function's own scalar slots); and hoisting
+keeps a pair of locals per origin and region, refreshed after calls, in
+place of the sync-extent analysis sketched in §8, which needed none of
+codegen's analyses. Step 6 (the page) and items 4 and 5 of §8 (typed
+slots) are not started, nor is the frame yield of §7.
 
 ## 1. The goal
 
@@ -435,6 +450,31 @@ further four times slower than node's for reasons outside the engine
 (the interpreter note's §9 records the observation); a compiled module
 is affected the same way, so the ratios hold while the absolute figures
 there do not.
+
+### Measured
+
+The same kernels after each step, under node, against the interpreter in
+`goose.wasm` and the ceiling of section 3:
+
+| kernel | interpreter | translation (§4) | + locals (§8.1) | + frame records | + statics, popcount | + hoisting (§8.3) | ceiling |
+|---|---|---|---|---|---|---|---|
+| `07_sieve` | 1,378 ms | 350 ms | 262 ms | 178 ms | 180 ms | 174 ms | 71 ms |
+| `09_sorting` merge sort | 7,224 | 1,077 | 952 | 577 | 576 | 489 | 102 |
+| `09_sorting` std sort | 6,503 | 1,458 | 1,115 | 727 | 731 | 771 | 58 |
+| `09_sorting` insertion | 19,489 | 1,983 | 1,629 | 1,051 | 1,041 | 705 | 287 |
+| `10_sudoku` sparse | 11,924 | 1,089 | 681 | 675 | 512 | 485 | 98 |
+| `21_raytrace` | 1,070 | 245 | 217 | 111 | 104 | 107 | 7.0 |
+
+Eight to twenty-eight times the interpreter, and within 2.5 to 5 times of
+the ceiling on all but the raytrace, which at 15 times off points at the
+i64 slots and the reinterprets around every float operation, item 4's
+case. The first column fell below the table above's lower estimate
+because the generated C reads a slice's data pointer through its struct
+in the frame on every element access, a decode of the frame segment the
+estimate did not count; the third column is that decode removed. The
+sieve's inner loop still spends some twenty instructions on the handle
+arithmetic and the hoisted check around its one byte store, which is
+where the next step lies.
 
 ## 10. Changes to the existing code
 
