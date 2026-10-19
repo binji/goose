@@ -83,6 +83,10 @@ and the reference describe what was built; these say why.
   built to Wasm with clang, interpreting the C it emits, with pointers as
   segment handles so stacks can move, and the native packages behind
   generated thunks; a proposal.
+* [A WebAssembly backend from the bytecode](design/wasm_backend.md): the
+  interpreter's bytecode compiled to a Wasm module on the interpreter's
+  own memory model, with measurements of the ceiling and an estimate of
+  the speedup; a proposal.
 
 ## Getting the compiler
 
