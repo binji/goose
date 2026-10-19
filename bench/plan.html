@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next compiler work, from the sixteen benchmarks · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#next-compiler-work-from-the-sixteen-benchmarks"
+id="toc-next-compiler-work-from-the-sixteen-benchmarks">Next compiler
+work, from the sixteen benchmarks</a>
+<ul>
+<li><a href="#1-where-the-time-goes-per-deficit"
+id="toc-1-where-the-time-goes-per-deficit">1. Where the time goes, per
+deficit</a></li>
+<li><a href="#2-compiler-work-ordered-by-measured-benefit"
+id="toc-2-compiler-work-ordered-by-measured-benefit">2. Compiler work,
+ordered by measured benefit</a>
+<ul>
+<li><a href="#21-cache-data-stack-tops-through-fat-references"
+id="toc-21-cache-data-stack-tops-through-fat-references">2.1 Cache
+data-stack tops through fat references</a></li>
+<li><a
+href="#22-inline-the-base-case-of-a-self-recursive-function-one-level"
+id="toc-22-inline-the-base-case-of-a-self-recursive-function-one-level">2.2
+Inline the base case of a self-recursive function one level</a></li>
+<li><a href="#23-accumulator-tail-recursion-elimination"
+id="toc-23-accumulator-tail-recursion-elimination">2.3 Accumulator
+tail-recursion elimination</a></li>
+<li><a
+href="#24-hoist-array-views-reached-through-fat-references-out-of-loops"
+id="toc-24-hoist-array-views-reached-through-fat-references-out-of-loops">2.4
+Hoist array views reached through fat references out of loops</a></li>
+<li><a href="#25-bounds-check-analysis-three-extensions"
+id="toc-25-bounds-check-analysis-three-extensions">2.5 Bounds-check
+analysis: three extensions</a></li>
+<li><a href="#26-build-inlined-named-results-at-the-destination"
+id="toc-26-build-inlined-named-results-at-the-destination">2.6 Build
+inlined named results at the destination</a></li>
+<li><a
+href="#27-stop-caching-the-stack-top-where-the-loop-does-not-push"
+id="toc-27-stop-caching-the-stack-top-where-the-loop-does-not-push">2.7
+Stop caching the stack top where the loop does not push</a></li>
+<li><a
+href="#28-seed-a-cycle-functions-return-root-before-its-back-edges"
+id="toc-28-seed-a-cycle-functions-return-root-before-its-back-edges">2.8
+Seed a cycle function's return root before its back edges</a></li>
+<li><a href="#29-relative-references-the-relinking-cost"
+id="toc-29-relative-references-the-relinking-cost">2.9 Relative
+references: the relinking cost</a></li>
+<li><a href="#210-varint-fields-on-hot-values"
+id="toc-210-varint-fields-on-hot-values">2.10 Varint fields on hot
+values</a></li>
+<li><a href="#211-unchanged-from-last-round"
+id="toc-211-unchanged-from-last-round">2.11 Unchanged from last
+round</a></li>
+<li><a href="#212-return-from-not-measured-estimated"
+id="toc-212-return-from-not-measured-estimated">2.12
+<code>return from</code>: not measured, estimated</a></li>
+</ul></li>
+<li><a href="#3-language-and-spec-questions-the-measurements-raise"
+id="toc-3-language-and-spec-questions-the-measurements-raise">3.
+Language and spec questions the measurements raise</a>
+<ul>
+<li><a href="#31-self-relative-or-pool-relative-offsets"
+id="toc-31-self-relative-or-pool-relative-offsets">3.1 Self-relative or
+pool-relative offsets</a></li>
+<li><a href="#32-a-constructible-self-reference"
+id="toc-32-a-constructible-self-reference">3.2 A constructible
+self-reference</a></li>
+<li><a href="#33-return-roots-across-a-cycle"
+id="toc-33-return-roots-across-a-cycle">3.3 Return roots across a
+cycle</a></li>
+<li><a href="#34-row-slices-not-a-2d-type"
+id="toc-34-row-slices-not-a-2d-type">3.4 Row slices, not a 2D
+type</a></li>
+<li><a href="#35-scratch-buffers-that-hand-out-slices"
+id="toc-35-scratch-buffers-that-hand-out-slices">3.5 Scratch buffers
+that hand out slices</a></li>
+<li><a href="#36-arithmetic-width-and-varint-in-the-performance-notes"
+id="toc-36-arithmetic-width-and-varint-in-the-performance-notes">3.6
+Arithmetic width and <code>varint</code> in the performance
+notes</a></li>
+</ul></li>
+<li><a href="#4-suggested-order" id="toc-4-suggested-order">4. Suggested
+order</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="next-compiler-work-from-the-sixteen-benchmarks">Next compiler
+work, from the sixteen benchmarks</h1>
+<p><em>This plan records a completed round of work: how each item was
+selected and measured. <code>adoption.md</code> records the results. For
+remaining work, see the list at the end of
+<code>notes.md</code>.</em></p>
+<p>The changes below aim to address the performance gaps measured by the
+benchmark suite and improve workloads where Goose already performs well.
+Most affect the compiler; a few require language changes. Every item
+below carries either a measurement (a hand-transformed version of the
+generated C, or the same benchmark written two ways in Goose, timed at
+the <code>large</code> size on the machine in <code>results.md</code>)
+or an explicit "not measured". Hand transformations estimate the upper
+bounds of the gains an equivalent compiler change could achieve; noise
+is 5-10% on most rows and ~15% on the two cache-bound random-access rows
+(<code>lru</code>, <code>graph</code>).</p>
+<h2 id="1-where-the-time-goes-per-deficit">1. Where the time goes, per
+deficit</h2>
+<p>The <code>large</code> ratios against the best safe Rust row, and
+what each one is:</p>
+<table>
+<thead>
+<tr>
+<th>benchmark</th>
+<th style="text-align: right;">Goose vs Rust</th>
+<th>what it is</th>
+<th>measured</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bintrees</code></td>
+<td style="text-align: right;">0.64x</td>
+<td>pushing through a fat reference; no base-case inlining; no TRE under
+v145</td>
+<td>fixed by hand: 356 -&gt; 229 ms (v145), 381 -&gt; 252 (clang), Rust
+227</td>
+</tr>
+<tr>
+<td><code>lru</code></td>
+<td style="text-align: right;">0.61x</td>
+<td>self-relative link encoding on a relink-only workload</td>
+<td>indices 2,397, plain refs 2,557, relative 3,738 (v145)</td>
+</tr>
+<tr>
+<td><code>calc</code></td>
+<td style="text-align: right;">0.78x</td>
+<td>varint numbers 11%; <code>return from</code> discriminants (est.
+5-10%); parse-loop codegen</td>
+<td><code>i32</code> numbers: 548 -&gt; 487 ms</td>
+</tr>
+<tr>
+<td><code>scene</code></td>
+<td style="text-align: right;">0.79x v145, 0.98x clang</td>
+<td>backend: the C++ arena is 9% behind its clang build too</td>
+<td>padding to 120 bytes: no change</td>
+</tr>
+<tr>
+<td><code>blur</code> flat</td>
+<td style="text-align: right;">0.16x</td>
+<td>v145: 9 checks/pixel block vectorisation; clang: header reloads
+through the fat reference</td>
+<td>row slices: 133 -&gt; 33 ms (v145), 131 -&gt; 31 (clang)</td>
+</tr>
+<tr>
+<td><code>particles</code></td>
+<td style="text-align: right;">0.95-0.98x</td>
+<td>stack-top caching where clang already kept it in a register</td>
+<td>6% clang, from last round's A/B</td>
+</tr>
+<tr>
+<td><code>respond</code> DTO vs streaming</td>
+<td style="text-align: right;">30% apart</td>
+<td>inlined named results are copied into the field, not built
+there</td>
+<td>the two Goose rows: 559 vs 427 ms</td>
+</tr>
+<tr>
+<td><code>push</code> by reference</td>
+<td style="text-align: right;">8%</td>
+<td>pushing through a fat reference</td>
+<td><code>push_ref</code> probe: 167 vs 155 ms</td>
+</tr>
+<tr>
+<td><code>graph</code> linked, <code>graph_csr</code></td>
+<td style="text-align: right;">--</td>
+<td>loaded-index bounds checks</td>
+<td>5-6% and ~10% (last round)</td>
+</tr>
+</tbody>
+</table>
+<p>The parse, variant-record, string, and tree-walk benchmarks already
+lead their comparisons. Changes to <code>return from</code>, dispatch
+merging, and named results may improve them further.</p>
+<h2 id="2-compiler-work-ordered-by-measured-benefit">2. Compiler work,
+ordered by measured benefit</h2>
+<h3 id="21-cache-data-stack-tops-through-fat-references">2.1 Cache
+data-stack tops through fat references</h3>
+<p><code>make(pool: TNode[&gt;..]&amp;, ...)</code> emits, per push,
+<code>pool.stk-&gt;top</code> read and written four times and
+<code>pool.hdr-&gt;len++</code> in memory, because a function holding a
+fat reference is excluded from top caching entirely
+(<code>CanCacheTops</code>): the reference carries a stack that the
+function might also name directly, so the two spellings could alias.
+With the top kept in a local and flushed around the recursive calls (the
+same discipline the global-stack caching already uses),
+<code>bintrees</code> goes from 356 to 313 ms under v145 and 381 to 331
+under clang (-12%, -13%). <code>push_ref</code> measures an 8% cost for
+moving the same loop into a function that accesses the array through a
+reference.</p>
+<p>The aliasing question is answered by the checker, not the backend.
+Every reference parameter has a root class per specialization; two fat
+references in different classes are provably different stacks, and a fat
+reference can alias a directly named stack only if its class root
+<em>is</em> that global -- which is visible at codegen time. So: cache
+<code>ref.stk-&gt;top</code> per class as a local, treat same-class
+references as one stack, and only fall back to the memory form for the
+(rare) specialization where a class root is a global the function also
+names. <code>calc</code> is unaffected (its pushes are a small share;
+the global-pool variant timed the same), so this is worth 8-13% on
+push-heavy callees and nothing elsewhere.</p>
+<h3
+id="22-inline-the-base-case-of-a-self-recursive-function-one-level">2.2
+Inline the base case of a self-recursive function one level</h3>
+<p>Rust's arena <code>bintrees</code> beats Goose and the C++ vector
+arena by 1.6x in the build and the check alike, and rustc's assembly
+shows why: LLVM inlines the recursion one level, so every leaf call is
+gone. Hand-transforming <code>make</code> so that
+<code>depth == 1</code> builds both leaves inline (plus 2.1 and 2.3)
+takes <code>bintrees</code> from 356 to 229 ms under v145 and 381 to 252
+under clang -- parity with Rust's 227. The unroll alone is worth about
+27% on top of 2.1.</p>
+<p>The optimizer never inlines cycle members ("cycles never inline").
+The targeted form is cheap: for a <code>recursive fn</code> whose body
+begins with a base case
+<code>if &lt;param test&gt; { return &lt;leaf construction&gt; }</code>,
+rewrite each self-call site <code>f(..., e)</code> into
+<code>if &lt;test on e&gt; { &lt;leaf construction with e&gt; } else { f(..., e) }</code>.
+That halves the calls for every complete tree walk in the suite
+(<code>tree</code>, <code>interp</code>, <code>sexp</code>,
+<code>scene</code>, <code>calc</code>) and needs no general recursive
+inlining; a one-level general inline behind a size cap is the follow-up
+if the pattern match proves too narrow.</p>
+<h3 id="23-accumulator-tail-recursion-elimination">2.3 Accumulator
+tail-recursion elimination</h3>
+<p><code>check</code>'s <code>1 + check(l) + check(r)</code> rewritten
+as a loop with an accumulator takes 7% off <code>bintrees</code> under
+v145 and nothing under clang, which already does it; the same transform
+was worth 7.5% on <code>tree</code> under v145 last round. Pattern: a
+return of the form <code>e op self(x)</code> (or
+<code>e + self(x) + self(y)</code>, looping on the last call) with
+<code>op</code> associative. Goose already knows the whole call graph
+and requires <code>recursive fn</code>, so the transform has everything
+it needs; it is purely about levelling v145 with clang.</p>
+<h3
+id="24-hoist-array-views-reached-through-fat-references-out-of-loops">2.4
+Hoist array views reached through fat references out of loops</h3>
+<p><code>blur</code>'s kernel reads <code>src.hdr-&gt;base</code> and
+<code>src.hdr-&gt;len</code> on every access and clang cannot hoist
+them, because a byte store through <code>dst</code> may alias the
+header: 131 ms at W=2048 against 31 for the same loop over a whole-array
+slice taken once. The existing loop-view hoist (<code>7a7ac87</code>)
+only fires for locals and globals. Extending it to reference parameters
+is safe for the same reason it is safe for globals: only a growth or
+shrink operation, or a call that can reach the array, changes
+<code>base</code>/<code>len</code>, and the BCE kill summary already
+says whether the loop body contains one. An element store through any
+reference never does. Worth 4x on <code>blur</code> under clang, and it
+applies to every <code>fn kernel(a: T[&gt;..]&amp;, ...)</code> in the
+language.</p>
+<h3 id="25-bounds-check-analysis-three-extensions">2.5 Bounds-check
+analysis: three extensions</h3>
+<p>a. <strong>Slice lengths as differences.</strong>
+<code>let a = src[lo..lo + W]</code> should record
+<code>len(a) = W</code> -- <code>hi - lo</code> with both terms tracked
+is already inside the difference domain. Today <code>blur_rows</code>
+needs an <code>assert(a.len == W)</code> per row to get its 10/10; this
+removes the assert and makes the row-slice idiom the obvious one to
+write. b. <strong>Products of counters.</strong>
+<code>src[y * W + x]</code> with <code>y &lt; H - 1</code>,
+<code>x &lt; W - 1</code> and <code>len == W * H</code> (the counted
+push loop <code>for i in W * W</code> already states the length as a
+product) keeps all nine checks, and under v145 that alone is 4x (133 vs
+33 ms). A special rule for the 2D idiom -- an index `i * c</p>
+<ul>
+<li>j<code>with</code>0 &lt;= j &lt; c<code>, </code>0 &lt;= i &lt;
+m<code>and</code>len &gt;= m *
+c<code>recorded as a product term -- is contained and covers image kernels, matrices and row-major tables generally. Under clang the checks are free (it vectorises around them, as it does for Rust), so this addresses</code>blur<code>'s v145 cost, while 2.4 addresses its clang cost. c. **Array-contents invariants** (</code>graph<code>5-6%,</code>graph_csr<code>~10%, from last round): "every element of</code>q<code>is a valid index into</code>dist<code>". The only route to the loaded-index checks, which are the majority of what survives in </code>graph<code>, </code>words<code>, </code>lru<code>(0/19) and</code>scene<code>'s child loop. Not urgent: </code>lru`
+with 37 such checks in its index variant is still 1.5x faster than the
+relative-reference row, so these checks cost little where they are.</li>
+</ul>
+<h3 id="26-build-inlined-named-results-at-the-destination">2.6 Build
+inlined named results at the destination</h3>
+<p><code>respond</code>'s DTO row is 30% behind its own streaming row
+(559 vs 427 ms), and the generated C shows where: <code>name_of</code>,
+<code>sku_of</code> and <code>make_items</code> are inlined (each is
+used once), and the inliner turns "construct the named local, return it"
+into "construct on a fresh stack, <code>memcpy</code> into the field".
+The spec's guarantee (7.3, named results built at the destination) holds
+for the non-inlined value form and is lost the moment the callee is
+inlined -- which is the common case for the small builders a DTO is made
+of.</p>
+<p>The fix is to bind the inlined callee's NRVO local to the receiving
+slot: its elements go straight onto the destination stack, and the
+receiver's length prefix is written afterwards. For fixed-width prefixes
+(<code>u32</code>, <code>u16</code>), reserve the prefix before the
+elements and patch it: zero copies. For <code>varint</code> prefixes the
+size is not known until the count is: reserve one byte and move the
+elements up only when the count reaches 128 -- the rare case. The same
+reserve-then-patch replaces the <code>memmove</code> in
+<code>EmitReprefix</code> (a <code>T[]</code> result landing in a
+<code>T[varint]</code> slot) and in <code>EmitNrvoPrefix</code> (a
+resizable local returned as a variable array) for the non-inlined forms.
+Upper bound: the 30% between the two <code>respond</code> rows, of which
+some is rendering from the object rather than building it; not
+separately measured.</p>
+<h3 id="27-stop-caching-the-stack-top-where-the-loop-does-not-push">2.7
+Stop caching the stack top where the loop does not push</h3>
+<p>Still the 6% lost on both float kernels under clang at
+<code>432f8ce</code>: the local pays for itself only where the loop
+actually pushes. Emit the cached-top form per loop, when the loop body
+contains a growth op on that stack, rather than per function. Unchanged
+from last round's list; this run measures <code>particles</code> 2%
+behind Rust under v145 and 6% under clang.</p>
+<h3 id="28-seed-a-cycle-functions-return-root-before-its-back-edges">2.8
+Seed a cycle function's return root before its back edges</h3>
+<p>A recursive call's result takes the root the callee has recorded so
+far; in a mutually recursive parser the entry function has none before
+the back edge, so <code>calc</code> carries a plain-reference Paren node
+and the result is rooted at static data -- which is also unsound, since
+it could be stored into a global (spec TODO 0g). Compute cycle return
+roots as a fixpoint: collect each cycle function's returns
+(<code>pool.push(...)</code> gives the pool's class;
+<code>return x</code> where <code>x</code> came from a cycle call gives
+that callee's root), iterate until stable, then check bodies. Small time
+effect; it removes an artefact node from the flagship-shaped benchmark
+and closes a soundness hole.</p>
+<h3 id="29-relative-references-the-relinking-cost">2.9 Relative
+references: the relinking cost</h3>
+<p><code>lru</code> at the <code>large</code> size, v145 / clang, best
+of three:</p>
+<table>
+<thead>
+<tr>
+<th>links</th>
+<th style="text-align: right;">node</th>
+<th style="text-align: right;">v145</th>
+<th style="text-align: right;">clang</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Node&amp;&lt;u32&gt;?</code> self-relative (the row)</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">3,787</td>
+<td style="text-align: right;">3,143</td>
+</tr>
+<tr>
+<td>same, null tests on loads removed by hand</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">3,498</td>
+<td style="text-align: right;">3,083</td>
+</tr>
+<tr>
+<td>same, range checks on stores removed by hand</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">3,353</td>
+<td style="text-align: right;">2,775</td>
+</tr>
+<tr>
+<td>both removed</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">3,242</td>
+<td style="text-align: right;">2,724</td>
+</tr>
+<tr>
+<td><code>Node&amp;&lt;u64&gt;?</code> self-relative (no range check
+emitted)</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">3,573</td>
+<td style="text-align: right;">2,881</td>
+</tr>
+<tr>
+<td><code>Node?</code> plain references</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">2,557</td>
+<td style="text-align: right;">2,352</td>
+</tr>
+<tr>
+<td><code>i32</code> indices, <code>pool[i]</code> bounds-checked</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">2,397</td>
+<td style="text-align: right;">2,266</td>
+</tr>
+</tbody>
+</table>
+<p>The checks and null tests are 14% of the row; removing all of them by
+hand leaves the relative form 35% behind indices. The gap is 13-21% at
+<code>small</code> (in cache) and 41-55% at <code>large</code>, so what
+remains is a memory-level effect of the encoding on a pointer chase --
+every hop is a 32-bit load, a sign-extension, an add to the
+<em>field's</em> address and a null test before the next load can issue
+-- and the first thing to put a hardware counter on. Two compiler items
+and one language question follow:</p>
+<ul>
+<li><strong>Skip the range check where the width covers the
+stack.</strong> A <code>u32</code> offset is exact for any pool under 2
+GB; the runtime reservation size is a compile-time constant
+(<code>GS_STACK_RESERVE</code>), so the check can be emitted only when
+it exceeds the width. Worth up to 11-12% here, nothing on the build-once
+rows (<code>bintrees</code> with <code>u64</code> links times the same
+as <code>u32</code>).</li>
+<li><strong>Non-optional links for sentinel lists.</strong> The null
+test on every load is there because the list links are optional, and
+they are optional only because the two sentinels cannot be constructed
+pointing at anything: a non-optional <code>Node&amp;&lt;u32&gt;</code>
+has no value before the first node exists. A construction form that
+names the value under construction
+(<code>Node { prev: self, next: self }</code>, or a documented "offset 0
+on a non-optional relative reference means the value itself") would let
+the whole list be non-optional and drop the test; <code>a8c9f69</code>
+already loads non-optional relative references without one. Worth 2-8%
+here.</li>
+<li><strong>Pool-relative offsets</strong> (see 3.1) would make the load
+<code>base + off</code> with the base in a register, which is exactly
+the index shape that runs 1.5x faster; that is a language change with a
+root-tracking cost, and the guidance at the time is the one in
+<code>notes.md</code>: relative references are for structures built once
+and walked, and a <code>reusable</code> structure that relinks is better
+off with plain references or indices.</li>
+</ul>
+<h3 id="210-varint-fields-on-hot-values">2.10 Varint fields on hot
+values</h3>
+<p><code>calc</code> with <code>Num { v: i32 }</code> instead of
+<code>varint</code> runs in 487 ms against 548 (-11%). It is not the
+decoder: a single-byte fast path added by hand to
+<code>gs_uleb_read</code> made the row <em>slower</em> (599 ms; the
+extra branch costs more than the loop it skips). It is the cost of a
+decode against a load, paid once per evaluated number. Two consequences:
+the language guidance should say that <code>varint</code> is for values
+with a wide or unpredictable range and a sized integer (<code>u8</code>
+here -- the values are 1..99) for values whose range is known; and a
+codegen refinement worth trying is decoding a varint <em>field</em> read
+as <code>b &lt; 128 ? b : slow(p)</code> with the slow path out of line,
+which is what the hand experiment did not manage inside the inlined
+loop.</p>
+<h3 id="211-unchanged-from-last-round">2.11 Unchanged from last
+round</h3>
+<ul>
+<li><strong>Merge repeated dispatch on the same scrutinee</strong>
+(<code>sexp</code>'s <code>walk_chain</code> switches on the tag twice).
+Pure duplication; not measured.</li>
+<li><strong><code>/arch:AVX2</code>, or clang, for release
+builds.</strong> 13% on <code>sum</code> under clang last round; this
+round adds <code>scene</code> (24% better under clang),
+<code>respond</code> streaming (22%), <code>blur_rows</code> (15%) and
+<code>lru</code> (18%) to the list of rows where the backend choice
+matters more than anything above.</li>
+</ul>
+<h3 id="212-return-from-not-measured-estimated">2.12
+<code>return from</code>: not measured, estimated</h3>
+<p>The discriminant is an <code>int32</code> out-parameter checked after
+every call on a propagation path: <code>calc</code> has 45 such sites
+and makes roughly 60 calls per input, 1.6M inputs, so on the order of
+100M predictable branches and loads -- 5-10% of the row by count, on
+inputs that never leave L1. The hand experiment to measure it
+(neutralising the checks in the error-free variant) crashed, because the
+same temp pattern is used by ordinary booleans; a clean measurement
+needs a compiler flag that omits the checks. Cheaper alternatives if it
+turns out to matter: return the discriminant in a register alongside the
+fixed result (a two-register struct return) instead of through memory,
+and skip the check after calls to functions that cannot propagate to any
+live target.</p>
+<h2 id="3-language-and-spec-questions-the-measurements-raise">3.
+Language and spec questions the measurements raise</h2>
+<h3 id="31-self-relative-or-pool-relative-offsets">3.1 Self-relative or
+pool-relative offsets</h3>
+<p><em>Outcome: both, chosen per field. Self-relative stays the default;
+a field may be declared relative to a named global pool
+(<code>T&amp;&lt;u32 in pool&gt;</code>, spec §3.9). The comparison
+behind the decision is
+<code>docs/design/relative_references.md</code>.</em></p>
+<p>Spec 3.9 makes relative references self-relative so that a linked
+region is position-independent as a unit and any sub-region can be moved
+(the whole-region copies of TODO 16, not yet implemented).
+<code>lru</code> prices that choice at 1.5x on a relinking workload, and
+the index variant shows what the alternative is worth: an offset
+measured from the <em>pool's</em> base loads as <code>base + off</code>
+with the base register-resident and stores as <code>ptr - base</code>,
+with no dependency on the field's own address and no range check at all
+for a <code>u32</code> on a pool under 4 GB. The whole pool stays
+mappable. What it costs is that every load of a relative reference needs
+its root's base, and the checker's roots are conservative in exactly one
+place: a reference read back out of a container is rooted at the
+container (9.5), so <code>slots[i].node.next</code> would be resolved
+against the wrong base. Pool-relative offsets are therefore gated on
+precise roots for stored references -- struct fields are "implicitly
+generic over their roots" (9.2), which is most of the machinery -- or on
+a runtime base carried with the reference. Worth an experiment behind a
+flag before a spec decision; the potential benefit is closing the entire
+<code>lru</code> performance gap.</p>
+<h3 id="32-a-constructible-self-reference">3.2 A constructible
+self-reference</h3>
+<p>For non-optional relative links to be usable in cyclic structures
+(2.9), the value under construction needs a name, or offset 0 on a
+non-optional slot needs a defined meaning. The second is already what
+the representation does (<code>a8c9f69</code>), so documenting it -- "a
+non-optional relative reference field constructed from <code>self</code>
+points at the containing value" -- is the smaller change; the first is
+the more readable one.</p>
+<h3 id="33-return-roots-across-a-cycle">3.3 Return roots across a
+cycle</h3>
+<p>2.8 changes what the checker accepts (a cycle function may
+<code>return</code> the result of a back-edge call); the spec's 7.8
+should say that cycle return roots are the fixpoint over the cycle's
+returns, and TODO 0g goes away.</p>
+<h3 id="34-row-slices-not-a-2d-type">3.4 Row slices, not a 2D type</h3>
+<p>With 2.5a and 2.5b in place, the row-slice kernel needs no assert and
+the flat kernel proves its checks, so the language does not need a
+multi-dimensional array type to be fast on images and matrices. Worth
+stating in the performance notes: slice the rows, index within them.</p>
+<h3 id="35-scratch-buffers-that-hand-out-slices">3.5 Scratch buffers
+that hand out slices</h3>
+<p><code>calc</code> reads its input through a global grow-shrink buffer
+by index because a grow-only array has no <code>clear</code> and a
+grow-shrink one cannot be sliced. A flow-sensitive relaxation --
+<code>clear()</code> on a grow-only <em>local</em> is legal at a point
+where no reference or slice rooted at it is live -- would give the
+"reusable scratch that can be sliced" the spec's TODO 4 asks for, at no
+runtime cost. Not a speed item; it removes the one place the new
+benchmarks had to choose between reuse and references.</p>
+<h3 id="36-arithmetic-width-and-varint-in-the-performance-notes">3.6
+Arithmetic width and <code>varint</code> in the performance notes</h3>
+<p>Two guidance items rather than changes: a sum of <code>u8</code> taps
+wraps (6.2) and needs <code>as u16</code> on each -- <code>blur</code>'s
+first version produced incorrect results for that reason -- and
+<code>varint</code> costs a decode per read (2.10). Both belong in a
+"choosing storage types" note next to Appendix A.</p>
+<h2 id="4-suggested-order">4. Suggested order</h2>
+<ol type="1">
+<li><strong>Codegen, low risk, this round's mechanics:</strong> 2.1
+(tops through fat references), 2.4 (views through fat references), 2.7
+(tops only in loops that push), 2.5a (slice lengths), 2.9's range-check
+skip. Expected: <code>bintrees</code> -12%,
+<code>push</code>-by-reference +8%, <code>blur</code> 4x under clang,
+<code>particles</code> +6% under clang, <code>blur_rows</code> without
+asserts, <code>lru</code> +11%.</li>
+<li><strong>Optimizer:</strong> 2.2 (base-case inlining), 2.3 (TRE), 2.6
+(inlined named results at the destination), 2.8 (fixpoint roots).
+Expected: <code>bintrees</code> at parity with Rust, <code>tree</code>
++7% under v145, <code>respond</code> DTO up to 30%, <code>calc</code>
+without its Paren node.</li>
+<li><strong>Analysis and language:</strong> 2.5b (product indices:
+<code>blur</code> 4x under v145), 2.5c (array contents), the
+pool-relative experiment of 3.1 (the <code>lru</code> deficit), 3.2
+(self-referential sentinels), 3.5 (clearable scratch).</li>
+<li><strong>Further measurements:</strong> hardware counters on
+<code>lru</code>'s relative row, a flag to omit <code>return from</code>
+checks for 2.12, and re-run the suite after each of the three rounds --
+the reproducibility caveats in <code>notes.md</code> apply to every
+number here.</li>
+</ol>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/bench/plan.md"><code>bench/plan.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

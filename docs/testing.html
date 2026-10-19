@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compiler and runtime tests · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#compiler-and-runtime-tests"
+id="toc-compiler-and-runtime-tests">Compiler and runtime tests</a>
+<ul>
+<li><a href="#running-the-suite" id="toc-running-the-suite">Running the
+suite</a></li>
+<li><a href="#fixture-layout" id="toc-fixture-layout">Fixture
+layout</a></li>
+<li><a href="#configurations-and-backends"
+id="toc-configurations-and-backends">Configurations and
+backends</a></li>
+<li><a href="#expected-output-and-diagnostics"
+id="toc-expected-output-and-diagnostics">Expected output and
+diagnostics</a></li>
+<li><a href="#additional-compiler-checks"
+id="toc-additional-compiler-checks">Additional compiler checks</a></li>
+<li><a href="#fixture-audit" id="toc-fixture-audit">Fixture
+audit</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="compiler-and-runtime-tests">Compiler and runtime tests</h1>
+<h2 id="running-the-suite">Running the suite</h2>
+<p>Run
+<code>python test/run_tests.py --profile baseline --cc native --require-clang</code>
+after a normal compiler build. CI runs this on Windows, macOS and
+Linux.</p>
+<p>The runners work on <code>-j</code>/<code>--jobs</code> things at
+once (by default one per logical processor, up to 32), on threads that
+mostly wait for the compiler, the C compiler and the programs they
+start. The log comes out in the same order whatever the number of jobs:
+each piece of work prints into a buffer of its own, which shows once
+everything before it has, so two logs diff cleanly. <code>-j1</code>
+runs everything in order on one thread. Everything one fixture runs
+happens one run after another, since a program may write a file
+(<code>stdlib_os.goose</code> does) that another run of it would see.
+The Goose-in-Goose chains and the samples' runner
+(<code>samples/run_samples.py</code>, a process of its own with as many
+jobs) start first: the -O0 bootstrap chain is the longest piece of work,
+and the suite takes about as long as it does. <code>--gpu-jobs N</code>
+limits how many gfx programs run at once within each runner, should a
+GPU driver not take many headless devices at a time; by default nothing
+limits them.</p>
+<p>The log comes in sections (parse, roundtrip and typecheck; generated
+C; JIT runs; <code>errors_tc/</code>; samples; ...), each ending in a
+line counting its checks,
+<code>== typecheck errors (...): 1668 ok</code>. What a section prints
+besides its ok lines shows in place, under the section's title: a
+failure with what led to it, and the skips. <code>-v</code> prints a
+line for every check that passed as well. Under GitHub Actions those
+lines are kept in a collapsed group per section, closed before anything
+else prints. After the log, the FAIL lines repeat with the titles of
+their sections, as GitHub annotations there.</p>
+<p>The compiler runs per fixture are as few as the checks allow. One
+run, <code>goose --roundtrip --check</code>, parses, checks that the
+dump parses again to the same dump, and typechecks (with
+<code>--bce-test</code> where the fixture has annotations,
+<code>--parse</code> instead of <code>--check</code> for a
+<code>parse-only</code> one, and <code>--dump-file</code> writing the
+dump for a <code>dump-runtime</code> one). Every run that gets past
+resolution prints <code>parsed ok</code>, which tells a parse failure
+from a typecheck failure in one <code>--check</code> of an
+<code>errors_tc/</code> fixture. Where a level both builds the C and
+runs the program through TinyCC, one
+<code>goose -O&lt;n&gt; --jit -o &lt;file&gt;</code> does both: it
+writes the C, then runs the program in-process. With
+<code>--interp</code>, the runner also runs programs through the
+interpreter (<code>goose -O0 --interp</code>, <a
+href="design/interpreter.html">design/interpreter.md</a> §11) at both
+levels against the same blessed output, for the fixture areas the
+interpreter has been widened to (<code>INTERP_AREAS</code> in the
+runner; a fixture the interpreter refuses, for threads or a native
+package, is a skip), the <code>GS_DEBUG=1</code> selection through it as
+well (<code>interp-debug</code>), and the samples through
+<code>run_samples.py --interp</code>, which the flag passes on. The
+interpreter's calls into a native package go through generated thunks
+(design/interpreter.md §7.1), which
+<code>test/packages/pkg_interp_thunks.goose</code> exercises against the
+in-tree package <code>test/packages/pkgs/interptest</code> when the
+compiler was configured with
+<code>-DGOOSE_INTERP_TEST_PACKAGE=ON</code>; without it the fixture is
+skipped under <code>--interp</code>, and runs natively either way. The
+<code>gfx/</code>, <code>ui/</code>, <code>physics/</code> and
+<code>audio/</code> fixtures and the samples that use those modules run
+through the interpreter where their package is compiled in
+(<code>GOOSE_BUILTIN_LIBS</code>) and its sidecar names a
+<code>thunk_api</code>, headless as the TinyCC runs are; elsewhere they
+are skipped. Where <code>WASI_SDK_PATH</code> names a wasi-sdk or
+<code>build/wasm</code> is configured already,
+<code>test/wasm_build.py</code> (a section of the runner, a skip
+otherwise or without node; run on its own with <code>--fetch</code>, it
+lets the toolchain file fetch the sdk) builds the compiler to
+WebAssembly with <code>cmake/wasm32-wasi.cmake</code> and runs the
+hello-world fixture and the sieve sample through <code>goose.wasm</code>
+under node's WASI (<code>scripts/wasm_run.mjs</code>), against the same
+blessed output. Where node is installed, the playground's own WASI shim
+(<code>docs/site/play/wasi.mjs</code>) is tested too
+(<code>wasi_test.mjs</code>): its file calls through a memory of their
+own, and with a <code>build/wasm/goose.wasm</code> at hand the
+hello-world fixture, a generated-C run and a type error through the shim
+end to end, and the same runs through the playground's worker
+(<code>worker.mjs</code>) under node's worker threads, which take the
+browser's messages.</p>
+<p>Most of those runs, and those of the <code>errors/</code> and
+<code>errors_tc/</code> fixtures, share a compiler process with others:
+<code>goose --multi-test &lt;flags&gt; a.goose b.goose ...</code>
+compiles each file in turn as a run on it alone would, and ends each
+file's part of stdout and of stderr with a line
+<code>==== goose --multi-test: exit &lt;code&gt; &lt;file&gt;</code>,
+from which the runner hands every fixture exactly the exit code and
+output a run of its own would have given. A compiler process starting
+costs about as much as checking a small fixture, so a batch of 20 checks
+in a tenth of the time. A batch that crashes or aborts gets through the
+files before the one it was on; that file and the rest run one to a
+process, so a crash is reported as that fixture's. Runs writing a dump
+(<code>dump-runtime</code>), with <code>runtime-define</code> defines,
+or running a program (TinyCC) stay one to a process. The C of the
+fixtures not linking a native layer builds a batch at a time as well, at
+each level and for the dump and <code>GS_DEBUG</code> programs: one C
+compiler run compiles each program's unit with its <code>main</code>
+renamed, beside a <code>main</code> that runs the program its first
+argument names, and links them once against the runtime object
+(<code>CC.compile_programs</code> in <code>scripts/toolchain.py</code>).
+Every run of a program is still a process of its own. Where a batch does
+not build, each program in it builds on its own and shows why. A C
+compiler run's start and link cost most of its time on these programs: a
+batch of 20 builds in a fifth of the time. <code>--batch N</code> sets
+how many files go to one compiler process and how many programs to one
+executable (by default a number that leaves every job some batches);
+<code>--batch 1</code> gives each a process and an executable of its
+own.</p>
+<h2 id="fixture-layout">Fixture layout</h2>
+<p>Test fixtures are grouped by category; <code>run_tests.py</code>
+stays at the root of <code>test/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Path under <code>test/</code></th>
+<th>Coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>syntax/</code></td>
+<td>Lexer, parser, dump grouping, imports and namespace resolution.
+Imported helpers live in <code>syntax/ns/</code> and
+<code>syntax/sub/</code>. <code>raw_strings_crlf.goose</code> is the one
+file checked out with CRLF line breaks
+(<code>.gitattributes</code>).</td>
+</tr>
+<tr>
+<td><code>typing/</code></td>
+<td>Types, generics, constants, optional narrowing, dispatch results and
+recursive return contracts.</td>
+</tr>
+<tr>
+<td><code>lifetimes/</code></td>
+<td>Reference roots, byte views, borrowed contents and shrinking while
+references are live.</td>
+</tr>
+<tr>
+<td><code>codegen/</code></td>
+<td>C names, evaluation order, representations, frame/stack layout and
+aliasing.</td>
+</tr>
+<tr>
+<td><code>optimizer/</code></td>
+<td>Inlining, tail recursion and bounds-check elimination.</td>
+</tr>
+<tr>
+<td><code>runtime/</code></td>
+<td>Runtime diagnostics, reusable slot and slice pool operations and
+array size checks.</td>
+</tr>
+<tr>
+<td><code>storage/</code></td>
+<td>Relative references, pools and serialization.</td>
+</tr>
+<tr>
+<td><code>threads/</code></td>
+<td>Workers, queues, shared globals, contained workers' aborts and the
+native runtime lifecycle test. Imported helpers live in
+<code>threads/spawn/</code>.</td>
+</tr>
+<tr>
+<td><code>stdlib/</code></td>
+<td>Standard-library modules.</td>
+</tr>
+<tr>
+<td><code>goose_in_goose/</code></td>
+<td>A Goose-written compiler used as one multi-file bootstrap
+regression: build and run three generations, check a C fixed point and
+repeated self-checks of the stage-2 compiler, and compare JIT/native
+self-compilation.</td>
+</tr>
+<tr>
+<td><code>gfx/</code></td>
+<td>The <code>gfx</code> graphics module: headless rendering, textures,
+compute, frames and input, a runtime misuse, shaders from files and from
+the program; shader and threading rejections (fixtures with
+<code>// error:</code> markers). The programs hold their shaders; the
+shader files beside them are for the file form of
+<code>embed_shader</code> and <code>--compile-shader</code>.
+<code>gfx/window/</code> is the windowed showcase, not part of the
+suite.</td>
+</tr>
+<tr>
+<td><code>physics/</code></td>
+<td>The <code>physics</code> module: worlds, bodies, every kind of shape
+and geometry, all joint kinds, queries, events, recording and replay, a
+runtime misuse, and the threading rejection.</td>
+</tr>
+<tr>
+<td><code>ui/</code></td>
+<td>The <code>ui</code> module: fonts, windows and layout, widgets,
+popups and menus, text editing, style, drawing and the input queries,
+charts, rendering and input through headless gfx, whether the keys and
+the mouse are the ui's, a runtime misuse, the layer's misuse messages,
+and the threading rejection.</td>
+</tr>
+<tr>
+<td><code>errors/</code>, <code>errors_tc/</code></td>
+<td>Expected parser/resolver and semantic rejections.</td>
+</tr>
+<tr>
+<td><code>expected/</code></td>
+<td>Shared output and runtime-diagnostic expectations.</td>
+</tr>
+<tr>
+<td><code>run_tests.py</code></td>
+<td>The Python test runner.</td>
+</tr>
+<tr>
+<td><code>compiler_roots.cpp</code></td>
+<td>Root-set join laws, feedback on weakening, order-independent
+equality and the deliberate comparison projections; compiled and run in
+both native profiles.</td>
+</tr>
+<tr>
+<td><code>compiler_containers.cpp</code></td>
+<td>The compiler's <code>small_vector</code> and <code>flat_map</code>
+against <code>std::vector</code> and <code>std::unordered_map</code>
+under random operations, across in-place/heap storage, growth and
+erasure; compiled and run in both native profiles.</td>
+</tr>
+<tr>
+<td><code>resource_paths.py</code></td>
+<td>Unicode source and C output paths, JIT entry-source resource roots,
+native executable roots with separate and standalone runtimes,
+relocation, and unchanged working-directory file access. Called by the
+main runner.</td>
+</tr>
+<tr>
+<td><code>extern_types.py</code></td>
+<td>One imported extern interface and C adapter with unused and
+partially used functions: slice, reference-pointee and return types are
+available to the header at O0/O2 through native C and TinyCC, with no
+implementation needed for an unused extern. Called by the main
+runner.</td>
+</tr>
+<tr>
+<td><code>runtime_cache.py</code>, <code>runtime_cache_cc.c</code></td>
+<td>Concurrent first builds share one completed runtime object; a failed
+compile cannot poison the cache, retry and reuse work, and dry runs
+leave the cache untouched. A controlled C compiler exercises both driver
+flag styles in debug and release configurations. Called by the main
+runner.</td>
+</tr>
+</tbody>
+</table>
+<p>Positive fixtures are discovered one level below <code>test/</code>;
+nested import helpers run through their entry programs.
+<code>goose_in_goose/</code> is handled separately as one bootstrap
+program, rather than discovering its modules as standalone fixtures.
+Keep fixture stems unique across categories, since expectations and
+generated build artifacts use those names. The runner rejects duplicate
+names.</p>
+<h2 id="configurations-and-backends">Configurations and backends</h2>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debug Goose compiler; Goose <code>-O0</code> / native C
+<code>-O0</code> versus Goose <code>-O2</code> / native C
+<code>-O2</code></td>
+<td>Compare actual unoptimized and optimized executables, including
+native optimizer effects; check output against the existing
+fixtures.</td>
+</tr>
+<tr>
+<td>Goose <code>-O2</code>, native C <code>-O2</code>,
+<code>GS_DEBUG=1</code>, selected fixtures</td>
+<td>Exercise checked arithmetic/conversions and critical runtime paths
+with optimization enabled. Selection is <code>codegen_exec.goose</code>
+plus files with <code>runtime-debug</code> on their first line.</td>
+</tr>
+<tr>
+<td>Additional Clang C build of <code>codegen_exec.goose</code>, native
+<code>-O1</code>, release/debug runtime</td>
+<td>Keep a second C-front-end check on the central codegen coverage file
+without repeating the whole suite for every backend.</td>
+</tr>
+<tr>
+<td>Goose <code>-O0</code> and <code>-O2</code> through the in-process
+TinyCC backend, plus <code>GS_DEBUG=1</code> on the same selected
+fixtures, over every test and every sample</td>
+<td>Check the generated C against a third, very different C
+implementation, and that a program means the same whichever backend
+builds it.</td>
+</tr>
+<tr>
+<td>One Linux Clang ASan/UBSan job</td>
+<td>Instrument the C++ compiler, generated C, selected debug-runtime
+cases, all samples and the direct runtime lifecycle test.</td>
+</tr>
+<tr>
+<td>Goose-in-Goose bootstrap, both profiles</td>
+<td>Build stage 1 with the real compiler, stage 2 with stage 1, and
+stage 3 with stage 2. Build all three executables, compare
+stage-2/stage-3 C, and run two self-checks in stage 2, which the fixed
+point makes the same compiler as stage 3, while stage 3 is emitted and
+built. Baseline requires equal self-compiled C across host/native O0 and
+O2 and JIT/native execution; sanitize instruments every native
+stage.</td>
+</tr>
+</tbody>
+</table>
+<p>Run just the bootstrap with
+<code>python test/run_tests.py --goose-in-goose-only --exe &lt;goose&gt; --cc native</code>.
+The usual <code>--profile</code>, <code>--no-jit</code>, and
+<code>--nocgen</code> options apply. With no native C compiler, it still
+checks the source and, when available, self-compiles through the JIT,
+but reports the native chain skipped. Sources and the exact stage
+contract are in <a
+href="../test/goose_in_goose/index.html">goose_in_goose/README.md</a>;
+artifacts and logs go in
+<code>build/gen/&lt;profile&gt;/goose_in_goose/O&lt;level&gt;/</code>.</p>
+<p>The sanitizer job builds Goose with
+<code>-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all</code>,
+then runs
+<code>python test/run_tests.py --exe &lt;instrumented-goose&gt; --profile sanitize --cc clang</code>.
+Generated C uses native <code>-O1</code> and disables only UBSan's
+alignment check because the current C backend deliberately performs
+unaligned packed accesses. The C++ compiler retains alignment checking.
+ASan observes C allocations, but does not know logical object boundaries
+inside Goose's custom virtual-memory arenas.</p>
+<p>Generated C is built as <code>goose -o</code> writes it, against the
+separate runtime (<code>docs/implementation.md</code> §7):
+<code>GooseRuntime</code> (<code>scripts/toolchain.py</code>) has the
+compiler under test write the runtime's C (<code>--emit-runtime</code>)
+once per run, compiles it once per toolchain configuration -- compiler,
+optimization level, defines and extra flags, so the sanitize profile's
+runtime is instrumented as well -- into <code>build/gen/runtime/</code>
+(the samples' into their own directory), and
+<code>CC.compile(..., runtime=...)</code> links that object with each
+program built that way. Stages 2 and 3 of the bootstrap hold their own
+runtime and link none. The single-unit form, which
+<code>--standalone</code> writes, is what every TinyCC run compiles; the
+benchmarks build that form too.</p>
+<p>The direct <code>test/threads/runtime_threads_lifecycle.c</code>
+regression checks allocations, mappings and Windows handles across
+worker churn, including unjoined workers, concurrent/repeated waits,
+children outliving their parents and contained workers that abort. It
+runs in both profiles. The normal suite also checks user-visible worker
+error diagnostics.</p>
+<p>The <code>gfx/</code> tests exercise the gfx package (<a
+href="https://github.com/aardappel/goose_gfx">https://github.com/aardappel/goose_gfx</a>,
+its <code>docs/gfx.md</code>). They always parse, typecheck and generate
+C. When the compiler includes the gfx layer (configured with the
+package, <code>GOOSE_BUILTIN_LIBS</code>), the tests also link against
+the libraries listed by <code>goose --gfx-link</code> and run at -O0 and
+-O2 and through TinyCC. They render headless into textures and read back
+only pixel-aligned results, so their output is the same on every backend
+and GPU; a machine with no GPU device (the program prints
+<code>gfx: no GPU device</code>) reports them skipped, as does a
+compiler without the layer. Linux CI runs them on Mesa's lavapipe. The
+runners set <code>GOOSE_GFX_HEADLESS=1</code>, so no test or sample
+opens a window. The hidden <code>--compile-shader</code> flag is probed
+on <code>gfx/probe.frag</code>.</p>
+<p>The <code>physics/</code> tests exercise the physics package (<a
+href="https://github.com/aardappel/goose_physics">https://github.com/aardappel/goose_physics</a>)
+in the same way. They always generate C. When the compiler was
+configured with the package (<code>GOOSE_BUILTIN_LIBS</code>),
+<code>goose build</code> links them and they run at -O0 and -O2 and
+through TinyCC. Box3D is deterministic across platforms and worker
+counts, so they print physics results, rounded, and compare them
+exactly. Between them they call every function of the layer.</p>
+<p>The <code>ui/</code> tests exercise the ui module of the gfx package
+(its <code>docs/ui.md</code>) in the same way, linking
+<code>goose --ui-link</code> and, for the one that renders through gfx,
+<code>goose --gfx-link</code> too: a test needs the layers of its own
+category and of every module it imports, and is skipped where one is
+missing. They drive a context with input of their own and print what
+comes back and what was drawn; <code>ui_render</code> draws through
+headless gfx and reads back pixels only where the ui drew solid color.
+Between them they call every function of the layer.</p>
+<p>Each package's own <code>test/api_check.py</code> compares the
+functions, structs, and constants in its modules with their C headers.
+This catches interface mismatches that can compile successfully on both
+sides. It also rejects a struct the layer passes by value that TinyCC
+would pass differently from the C compilers on System V x86-64: one of
+at most 16 bytes with a misaligned field, or with floats alone in one
+eightbyte and integers in the other.</p>
+<p><code>test/gfx/window/run_window_test.py</code> is run by hand, on a
+machine with a display and a GPU: it runs the showcase
+<code>gfx_showcase.goose</code> with a window in-process and built by
+every C toolchain found, on each GPU driver of the platform, checks what
+the program reports about its own readbacks, and decodes the screenshots
+it saves (under <code>build/gfx-window/</code>) to check them for detail
+and compare them across runs.</p>
+<p>The TinyCC runs are skipped under the sanitizers, where the program
+runs uninstrumented inside an instrumented compiler and still holds its
+runtime allocations when that compiler exits. A test the backend cannot
+run yet is reported as a skip, not a failure: either because the
+compiler refuses the program outright
+(<code>JIT mode does not support</code>) or because the test's first
+line says <code>no-jit</code>. Prefer portable assertions to skipping a
+backend; the math tests allow small rounding differences in
+transcendental results. See <code>docs/design/jit_backend.md</code> for
+the backend's remaining limitations and possible solutions.</p>
+<h2 id="expected-output-and-diagnostics">Expected output and
+diagnostics</h2>
+<p>An explicitly requested compiler must exist; CI does not silently
+skip it. Every runnable fixture requires an
+<code>expected/&lt;name&gt;.out</code>, including an empty file when the
+program should be silent. Expected aborts additionally require
+<code>.aborts</code> and a nonempty <code>.stderr</code> containing the
+expected runtime diagnostic substrings. Sanitizer reports fail even when
+a program was expected to abort. Resource-bound fixtures can set a limit
+in their first line, such as
+<code>// runtime-define: GS_MAX_STACKS=1</code>; the runner passes it as
+a <code>-D</code> to every compile, where the compiler checks
+<code>GS_MAX_STACKS</code> against the program's static stack count and
+the generated C takes the rest.
+<code>append_destination_storage.goose</code> uses this to detect
+temporary result stacks that output-only comparisons would miss,
+<code>cycle_scratch_locals.goose</code> to show that a recursion's
+scratch locals take the same few stacks at every level, and
+<code>discarded_resizable_results.goose</code> shrinks each stack's
+reservation (<code>GS_STACK_RESERVE</code>) so that its loops overflow
+one unless every discarded result is released, as
+<code>guard_flat_storage.goose</code> does for what a guard's condition,
+its else and the rest of its block take, the rest emitted without braces
+of its own. <code>cycle_static_stacks.goose</code> runs the shapes a
+call into a recursive cycle allows (§7.8), the
+<code>errors_tc/cycle_temporary_*</code>,
+<code>cycle_construction_*</code> and <code>cycle_result_*</code>
+fixtures being the rejected ones, and codegen fails with an internal
+error should any program hold a data stack across such a call.
+<code>thread_cap.goose</code> shrinks the address space budget
+(<code>GS_STACK_BUDGET</code>) so that <code>hardware_threads()</code>
+reports its floor of one wherever it runs, and
+<code>stack_stats.goose</code> has its program report its stack use
+(<code>GS_STACK_STATS</code>), checked through
+<code>expected/stack_stats.stderr</code>. The runner also checks the
+<code>--stacks</code> report of <code>thread_cap.goose</code> and
+<code>cycle_scratch_locals.goose</code> for its shape, not its counts. A
+fixture expecting a debug-only abort sets <code>GS_DEBUG=1</code> the
+same way, which makes every run of it a debug build:
+<code>cast_abort_location.goose</code> and
+<code>overflow_abort_location.goose</code> check the location a failing
+check reports, and <code>thread_contained.goose</code> that the debug
+checks end a contained worker alone.</p>
+<p>Parser/resolver errors live in <code>test/errors/</code>; semantic
+errors live in <code>test/errors_tc/</code> and must get past parsing
+and resolution (<code>parsed ok</code>) before they fail. Each source
+declares one or more <code>// error: &lt;diagnostic substring&gt;</code>
+lines. The compiler must exit with 1, and all markers must occur in
+diagnostic headers or <code>in const for</code> expansion context lines,
+excluding echoed source. Use the specific rejection reason and relevant
+types/roots; omit source paths, line numbers and specification section
+numbers. These inline assertions replace the old compiler-error
+<code>.stderr</code> files.</p>
+<p>A fixture declares the warnings its <code>--check</code> prints the
+same way, with one <code>// warning: &lt;message substring&gt;</code>
+line per warning; a positive fixture that declares none must print none.
+Markers and warning lines pair up one to one, each marker part of the
+message of a line of its own, so a warning printed twice fails the
+fixture as a missing or an undeclared one does (a warning prints once
+for its node as the source has it, <code>docs/implementation.md</code>
+§3.12). Two <code>&amp;</code>s on one line that warn alike print two
+identical lines and take two markers, as <code>r6</code> in
+<code>branch_reference_copies.goose</code> does. The markers' order does
+not matter: without line numbers it could not say where a warning is,
+and warnings print in the order checking reaches their nodes -- a
+callee's body at its first call, a loop's and a construct's once their
+checks settle, redundant casts by line after the whole program -- which
+a change to the checker may rearrange without changing what a program is
+told. A rejection test answers for its warnings only if it declares
+some: checking stops at its error, so which warnings print first depends
+on how far it got. <code>cycle_local_store.goose</code>, for one, warns
+about its recursive call's <code>&amp;local</code> before the error that
+call reveals, at the store on the line above.</p>
+<h2 id="additional-compiler-checks">Additional compiler checks</h2>
+<p>The runner checks more than exit status and runtime output:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lexer_tokens.goose</code></td>
+<td>Exact token stream, including keyword classification, decoded
+literals and longest-match punctuation.</td>
+</tr>
+<tr>
+<td>Every positive Goose fixture</td>
+<td>Successful parse, successful initial dump, identical
+dump/reparse/dump, and typechecking with exactly the warnings it
+declares, unless its first line contains <code>parse-only</code>.
+Parsing also resolves type names; dumping alone does not.</td>
+</tr>
+<tr>
+<td>First-line <code>dump-runtime</code></td>
+<td>Compile and execute the dumped source against the original output.
+<code>control_expression_dump.goose</code> uses this to check grouping
+semantics, which a stable dump alone cannot establish.</td>
+</tr>
+<tr>
+<td>Every fixture with <code>// bce:elide</code> or
+<code>// bce:keep</code></td>
+<td>Run <code>-O1 --check --bce-test</code>, including expected-abort
+regressions. Native/JIT O0 and O2 runs independently check
+behavior.</td>
+</tr>
+<tr>
+<td><code>gfx_err_shader_syntax.goose</code>,
+<code>gfx_err_shader_part.goose</code></td>
+<td>Besides their markers, the error is reported at the program's line
+holding the offending GLSL.</td>
+</tr>
+<tr>
+<td>Generated <code>call_chain.goose</code>,
+<code>call_chain_too_deep.goose</code>
+(<code>build/gen/&lt;profile&gt;/</code>)</td>
+<td>A compile-time call path through 2000 distinct functions checks at
+<code>-O0</code>, and runs through TinyCC; at <code>-O2</code>, where
+the inliner may fold its single-use functions into one body only 64 C
+blocks deep at a time, it builds with the native C compiler and runs
+(<code>docs/implementation.md</code> §4). One through 6000, each calling
+the next from 32 blocks deep, is rejected as too deep for the compiler's
+stack instead of overflowing it (§3.1).</td>
+</tr>
+<tr>
+<td>Generated <code>guard_runs.goose</code>
+(<code>build/gen/&lt;profile&gt;/</code>)</td>
+<td>300 guards in a row, in a function's body and in a loop's, build
+with the native C compiler and run at <code>-O0</code> and
+<code>-O2</code>: the rest of the block after a guard whose else leaves
+opens no C block (<code>docs/implementation.md</code> §6.2), where MSVC
+stops at 128 levels and clang at 256. A chain of 200 single-use
+functions, each calling the next behind four guards, folds at
+<code>-O2</code> into bodies 64 blocks deep, which would nest past both
+limits if the inliner's count left out blocks codegen opens (§4).</td>
+</tr>
+<tr>
+<td><code>loop_shapes.goose</code> at O1</td>
+<td>Read the generated C: every <code>shape_</code> function has the
+restated loop it is named for, marked by codegen's
+<code>/* loop shape: ... */</code> comment, and no <code>keep_</code>
+function has one (<code>docs/implementation.md</code> §6.12). Its runs
+check that each restated loop computes what a reference loop does.</td>
+</tr>
+<tr>
+<td><code>member_parameters.goose</code> at O1</td>
+<td>Read the generated C: <code>walk</code>, which takes two slices and
+a <code>T[&gt;..]&amp;</code>, has each as two scalar C parameters (data
+pointer and count, header pointer and stack; spec C.3,
+<code>ParamFields</code>). Its runs pass slices, builders and pool
+references through calls, a recursion, a case-function dispatch, nested
+functions' free variables, a <code>simd</code> function, a
+<code>format</code> overload and an exported wrapper.</td>
+</tr>
+<tr>
+<td><code>member_stores.goose</code> at O1</td>
+<td>Read the generated C: <code>store_links</code> stores to fields
+reached through references that cannot be rebound, with no index on the
+way, as C member stores rather than through a pointer taken first
+(<code>StableDest</code>); its runs check the stores, and that a right
+side rebinding the reference on the way still stores where the
+destination named before it ran (<code>evaluation_order.goose</code> has
+a right side writing the destination itself).</td>
+</tr>
+<tr>
+<td><code>optimize.goose</code> at O0/O1/O2</td>
+<td>Inspect named tail-recursion bodies in <code>--specs</code>:
+supported integer accumulator/plain recursion becomes loops; modulo,
+floating-point reassociation, nonlocal-return frames and returns inside
+nested loops retain self calls. Mixed operators retain the ineligible
+call. Leading locals prevent base-case inlining from consuming these
+cases first. The <code>gb_</code> functions count the copies of their
+first statement: guarded base-case inlining copies the body once per
+self-call site where the test compares unassigned parameters,
+UFCS-spelled self-calls included, and not where it reads a global or a
+node, does arithmetic, or reads an assigned parameter.</td>
+</tr>
+<tr>
+<td><code>docs/reference.md</code></td>
+<td>Every <code>```goose</code> block of the language reference compiles
+(as written, or wrapped in a <code>main</code>), a block marked
+<code>// error</code> fails, none warns, and where the JIT runs, each
+complete program prints the block shown after it.
+<code>scripts/check_doc_examples.py</code> does the work in a process of
+its own, as the samples' runner does, writing the blocks under
+<code>build/gen/&lt;profile&gt;/doc_examples/</code>; its docstring has
+the markers a document uses for a block that is only a fragment or is
+compiled without being run. Run it by hand on any document:
+<code>python scripts/check_doc_examples.py docs/reference.md --run -v</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="fixture-audit">Fixture audit</h2>
+<p>The fixture audit retained the small lifetime, optional-narrowing,
+alias-cycle, dispatch and frame-layout regressions. Similar diagnostics
+do not make them duplicates: they exercise different expression
+visitors, specialization/cache states, root propagation, or generated
+layouts. Whole-program globals and call graphs are also part of many
+regressions, so combining them can change the property under test.</p>
+<p>The audit removed three redundant fixtures:
+<code>all_tests.goose</code> only re-ran seven standalone suites
+(imported-main behavior remains covered by the namespace tests);
+<code>spec_examples.goose</code> executed a word scanner already covered
+by <code>typecheck.goose</code> and <code>bce.goose</code>, while its
+other declarations were unused sketches;
+<code>errors_tc/shrink_live_slice.goose</code> duplicated the live-slice
+clear rejection in <code>clear_live_slice.goose</code>. Dedicated tests
+retain recursive relative structures, dispatch, nonlocal returns and
+dictionary execution previously suggested by those unused sketches.</p>
+<p>Two overlapping positive fixtures are now covered by their broader
+suites:</p>
+<table>
+<thead>
+<tr>
+<th>Removed fixture (and its <code>.out</code>)</th>
+<th>Retained coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lifetimes/borrowed_context_store.goose</code></td>
+<td><code>lifetimes/store_reached_types.goose</code> saves a slice
+through a borrowed context, keeps it in a local binding, stores it in
+the context's input table, and reads both the argument and the stored
+text. The same suite exercises the other destination forms.</td>
+</tr>
+<tr>
+<td><code>codegen/resizable_adt_tag.goose</code></td>
+<td><code>codegen/adt_adaptation.goose</code> matches both variants of a
+resizable ADT through a reference parameter and directly. The resizable
+payload has no binder; the fixed payload is bound and read.</td>
+</tr>
+</tbody>
+</table>
+<p>The small <code>return_from_cycle.goose</code> remains beside
+<code>return_from_cached_call.goose</code>: the former checks replay
+through a recursion back edge without an additional cached-call path,
+which could otherwise mask a missing propagation step.</p>
+<p>CI uses four jobs to cover these configurations without testing every
+combination of platform, sanitizer, optimization level, and runtime
+mode. Benchmarks run separately from CI.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/testing.md"><code>docs/testing.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

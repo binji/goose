@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Index types and bounds-check-free functions · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#index-types-and-bounds-check-free-functions"
+id="toc-index-types-and-bounds-check-free-functions">Index types and
+bounds-check-free functions</a>
+<ul>
+<li><a href="#1-the-check-no-analysis-removes"
+id="toc-1-the-check-no-analysis-removes">1. The check no analysis
+removes</a></li>
+<li><a href="#2-index-and-bound-types"
+id="toc-2-index-and-bound-types">2. Index and bound types</a>
+<ul>
+<li><a href="#21-spelling" id="toc-21-spelling">2.1 Spelling</a></li>
+<li><a href="#22-what-a-value-means" id="toc-22-what-a-value-means">2.2
+What a value means</a></li>
+<li><a href="#23-making-one" id="toc-23-making-one">2.3 Making
+one</a></li>
+<li><a href="#24-using-one" id="toc-24-using-one">2.4 Using one</a></li>
+<li><a href="#25-how-values-pass-through"
+id="toc-25-how-values-pass-through">2.5 How values pass through</a></li>
+<li><a href="#26-what-may-not-hold-or-make-one"
+id="toc-26-what-may-not-hold-or-make-one">2.6 What may not hold or make
+one</a></li>
+<li><a href="#27-the-array-never-shrinks"
+id="toc-27-the-array-never-shrinks">2.7 The array never shrinks</a></li>
+</ul></li>
+<li><a href="#3-why-it-is-sound" id="toc-3-why-it-is-sound">3. Why it is
+sound</a></li>
+<li><a href="#4-what-bounds-check-elimination-gets-from-it"
+id="toc-4-what-bounds-check-elimination-gets-from-it">4. What
+bounds-check elimination gets from it</a></li>
+<li><a href="#5-index-types-and-relative-references"
+id="toc-5-index-types-and-relative-references">5. Index types and
+relative references</a></li>
+<li><a href="#6-checkfree-functions" id="toc-6-checkfree-functions">6.
+<code>checkfree</code> functions</a>
+<ul>
+<li><a href="#61-meaning" id="toc-61-meaning">6.1 Meaning</a></li>
+<li><a href="#62-calls" id="toc-62-calls">6.2 Calls</a></li>
+<li><a href="#63-where-its-facts-come-from"
+id="toc-63-where-its-facts-come-from">6.3 Where its facts come
+from</a></li>
+<li><a href="#64-what-every-implementation-must-prove"
+id="toc-64-what-every-implementation-must-prove">6.4 What every
+implementation must prove</a></li>
+<li><a href="#65-diagnostics" id="toc-65-diagnostics">6.5
+Diagnostics</a></li>
+<li><a href="#66-flags-and-combinations"
+id="toc-66-flags-and-combinations">6.6 Flags and combinations</a></li>
+</ul></li>
+<li><a href="#7-worked-example-csr-breadth-first-search"
+id="toc-7-worked-example-csr-breadth-first-search">7. Worked example:
+CSR breadth-first search</a></li>
+<li><a href="#8-implementation" id="toc-8-implementation">8.
+Implementation</a>
+<ul>
+<li><a href="#81-the-plan-held" id="toc-81-the-plan-held">8.1 The plan
+held</a></li>
+<li><a href="#82-what-the-plan-missed"
+id="toc-82-what-the-plan-missed">8.2 What the plan missed</a></li>
+<li><a href="#83-a-soundness-bug-found-on-the-way"
+id="toc-83-a-soundness-bug-found-on-the-way">8.3 A soundness bug found
+on the way</a></li>
+<li><a href="#84-size" id="toc-84-size">8.4 Size</a></li>
+</ul></li>
+<li><a href="#9-testing" id="toc-9-testing">9. Testing</a></li>
+<li><a href="#10-measurements" id="toc-10-measurements">10.
+Measurements</a></li>
+<li><a href="#11-open-questions" id="toc-11-open-questions">11. Open
+questions</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="index-types-and-bounds-check-free-functions">Index types and
+bounds-check-free functions</h1>
+<p>This proposal adds two features that are meant to ship together. An
+<em>index type</em> <code>u32 in nodes</code> is an integer that is a
+valid index of the global array <code>nodes</code> wherever it can be
+named, so indexing with it needs no check. A <code>checkfree fn</code>
+is a function the compiler rejects if any bounds check is left in it.
+Together they let a programmer move the bounds checks of a hot loop to
+where its data enters the program, and have the compiler confirm that
+the loop is left with none. This was TODO 0e of the spec, and is the
+answer to the indirect-indexing gap TODO 0f lists. Both features are
+implemented (spec §3.11 and §7.14). This note keeps the reasoning behind
+them; §8 to §10 record how they were built, what building them turned
+up, and what they measure.</p>
+<h2 id="1-the-check-no-analysis-removes">1. The check no analysis
+removes</h2>
+<p>The bounds-check pass (§10.5, <code>src/bce.h</code>) proves most
+checks in ordinary loops. The common case it keeps is an index read out
+of another array:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">relax</span>(adj<span class="op">:</span> <span class="dt">i32</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> dist<span class="op">:</span> <span class="dt">i32</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> u<span class="op">:</span> <span class="dt">i64</span>) {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> k <span class="kw">in</span> adj<span class="op">.</span><span class="bu">len</span> {</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> w <span class="op">=</span> adj[k]<span class="op">;</span>                              <span class="co">// elided</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> dist[w] <span class="op">&lt;</span> <span class="dv">0</span> { dist[w] <span class="op">=</span> dist[u] <span class="op">+</span> <span class="dv">1</span><span class="op">;</span> }    <span class="co">// the first dist[w] is kept</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The same shape is graph edges (<code>dist[adj[k]]</code>), mesh index
+buffers (<code>verts[tri.a]</code>), sort permutations
+(<code>vals[order[i]]</code>), union-find (<code>parent[x]</code>) and
+handle tables. <code>bench/goose/graph_csr.goose</code> keeps a check
+per edge on <code>out[k]</code> and on <code>dist[w]</code>, per vertex
+on <code>dist[u]</code> and on <code>start[u + 1]</code> (an
+<code>i32</code> sum, which may wrap), and two in the build loop on
+<code>cursor[s]</code> and <code>out[cursor[s]]</code>
+(<code>goose --check --bce-lines</code>).</p>
+<p>Proving <code>dist[w]</code> takes
+<code>∀k: 0 &lt;= adj[k] &lt; dist.len</code>, a fact about the
+<em>contents</em> of one array relative to the <em>length</em> of
+another. A smarter analysis does not get there:</p>
+<ul>
+<li>Where <code>adj</code> came from outside the program (an edge list
+or a mesh read from a file), the fact is false until something checks
+it. That check is the program's input validation. It can be moved, but
+not removed, and where it belongs (once at load, or at every traversal)
+is the programmer's knowledge.</li>
+<li>Where the program built <code>adj</code>, a proof needs an invariant
+over every write into <code>adj</code> anywhere it is reachable, against
+a length that is often a run time value and belongs to an array
+allocated elsewhere. A summary of the range of values stored into each
+array would prove <code>graph_csr</code>, where the bound is a constant
+<code>V</code> and every pushed value is <code>% V</code>, but not the
+general case.</li>
+</ul>
+<p>Pool-relative references (§3.9) already cover part of this.
+<code>adj: Node&amp;&lt;u32 in nodes&gt;[&gt;..]&amp;</code>, with
+<code>dist</code> moved into <code>Node</code>, compiles
+<code>relax</code> with no checks at all, because a link is validated
+where it is stored and a load is <code>base + off - 1</code>. What they
+cannot do is reach a <em>parallel</em> array: <code>dist</code>,
+<code>visited</code> and <code>parent</code> are indexed by the same
+node id and are usually allocated per query, not part of the node.</p>
+<h2 id="2-index-and-bound-types">2. Index and bound types</h2>
+<h3 id="21-spelling">2.1 Spelling</h3>
+<pre><code>type        := &quot;const&quot;? (prim | qname tyargs? | &quot;(&quot; type &quot;)&quot;) postfix*
+             | indextype
+indextype   := (&quot;u8&quot; | &quot;u16&quot; | &quot;u32&quot; | &quot;u64&quot;) (&quot;in&quot; | &quot;upto&quot;) qname</code></pre>
+<p><code>u32 in nodes</code> is an <em>index type</em> of
+<code>nodes</code>, <code>u32 upto edges</code> a <em>bound type</em> of
+<code>edges</code>. An index type takes no postfix directly: an array of
+them is <code>(u32 in nodes)[&gt;..]</code>, a cast to one is
+<code>x as (u32 in nodes)</code>. An alias reads better at every use and
+is the expected style:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> <span class="dt">NodeId</span> <span class="op">=</span> <span class="dt">u32</span> <span class="kw">in</span> nodes<span class="op">;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> edges<span class="op">:</span> <span class="dt">NodeId</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span></code></pre></div>
+<p><code>upto</code> is a keyword only directly after an unsigned type
+name in a type, as <code>in</code> already is inside
+<code>T&amp;&lt;u32 in pool&gt;</code>. <code>qname</code> resolves as a
+pool's name does, in the namespace of the declaration the type is
+written in.</p>
+<h3 id="22-what-a-value-means">2.2 What a value means</h3>
+<p>A value of <code>uN in a</code> is an integer <code>v</code> with
+<code>0 &lt;= v &lt; a.len</code>, at every point of the program where
+it can be observed. A value of <code>uN upto a</code> has
+<code>0 &lt;= v &lt;= a.len</code>: the end of a range, such as a CSR
+offset.</p>
+<p><code>a</code> names a global <code>var</code> or
+<code>reusable var</code> of a grow-only type <code>T[&gt;..]</code>
+whose elements are fixed-size, so that it can be indexed. Anything else
+is a compile error: a local or parameter has no name where a field's
+type is written (as for <code>in pool</code>), a grow-shrink or limited
+array can shrink, and a sequential array cannot be indexed. Unlike
+<code>in pool</code>, the element type is unrestricted.</p>
+<p>The array is part of the type's identity: <code>u32 in nodes</code>
+is neither <code>u32</code> nor <code>u32 in edges</code>, and two
+widths of one array are different types. The representation is the plain
+unsigned integer. The array is not stored and the generated C does not
+see the type.</p>
+<h3 id="23-making-one">2.3 Making one</h3>
+<ul>
+<li><strong>A conversion.</strong> <code>x as (uN in a)</code>, for
+<code>x</code> of any integer type, aborts unless
+<code>0 &lt;= x &lt; a.len</code>, with the ordinary index-out-of-bounds
+error that <code>a[x]</code> would give. <code>x as (uN upto a)</code>
+is the same with <code>x &lt;= a.len</code>. A value <code>uN</code>
+cannot hold then converts as any <code>as</code> does: checked in debug,
+wrapped in release, and what it wraps to is smaller, so still in range.
+<ul>
+<li>Unlike every other <code>as</code>, this one is checked in every
+build: it is a bounds check moved, not a debug conversion check.</li>
+<li>The bounds-check pass judges it as it judges <code>a[x]</code> and
+elides it wherever that would be elided.</li>
+<li>There is no unchecked form: <code>x as! (uN in a)</code> is an
+error.</li>
+</ul></li>
+<li><strong>A read.</strong> Reading storage of the type (an element, a
+field, a variable) gives the type, as does a call whose result type is
+it.</li>
+<li><strong>A loop.</strong> <code>for i in lo..hi</code>, where both
+bounds are index or bound types of the same <code>a</code>, gives
+<code>i</code> the index type <code>uN in a</code> at the bounds' joined
+width. Every value it takes satisfies
+<code>lo &lt;= i &lt; hi &lt;= a.len</code>. A count loop
+<code>for i in n</code> with <code>n</code> of an index or bound type of
+<code>a</code> gives the same.</li>
+<li><strong>Within one array's types.</strong> A wider width of the same
+array converts implicitly (<code>u16 in a</code> to
+<code>u32 in a</code>), and so does an index type to the bound type of
+the same array (<code>u32 in a</code> to <code>u32 upto a</code>). The
+other directions, a narrower width and <code>upto</code> to
+<code>in</code>, take an <code>as</code> and are checked as above.</li>
+<li><strong>Nothing else.</strong> A constant never has an index type
+and never adapts to one, since its value says nothing about
+<code>a.len</code>.</li>
+</ul>
+<h3 id="24-using-one">2.4 Using one</h3>
+<ul>
+<li><strong>Indexing.</strong> <code>a[v]</code>, and
+<code>&amp;a[v]</code>, with <code>v</code> of an index type of
+<code>a</code> need no check, whatever the analysis knows. Indexing
+another array <code>b[v]</code> is checked unless the analysis proves
+<code>a.len &lt;= b.len</code> (§4), which it does from a counted fill,
+a <code>resize</code>, an <code>assert</code> or call-site facts. A
+slice <code>a[lo..hi]</code> with bound-type ends still checks
+<code>lo &lt;= hi</code> unless proven.</li>
+<li><strong>As a number.</strong> It converts implicitly to its plain
+type, and from there wherever that converts (<code>u32 in a</code> to
+<code>u32</code>, <code>u64</code> and <code>i64</code>). It is
+compared, printed, hashed, passed to an <code>i64</code> parameter and
+used in arithmetic as that type.</li>
+<li><strong>Arithmetic</strong> sees only the plain value.
+<code>w + 1</code>, <code>w &lt;&lt; 3</code>, <code>w &amp; m</code>,
+<code>-w</code> and <code>~w</code> are plain integers,
+<code>w + 0</code> included. Compound assignment and
+<code>++</code>/<code>--</code> on a place of an index type are errors,
+since their result would be a plain integer stored back.</li>
+</ul>
+<h3 id="25-how-values-pass-through">2.5 How values pass through</h3>
+<ul>
+<li><strong>Declarations.</strong> A <code>let</code> or
+<code>var</code> with no written type takes the index type of its
+initializer. A later <code>x = 0</code> to such a <code>var</code> is
+then an error, and the message suggests writing the plain type
+(<code>var x: u32 = adj[k];</code>).</li>
+<li><strong>Calls.</strong> Parameters and results may have index types,
+and arguments and <code>return</code> values are checked against them
+like any other type.</li>
+<li><strong>Branches.</strong> An <code>if</code>, a <code>match</code>,
+a block or a <code>break</code> value has an index type where every
+branch value has an index or bound type of the same <code>a</code>: the
+widest width, and <code>upto</code> if any branch is. Otherwise it has
+the join of the plain types. <code>if c { 0 } else { w }</code> is a
+plain <code>u32</code>.</li>
+<li><strong>Storage.</strong> Fields, ADT payloads, array elements,
+locals and globals may have index types, and every store into one needs
+a value of that type.</li>
+<li><strong>References and slices.</strong> A reference to index-typed
+storage is <code>(u32 in a)&amp;</code>, a slice of it
+<code>(u32 in a)[:]</code>. They are not <code>u32&amp;</code> or
+<code>u32[:]</code>, since a write through those could store any
+<code>u32</code>. A <code>u32[:]</code> parameter does not accept a
+<code>NodeId[:]</code> argument.</li>
+<li><strong>Generics.</strong> A type argument may be an index type, and
+is inferred as one. Each instantiation is checked with it (§7.7). A
+generic body that moves <code>T</code> values works
+(<code>swap_at</code>, <code>fill</code>, <code>sort</code>,
+<code>max</code>). One that stores arithmetic into a <code>T</code>
+slot, or needs <code>default&lt;T&gt;()</code>, does not instantiate
+with an index type, and the error names the instantiation.</li>
+<li><strong>No null.</strong> Goose's optionals are references. A "no
+link" value is an ADT
+(<code>enum Link { None, To { n: NodeId } }</code>) or a sentinel in
+plain storage that is converted at use.</li>
+</ul>
+<h3 id="26-what-may-not-hold-or-make-one">2.6 What may not hold or make
+one</h3>
+<ul>
+<li><strong>Defaults.</strong> An index type has no default value:
+<code>default&lt;T&gt;()</code>, a literal's <code>..</code>, a field
+default and a global without an initializer all need one
+(<code>HasDefault</code>). The array may be empty, so not even 0 is
+valid. A local declared without an initializer is fine, since it must be
+assigned before it is read.</li>
+<li><strong>Byte writers.</strong> <code>format</code> and
+<code>to_bytes(a, out)</code> reject an output array of an index type
+(<code>(u8 in x)[&gt;..]</code>). <code>bytes_of</code> views are
+read-only already.</li>
+<li><strong>Images.</strong> <code>from_bytes</code> accepts element
+types holding index types, and its verifier checks each such value
+against the named array's length at verification time, rejecting the
+image otherwise. This differs from <code>in pool</code> links, which it
+rejects (<code>design/serialization.md</code> §4): an index does not
+depend on the element layout, so checking it once at load is meaningful.
+It is exactly where the check of data from outside belongs.</li>
+<li><strong>Threads.</strong> Each thread program has its own copy of
+every global it uses (§11.2), and the copies of <code>a</code> grow
+apart after the spawn. <code>qput</code>, <code>qget</code>,
+<code>qpoll</code> and <code>thread_spawn</code> arguments reject types
+that hold index types.</li>
+<li><strong>C.</strong> An <code>extern fn</code> or
+<code>export fn</code> signature holds no index type at any depth, since
+C code is not checked against the array (<code>ExternValueOk</code>).
+By-value parameters to C would be harmless; v1 does not tell them
+apart.</li>
+</ul>
+<h3 id="27-the-array-never-shrinks">2.7 The array never shrinks</h3>
+<p>An array that an index or bound type names is never shrunk.
+<code>pop</code>, <code>pop_n</code>, <code>resize</code>,
+<code>clear</code> and a whole assignment of it are errors, anywhere in
+the program, directly or through a reference parameter. The
+per-specialization shrink summaries that §5.1 already keeps for globals
+find every such shrink. The error names the index type that pins the
+array. A shrink through a reference whose root only bounds the storage
+(§9.5) is rejected where an array the root may reach is of a named
+array's type, which is conservative. Element writes, <code>push</code>,
+<code>append</code> and a <code>reusable</code> pool's <code>free</code>
+(whose slot stays a valid element, §5.4) are unaffected.</p>
+<h2 id="3-why-it-is-sound">3. Why it is sound</h2>
+<p>The invariant is that every live value of <code>uN in a</code> is
+less than <code>a.len</code> (<code>&lt;=</code> for
+<code>upto</code>).</p>
+<ul>
+<li><strong>It is established</strong> wherever a value is made: the
+conversion checks it, a loop's values lie between bounds that satisfy
+it, and a read gives what a store put there.</li>
+<li><strong>It is preserved</strong> because:
+<ul>
+<li><code>a.len</code> never decreases (§2.7). A grow-only global's
+element region also never moves.</li>
+<li>every store into storage of the type needs a value of the type,
+which only §2.3 makes;</li>
+<li>arithmetic yields plain integers (§2.4);</li>
+<li>there is no default value and no byte-level write (§2.6);</li>
+<li>images are verified, and values do not travel between threads or
+come from C.</li>
+</ul></li>
+<li><strong>Global initialization.</strong> A conversion reads
+<code>a.len</code>, so the initialization order of globals (§11.1)
+treats it as a use of <code>a</code>.</li>
+</ul>
+<p>Nothing here involves lifetimes. Rust needs generative lifetimes to
+keep a branded index from outliving its container (the
+<code>indexing</code> crate), and Ada's index subtypes
+(<code>array (Vertex) of T</code>) fix the bound when the type is
+elaborated. Goose gets a bound that only grows from the
+grow-only/grow-shrink split, which is the same monotonicity §10.5
+already relies on.</p>
+<p>The contents of <code>a</code> change freely. Only its length
+matters.</p>
+<h2 id="4-what-bounds-check-elimination-gets-from-it">4. What
+bounds-check elimination gets from it</h2>
+<ul>
+<li><strong>Facts from the type.</strong> Any term whose expression has
+type <code>uN in a</code> gets <code>0 &lt;= t &lt;= len(a) - 1</code>
+at <code>a</code>'s <em>current</em> generation, and <code>upto</code>
+gets <code>t &lt;= len(a)</code>. A current generation is always right,
+because <code>len(a)</code> never decreases, so no bridge facts are
+involved. This attaches to one-shot bases as well: a <code>for</code>
+range's end (<code>n.hi</code>) and a field read.</li>
+<li><strong>Turning a content fact into a length fact.</strong>
+<code>dist[w]</code> with <code>w: u32 in nodes</code> reduces to
+<code>len(nodes) &lt;= len(dist)</code>. That is one relation between
+two lengths, which the difference domain already states and keeps.
+<ul>
+<li>It breaks exactly where it should. If <code>nodes</code> grows after
+<code>dist</code> was sized, the generation of <code>len(nodes)</code>
+moves on and the check stays.</li>
+</ul></li>
+<li><strong>The conversion</strong> is an index check of <code>a</code>
+and is elided the same way: in
+<code>for v in nodes.len { edges.push(v as NodeId); }</code> it costs
+nothing.</li>
+<li><strong>Not yet: <code>index_of(r)</code> and
+<code>alloc_index(v)</code>.</strong> Their results could get
+<code>0 &lt;= t &lt; len(recv)</code>, which they already satisfy, so
+that <code>a.index_of(r) as (u32 in a)</code> would be free. Today that
+conversion is checked.</li>
+<li><strong>Typed kills.</strong> The worked example (§7) turned up a
+gap the facts above depend on: a <code>q.clear()</code> through a
+reference parameter, or a call that pushes through one, killed every
+global's length, whatever its type. An array is of one type and a
+reference reaches only an array of its own type (array kinds do not
+convert at a reference), so a growth or shrink now kills only places of
+the receiver's type, and a callee's write through an argument that is an
+array of scalars only places of that array's type (spec §10.5).</li>
+</ul>
+<h2 id="5-index-types-and-relative-references">5. Index types and
+relative references</h2>
+<p>Both are links that are checked once, when stored, and trusted when
+used. Both rest on the same argument: a grow-only global target that
+nothing live can see shrink. They differ in what the link names. A
+relative reference names an <em>element</em>: following it is all it
+does, and it is a <code>T&amp;</code> with a root, constness,
+<code>.=</code> relinking and a free null. An index names a
+<em>position</em> in a numbering: it is a number that reaches several
+arrays and can be computed with, compared, sorted, hashed and sent out
+of the process. With an index type, <code>&amp;nodes[w]</code> turns an
+index into a reference without a check.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>Node&amp;&lt;u32 in pool&gt;</code></th>
+<th><code>u32 in nodes</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reaches</td>
+<td>the one array it points into, or a field inside an element</td>
+<td><code>a</code> and any array the analysis knows is at least as
+long</td>
+</tr>
+<tr>
+<td>Load</td>
+<td><code>base + off - 1</code>, one addressing mode</td>
+<td><code>base + i * sizeof(T)</code>, free only for element sizes 1, 2,
+4 and 8</td>
+</tr>
+<tr>
+<td>Null</td>
+<td>the optional form, offset 0</td>
+<td>none: an ADT or a sentinel</td>
+</tr>
+<tr>
+<td>Arithmetic, order, hashing</td>
+<td>no (via <code>index_of</code>)</td>
+<td>yes, as a plain number</td>
+</tr>
+<tr>
+<td><code>u16</code> covers</td>
+<td>64 KB of pool bytes</td>
+<td>65,535 elements of any size</td>
+</tr>
+<tr>
+<td>Images</td>
+<td>rejected by <code>from_bytes</code></td>
+<td>verified by <code>from_bytes</code></td>
+</tr>
+<tr>
+<td>Variable-size elements</td>
+<td>yes (§3.3's index of links)</td>
+<td>no: such an array cannot be indexed</td>
+</tr>
+<tr>
+<td>Local or parameter arrays</td>
+<td>self-relative form</td>
+<td>no (v1)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Prefer relative references</strong> where a link is only ever
+followed to one element, and maybe relinked or null: linked lists and
+trees in a pool, map slots pointing at nodes
+(<code>bench/goose/lru.goose</code>). <strong>Prefer indices</strong>
+where the id is used as a number: to reach parallel arrays, to compute
+neighbours or ranges (<code>i + W</code>, CSR offsets), to compare or
+sort, or to leave the process.</p>
+<p>A mesh is a case where both work and indices are the better choice.
+With <code>verts: Vertex[&gt;..]</code> of 32-byte vertices,
+<code>Vertex&amp;&lt;u32 in verts&gt;</code> links in <code>Tri</code>
+serve CPU code that reads positions. Indices still win, for four
+reasons. The index buffer goes to the GPU as it is. It loads from file
+formats as it is, with <code>from_bytes</code> doing the one check.
+<code>u16</code> indices, the norm below 65,536 vertices, would reach
+only 2,048 vertices as <code>u16 in pool</code>. And per-vertex
+attributes added later (normals, skinning weights, SoA columns for SIMD)
+are parallel arrays the same index reaches.</p>
+<h2 id="6-checkfree-functions">6. <code>checkfree</code> functions</h2>
+<h3 id="61-meaning">6.1 Meaning</h3>
+<pre><code>fndecl := (&quot;export&quot; strlit? | &quot;extern&quot; strlit?)? &quot;checkfree&quot;? &quot;inline&quot;? &quot;simd&quot;? &quot;recursive&quot;?
+          (&quot;fn&quot; | &quot;thread_fn&quot;) ...</code></pre>
+<p><code>checkfree fn f</code> is a compile error if a bounds check is
+left anywhere in <code>f</code>'s body after bounds-check elimination.
+That covers every copy of the body: each specialization, each
+<code>simd</code> version and each inlined copy. The annotation changes
+nothing about what the program computes or how it is compiled.
+<code>checkfree</code> is a keyword only directly before
+<code>inline</code>, <code>simd</code>, <code>recursive</code>,
+<code>fn</code> or <code>thread_fn</code>, so it stays usable as a
+name.</p>
+<p><em>Bounds checks</em> are the index and slice checks of §9.3,
+conversions into index and bound types (§2.3), and
+<code>free(i)</code>'s index check. The other aborts of §9.3 are
+not:</p>
+<ul>
+<li>limited-array capacity;</li>
+<li>shrinking below empty;</li>
+<li>debug overflow and debug <code>as</code> checks;</li>
+<li>division by zero;</li>
+<li>relative-reference offset overflow;</li>
+<li><code>assert</code> and <code>abort</code>.</li>
+</ul>
+<p><code>assert</code> in particular is how a <code>checkfree</code>
+function states its preconditions once, outside its loops.</p>
+<h3 id="62-calls">6.2 Calls</h3>
+<p>Every call in a <code>checkfree</code> body is to a
+<code>checkfree</code> function, a builtin or an
+<code>extern</code>.</p>
+<ul>
+<li><strong>Indirect calls.</strong> A call through a function value
+counts as a call to each function it may be. <code>print</code>,
+<code>str</code> and <code>format</code> count as calls to the user
+<code>format</code> overloads they reach.</li>
+<li><strong>Nested code.</strong> Nested functions declared in a
+<code>checkfree</code> function are <code>checkfree</code> themselves. A
+trailing block is part of the body, and the function it is passed to
+must be <code>checkfree</code> too.</li>
+<li><strong>No inlining exception.</strong> <code>inline</code> does not
+exempt a callee. Inlining is a request the implementation may not grant
+(§7.13, and never at <code>-O0</code>), and a call that stays a call
+runs the callee's own checks inside the loop.</li>
+</ul>
+<p>So the guarantee is transitive: no bounds check runs while a
+<code>checkfree</code> function is executing. Small helpers called from
+hot loops (<code>swap</code>, <code>min</code>, <code>max</code>, vector
+math) are expected to be <code>checkfree</code> themselves.</p>
+<h3 id="63-where-its-facts-come-from">6.3 Where its facts come from</h3>
+<p>A function's entry facts come from its call sites (§10.5). A
+<code>checkfree</code> function relying on them can stop compiling when
+a new caller elsewhere fails to establish them. In that case the error
+names that call site and the fact it does not establish. The robust
+style needs no callers' facts:</p>
+<ul>
+<li>index types in the signature;</li>
+<li>entry <code>assert</code>s for the length relations the body needs,
+like <code>assert(dist.len &gt;= nodes.len)</code>.</li>
+</ul>
+<p>Each is one check per call, outside the loop, and reads as
+documentation of the precondition.</p>
+<h3 id="64-what-every-implementation-must-prove">6.4 What every
+implementation must prove</h3>
+<p>§10.5 says nothing about a program's meaning depends on how much the
+analysis proves. <code>checkfree</code> makes whether a program compiles
+depend on it, so the spec fixes a <em>core</em>: checks every conforming
+implementation must elide inside a <code>checkfree</code> function.
+Accepting anything beyond the core is implementation-defined. A program
+written to the core compiles under every version of the analysis.</p>
+<p>A <em>kill</em> of a fact about <code>x</code> is, between the fact
+and the check, a write to <code>x</code>, a shrink of an array in the
+fact, a growth of the array an index type names, or a call whose effect
+summary says it may do one of these. The core:</p>
+<ol type="1">
+<li>A constant index into a fixed array, in range, and an index whose
+type's whole range fits a fixed array (a <code>u8</code> into a
+<code>[256]</code>).</li>
+<li>An index of an index type of <code>a</code>, into
+<code>a</code>.</li>
+<li>An index of an index type of <code>a</code> into <code>b</code>,
+where <code>b.len &gt;= a.len</code> (or <code>==</code>) was asserted
+or established by a counted fill, with no kill in between.</li>
+<li>A <code>for</code> index into the array its count or range end is
+the length of (<code>for i in a.len</code>, <code>for x, i in a</code>,
+<code>for i in lo..a.len</code> with <code>lo &gt;= 0</code> known),
+with no shrink of <code>a</code> in the body.</li>
+<li><code>a[i]</code> where a condition (<code>while</code>,
+<code>if</code>, <code>guard</code> or <code>assert</code>) established
+<code>i &lt; a.len</code>, with no kill in between, for an
+<code>i</code> known to be non-negative: an unsigned type, an index
+type, or a local that starts non-negative and is written only by
+<code>++</code> and <code>+=</code> of a non-negative constant.</li>
+<li>A check identical to one already passed on the same path, with no
+kill in between.</li>
+</ol>
+<p>Everything else the analysis proves (products, reductions with
+<code>%</code> and <code>&amp;</code>, facts from callers, effect
+summaries, step counters) is best-effort.</p>
+<h3 id="65-diagnostics">6.5 Diagnostics</h3>
+<p>The error is per remaining check, at its index, with the source line.
+It says why, in the terms of <code>docs/implementation.md</code> §9.1's
+"Kept" list. The implemented reasons:</p>
+<ul>
+<li><p><strong>A value read out of an array, a field or a call.</strong>
+The error suggests an index type for what is stored there.</p></li>
+<li><p><strong>A <code>u64</code> index variable.</strong></p></li>
+<li><p><strong>A term the domain cannot relate to the length</strong>,
+or a length it does not track there.</p></li>
+<li><p><strong>Which bound failed:</strong> nothing shows
+<code>x &gt;= 0</code>, or nothing shows <code>x &lt; a.len</code>. For
+an index type of another array the error names the <code>assert</code>
+that would settle it:</p>
+<pre><code>checkfree fn bfs keeps a bounds check: nothing shows u &lt; dist.len; u is a
+u32 in nodes, so `assert(dist.len &gt;= nodes.len)` where neither changes
+after it would settle it</code></pre></li>
+<li><p><strong>Slices:</strong> which of the three comparisons
+failed.</p></li>
+</ul>
+<p>Two reasons are not implemented yet, since they need the pass to keep
+provenance it does not keep today:</p>
+<ul>
+<li><strong>A length that was invalidated:</strong> <code>dist</code>'s
+length was invalidated by the call to <code>f</code> at line N, or by
+<code>q.pop()</code>. That needs the statement behind each generation of
+a length base.</li>
+<li><strong>A fact that came from callers:</strong> the call at
+file:line passes <code>src</code> without <code>src.len == W * W</code>.
+That needs to know which site's meet dropped an entry fact.</li>
+</ul>
+<h3 id="66-flags-and-combinations">6.6 Flags and combinations</h3>
+<ul>
+<li><strong>Flags.</strong>
+<ul>
+<li>Under <code>--no-bce</code>, <code>checkfree</code> is not verified.
+One warning says so, and every check is present as usual.</li>
+<li>Debug and release builds run the same analysis and get the same
+verdict.</li>
+<li>At <code>-O0</code> nothing is inlined. A function whose checks are
+settled by its own types and asserts gets the same verdict there. The
+worked example passes at <code>-O0</code>, <code>-O1</code> and
+<code>-O2</code>, an inlined helper included.</li>
+</ul></li>
+<li><strong>Combinations.</strong>
+<ul>
+<li><code>checkfree</code> is an error with <code>extern</code>, which
+has no body.</li>
+<li>It may be combined with <code>inline</code>, <code>simd</code>,
+<code>recursive</code>, <code>thread_fn</code> and
+<code>export</code>.</li>
+<li>A thread entry and an export get no call-site facts, which the core
+never relies on anyway (§8.3).</li>
+</ul></li>
+</ul>
+<h2 id="7-worked-example-csr-breadth-first-search">7. Worked example:
+CSR breadth-first search</h2>
+<p><code>graph_csr.goose</code> written with index types. The graph is
+global and built once. Per edge the traversal does no check, and per
+vertex none either.</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Node</span> { lo<span class="op">:</span> <span class="dt">u32</span> <span class="kw">upto</span> edges<span class="op">,</span> hi<span class="op">:</span> <span class="dt">u32</span> <span class="kw">upto</span> edges }</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> nodes<span class="op">:</span> <span class="dt">Node</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> <span class="dt">NodeId</span> <span class="op">=</span> <span class="dt">u32</span> <span class="kw">in</span> nodes<span class="op">;</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> edges<span class="op">:</span> <span class="dt">NodeId</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co">// Builds the graph from an edge list nothing has validated: these checks are</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co">// the only ones the traversal will ever need.</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">build</span>(nv<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> src<span class="op">:</span> <span class="dt">i32</span>[<span class="op">:</span>]<span class="op">,</span> dst<span class="op">:</span> <span class="dt">i32</span>[<span class="op">:</span>]) {</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> empty <span class="op">=</span> <span class="dv">0</span> <span class="kw">as</span> (<span class="dt">u32</span> <span class="kw">upto</span> edges)<span class="op">;</span>            <span class="co">// 0 &lt;= edges.len always</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> v <span class="kw">in</span> nv { nodes<span class="op">.</span><span class="bu">push</span>(<span class="dt">Node</span> { lo<span class="op">:</span> empty<span class="op">,</span> hi<span class="op">:</span> empty })<span class="op">;</span> }</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> first<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span>                     <span class="co">// CSR offsets</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> v <span class="kw">in</span> nv <span class="op">+</span> <span class="dv">1</span> { first<span class="op">.</span><span class="bu">push</span>(<span class="dv">0</span>)<span class="op">;</span> }</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> e <span class="kw">in</span> src<span class="op">.</span><span class="bu">len</span> { first[src[e] <span class="op">+</span> <span class="dv">1</span>]<span class="op">++;</span> }</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> v <span class="kw">in</span> nv { first[v <span class="op">+</span> <span class="dv">1</span>] <span class="op">+=</span> first[v]<span class="op">;</span> }</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> next<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> v <span class="kw">in</span> nv { next<span class="op">.</span><span class="bu">push</span>(first[v])<span class="op">;</span> }</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> some <span class="op">=</span> <span class="dv">0</span> <span class="kw">as</span> <span class="dt">NodeId</span><span class="op">;</span>                       <span class="co">// aborts for an empty graph</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> e <span class="kw">in</span> dst<span class="op">.</span><span class="bu">len</span> { edges<span class="op">.</span><span class="bu">push</span>(some)<span class="op">;</span> }</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> e <span class="kw">in</span> src<span class="op">.</span><span class="bu">len</span> {</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> s <span class="op">=</span> src[e]<span class="op">;</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>        edges[next[s]] <span class="op">=</span> dst[e] <span class="kw">as</span> <span class="dt">NodeId</span><span class="op">;</span>        <span class="co">// one check per edge, here</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>        next[s]<span class="op">++;</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> v <span class="kw">in</span> nv {</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>        nodes[v]<span class="op">.</span>lo <span class="op">=</span> first[v] <span class="kw">as</span> (<span class="dt">u32</span> <span class="kw">upto</span> edges)<span class="op">;</span></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>        nodes[v]<span class="op">.</span>hi <span class="op">=</span> first[v <span class="op">+</span> <span class="dv">1</span>] <span class="kw">as</span> (<span class="dt">u32</span> <span class="kw">upto</span> edges)<span class="op">;</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="co">// The sum of distances from src; dist holds an entry per node.</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="kw">checkfree</span> <span class="kw">fn</span> <span class="fu">bfs</span>(dist<span class="op">:</span> <span class="dt">i32</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> q<span class="op">:</span> <span class="dt">NodeId</span>[<span class="op">&gt;..&lt;</span>]<span class="op">&amp;,</span> src<span class="op">:</span> <span class="dt">NodeId</span>) <span class="op">-&gt;</span> <span class="dt">i64</span> {</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>    <span class="bu">assert</span>(dist<span class="op">.</span><span class="bu">len</span> <span class="op">&gt;=</span> nodes<span class="op">.</span><span class="bu">len</span>)<span class="op">;</span></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> total <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>    q<span class="op">.</span><span class="bu">clear</span>()<span class="op">;</span></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>    dist[src] <span class="op">=</span> <span class="dv">0</span><span class="op">;</span>                     <span class="co">// core 3</span></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>    q<span class="op">.</span><span class="bu">push</span>(src)<span class="op">;</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> qh <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>    <span class="kw">while</span> qh <span class="op">&lt;</span> q<span class="op">.</span><span class="bu">len</span> {</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> u <span class="op">=</span> q[qh]<span class="op">;</span>                 <span class="co">// core 5; u: NodeId</span></span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>        qh<span class="op">++;</span></span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> d <span class="op">=</span> dist[u]<span class="op">;</span>               <span class="co">// core 3</span></span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>        total <span class="op">+=</span> d<span class="op">;</span></span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> n <span class="op">=</span> nodes[u]<span class="op">;</span>              <span class="co">// core 2</span></span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>        <span class="kw">for</span> k <span class="kw">in</span> n<span class="op">.</span>lo<span class="op">..</span>n<span class="op">.</span>hi {          <span class="co">// k: u32 in edges (§2.3)</span></span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a>            <span class="kw">let</span> w <span class="op">=</span> edges[k]<span class="op">;</span>          <span class="co">// core 2; w: NodeId</span></span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a>            <span class="kw">if</span> dist[w] <span class="op">&lt;</span> <span class="dv">0</span> {           <span class="co">// core 3</span></span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>                dist[w] <span class="op">=</span> d <span class="op">+</span> <span class="dv">1</span><span class="op">;</span>       <span class="co">// core 6</span></span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>                q<span class="op">.</span><span class="bu">push</span>(w)<span class="op">;</span></span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> total<span class="op">;</span></span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Notes on the example:</p>
+<ul>
+<li><strong>Core 3 holds through the loop</strong> because nothing in it
+grows <code>nodes</code> or shrinks <code>dist</code>. <code>q</code> is
+a different array of a different type.</li>
+<li><strong><code>build</code> keeps its checks,</strong> on input data,
+at build time, once per edge and vertex.</li>
+<li><strong>The order in <code>build</code> matters.</strong> The nodes
+exist before the edges that name them, and the offsets are set once the
+edges are all there.</li>
+<li><strong>The graph can't be rebuilt</strong> in the same run.
+<code>edges</code> can never be cleared (§2.7), which suits a graph
+loaded once. A graph rebuilt per phase needs the grow-shrink extension
+of §10.</li>
+</ul>
+<h2 id="8-implementation">8. Implementation</h2>
+<p><code>docs/implementation.md</code> §3.13 and §5.5 to §5.12 describe
+the implementation pass by pass. This section records how it went
+against the plan.</p>
+<h3 id="81-the-plan-held">8.1 The plan held</h3>
+<p>Every typed store already passes <code>TypeCheck::FitsAt</code>,
+which is also where <code>in pool</code> checks roots, so making it take
+only a value of the same array covered nearly every way an element can
+be written. The risk was integer code that picks a result type by
+storage width, or by copying an operand's <code>TypeExpr *</code>. Two
+choke points made that fail closed, as planned: the brand is stripped in
+<code>TypeCheck::Operand</code>, where every operator operand passes,
+and every branded destination or join requires the same array. The sites
+that copied a type along were the ones predicted:
+<code>MergeVals</code>' constant <code>adapt</code>,
+<code>UnifyBranch</code>, <code>FitsAt</code>'s constant and literal
+cases, and <code>Converts</code> for the cast judgements. The brand
+stayed a field on <code>TY_INT</code> rather than a kind of its own.</p>
+<h3 id="82-what-the-plan-missed">8.2 What the plan missed</h3>
+<ul>
+<li><strong>The optimizer folds casts.</strong> <code>AsCast::Opt</code>
+turned <code>5 as NodeId</code> into the constant 5, dropping the check.
+A conversion into an index type now never folds.</li>
+<li><strong>Two codegen paths look inside casts.</strong>
+<code>DivisorKey</code> and <code>DivisorValue</code> hoist a divisor's
+conversion checks ahead of a loop, and <code>Speculatable</code>
+evaluates a cast unconditionally where it cannot fail. Both now treat a
+conversion into an index type as the check it is.</li>
+<li><strong>The worked example needed typed kills</strong> (§4): without
+them the entry <code>assert</code> of <code>bfs</code> died at
+<code>q.clear()</code>.</li>
+<li><strong>Attributing a check to its text.</strong> Tracking the
+function a walk is in attributed an argument expression, which the
+inliner places inside the callee's block, to the callee. Source-line
+spans, as <code>--bce-test</code> uses, attribute every copy
+correctly.</li>
+<li><strong>A dump of a <code>for</code> binder</strong> needs the
+parentheses the parser does.</li>
+</ul>
+<h3 id="83-a-soundness-bug-found-on-the-way">8.3 A soundness bug found
+on the way</h3>
+<p>The <code>checkfree_parallel</code> fixture first used an
+<code>export fn</code>, and the check that should have stayed was
+elided. A Goose caller's facts are granted to an
+<code>export fn</code>'s entry, but its C wrapper calls the same
+specialization with arguments nobody checked:
+<code>export fn api(d: i32[:], i: i64) -&gt; i32 { d[i] }</code> called
+once from Goose with a known length and index compiles without its
+check, and C can then read past the end. This predated index types. It
+is fixed separately (2f7e1b6b): an export, like a thread entry, gets no
+call-site facts.</p>
+<h3 id="84-size">8.4 Size</h3>
+<p>Against the estimate of 400–600 lines: +685 −44 in 19 source files,
+the typed kills and <code>checkfree</code>'s messages included. Plus 28
+rejection fixtures, three parse-error fixtures and six programs with
+blessed output.</p>
+<h2 id="9-testing">9. Testing</h2>
+<ul>
+<li><strong>Rejections</strong> (<code>test/errors_tc</code>, one per
+rule; <code>test/errors</code> for the parse errors):
+<ul>
+<li>a constant, an arithmetic result, compound assignment and
+<code>++</code> into an index type; a branch joining one with a
+constant;</li>
+<li>one array's index into another's slot, and a bound into an index
+slot;</li>
+<li>a view of index-typed storage as plain integers;</li>
+<li><code>default&lt;NodeId&gt;()</code> and a literal's
+<code>..</code>;</li>
+<li><code>as!</code> into one, and a float converted to one;</li>
+<li><code>format</code> into <code>(u8 in x)[&gt;..]</code>,
+<code>qput</code>, a thread argument, an <code>extern</code>
+result;</li>
+<li>each shrink of a named array, <code>pop</code>, <code>clear</code>
+and whole assignment, and one through a reference parameter;</li>
+<li>an invalid named array: a local, a grow-shrink array, a
+<code>let</code>, a sequential array; a signed index type; the missing
+parentheses;</li>
+<li><code>checkfree</code>: a call to an unannotated function, a block
+written outside one, an index read out of an array, an index of another
+array without the length relation, and
+<code>checkfree extern</code>.</li>
+</ul></li>
+<li><strong>Programs</strong> (blessed output, run at -O0 and -O2,
+natively and through the JIT):
+<ul>
+<li><code>test/typing/index_types.goose</code>: loads, joins, widths,
+calls, ADT payloads, generic code (<code>sort</code>,
+<code>swap_at</code>, <code>max</code>), <code>for</code> binders, and
+<code>from_bytes</code> accepting and rejecting images;</li>
+<li><code>test/optimizer/bce_index_types.goose</code>: what the types
+prove, including the keep after <code>nodes</code> grows past where
+<code>dist</code> was sized;</li>
+<li><code>test/optimizer/bce_typed_kills.goose</code>: kills of same-
+and other-typed arrays, by the operation and through a callee;</li>
+<li><code>test/optimizer/checkfree_bfs.goose</code>: §7 with an inlined
+<code>checkfree</code> helper, checked against a plain-integer version
+of the same BFS;</li>
+<li><code>test/codegen/index_type_abort.goose</code> and
+<code>bound_type_abort.goose</code>: the conversions' aborts and their
+messages.</li>
+</ul></li>
+<li><strong>Fuzzing.</strong> <code>bench/bce_fuzz.py</code> (400
+programs, seed 7) still finds no mismatch with the typed kills. It does
+not generate index-typed shapes yet.</li>
+</ul>
+<h2 id="10-measurements">10. Measurements</h2>
+<p>Built by <code>goose build</code> with clang-cl 22 for x64 at its
+default target, on the development machine, best and median of 9–11
+interleaved runs. These are rough numbers, not a benchmark-suite
+row.</p>
+<ul>
+<li><strong>The BFS of §7</strong> at a million nodes, eight million
+edges and eight sources, against the same program with plain
+<code>u32</code> storage and the same layout: 0.606 s against 0.628 s
+for the searches (medians, build time subtracted). That is within noise.
+The walk is memory-bound, and the checks it drops are well-predicted
+branches, as <code>docs/implementation.md</code> §5.12 found for an
+earlier analysis of array contents.</li>
+<li><strong>A gather kernel</strong>,
+<code>out[i] = verts[idx[i]] * 2.0 + 1.0</code> over four million
+indices, 50 passes: 0.220 s against 0.232 s (best), 0.224 s against
+0.247 s (median), so 5–9% for the whole run.</li>
+<li>An earlier draft of the comparison used <code>i64</code> fields and
+edges for the plain version and measured 25% in favour of index types.
+That was the halved memory traffic of the narrower layout, which the
+plain version can have too. Index types are no reason to narrow, but
+they make the narrow layout as safe to index as the wide one.</li>
+</ul>
+<p>So on clang the value is the guarantee, and the check moved to where
+data enters the program, more than the speed. MSVC, where a kept check
+prevents vectorization outright (<code>blur</code> was 1.75x slower with
+nine checks), and wider instruction sets with gather instructions are
+untested.</p>
+<h2 id="11-open-questions">11. Open questions</h2>
+<ul>
+<li><strong>Names.</strong> <code>checkfree</code> overpromises
+slightly, since other aborts remain. <code>proven</code> and
+<code>boundsfree</code> are alternatives. Names that read as permission
+are out (Odin's <code>#no_bounds_check</code> and Julia's
+<code>@inbounds</code> disable checks unsafely). <code>upto</code> might
+instead be <code>in ..= a</code>.</li>
+<li><strong><code>var</code> inference.</strong> Should a
+<code>var</code> without a written type take the plain type, so that
+reassigning it works? <code>var u = q[qh]</code> would then lose the
+index type, and every loop that walks with a <code>var</code> would need
+it written.</li>
+<li><strong>Locals and parameters as <code>a</code>.</strong> A local
+array could be named in local declarations, and a reference parameter's
+array settled per call site as pool parameters' are (§3.9). The obstacle
+is only a field's type, which cannot name a local.</li>
+<li><strong>Shrinkable arrays as <code>a</code>.</strong> A grow-shrink
+array could shrink where no index value of it is live, as §5.2 does for
+references. That is what a graph rebuilt per phase needs.</li>
+<li><strong>Signed index types.</strong> <code>i64 in a</code> would let
+<code>for i in a.len</code> and <code>for x, i in a</code> give index
+types without a cast. Giving existing loops new types changes which
+generic instantiations existing programs make, so v1 does not.</li>
+<li><strong>Read-only views.</strong> A <code>const u32[:]</code> could
+accept a <code>NodeId[:]</code>, since nothing writes through it. That
+needs a subtyping rule <code>TypeEq</code> does not have.</li>
+<li><strong>An optional form</strong> biased by one, as
+<code>in pool</code> is, would give a free null.</li>
+<li><strong>Thread spawn arguments</strong> are probably safe, since the
+worker's copy of <code>a</code> is taken at the spawn, provided the
+worker uses <code>a</code>. v1 rejects them.</li>
+<li><strong><code>index_of</code> and <code>alloc_index</code></strong>
+could return index types instead of <code>i64</code>. That would break
+code doing arithmetic on the result in place, so the plan is the fact of
+§4, which is not implemented yet.</li>
+<li><strong>The two missing diagnostics</strong> of §6.5.</li>
+<li><strong>Index-typed shapes in
+<code>bench/bce_fuzz.py</code></strong>: loads, joins, generic
+pass-through and growth between sizing and use.</li>
+<li><strong>Fixed arrays as <code>a</code></strong>
+(<code>u8 in table</code> for a <code>T[256]</code>) are sound trivially
+and mostly cover what the type's range already gives.</li>
+</ul>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/index_types.md"><code>docs/design/index_types.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Column arrays: minimal struct-of-arrays storage · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#column-arrays-minimal-struct-of-arrays-storage"
+id="toc-column-arrays-minimal-struct-of-arrays-storage">Column arrays:
+minimal struct-of-arrays storage</a>
+<ul>
+<li><a href="#why-a-new-array-kind" id="toc-why-a-new-array-kind">Why a
+new array kind</a></li>
+<li><a href="#rules" id="toc-rules">Rules</a></li>
+<li><a href="#what-the-checker-does-not-need"
+id="toc-what-the-checker-does-not-need">What the checker does not
+need</a></li>
+<li><a href="#representation"
+id="toc-representation">Representation</a></li>
+<li><a href="#implementation"
+id="toc-implementation">Implementation</a></li>
+<li><a href="#measurements" id="toc-measurements">Measurements</a></li>
+<li><a href="#possible-extensions-ordered-by-expected-benefit"
+id="toc-possible-extensions-ordered-by-expected-benefit">Possible
+extensions, ordered by expected benefit</a></li>
+<li><a href="#open-questions" id="toc-open-questions">Open
+questions</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="column-arrays-minimal-struct-of-arrays-storage">Column arrays:
+minimal struct-of-arrays storage</h1>
+<p>This proposal adds column arrays. A <code>T[||..]</code> would store
+a struct element as one array per leaf field, each on its own data
+stack, with one shared length. Elements could be copied out as ordinary
+structs or written through field paths. Sorting, slicing, serialization,
+and passing an element by reference would require copying the data into
+ordinary storage. The feature is not implemented.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> std<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> vec<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Particle</span> { pos<span class="op">:</span> float3<span class="op">,</span> vel<span class="op">:</span> float3<span class="op">,</span> age<span class="op">:</span> <span class="dt">i32</span> }   <span class="co">// seven columns</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">spawn</span>(ps<span class="op">:</span> <span class="dt">Particle</span>[<span class="op">||..</span>]<span class="op">&amp;,</span> n<span class="op">:</span> <span class="dt">i64</span>) {</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> n {</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> x <span class="op">=</span> i <span class="kw">as</span> <span class="dt">f32</span><span class="op">;</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>        ps<span class="op">.</span><span class="bu">push</span>(<span class="dt">Particle</span> { pos<span class="op">:</span> float3 { x<span class="op">,</span> <span class="fl">1.0</span><span class="op">,</span> <span class="fl">0.0</span> }<span class="op">,</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>                           vel<span class="op">:</span> float3 { <span class="fl">0.0</span><span class="op">,</span> i <span class="op">%</span> <span class="dv">4</span><span class="op">,</span> <span class="fl">1.0</span> }<span class="op">,</span> age<span class="op">:</span> <span class="dv">0</span> })<span class="op">;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">step</span>(ps<span class="op">:</span> <span class="dt">Particle</span>[<span class="op">||..</span>]<span class="op">&amp;,</span> g<span class="op">:</span> float3) {</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> ps<span class="op">.</span><span class="bu">len</span> {</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>        ps[i]<span class="op">.</span>vel <span class="op">=</span> ps[i]<span class="op">.</span>vel <span class="op">+</span> g<span class="op">;</span>          <span class="co">// three columns in, three out</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>        ps[i]<span class="op">.</span>pos <span class="op">=</span> ps[i]<span class="op">.</span>pos <span class="op">+</span> ps[i]<span class="op">.</span>vel<span class="op">;</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>        ps[i]<span class="op">.</span>age<span class="op">++;</span>                        <span class="co">// one column</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">while</span> i <span class="op">&lt;</span> ps<span class="op">.</span><span class="bu">len</span> {</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> ps[i]<span class="op">.</span>pos<span class="op">.</span>y <span class="op">&lt;</span> <span class="fl">0.0</span> {</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>            ps[i] <span class="op">=</span> ps[ps<span class="op">.</span><span class="bu">len</span> <span class="op">-</span> <span class="dv">1</span>]<span class="op">;</span>         <span class="co">// swap-remove: whole elements</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>            ps<span class="op">.</span><span class="bu">pop</span>()<span class="op">;</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>        } <span class="kw">else</span> {</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>            i<span class="op">++;</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> ps<span class="op">:</span> <span class="dt">Particle</span>[<span class="op">||..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    <span class="fu">spawn</span>(ps<span class="op">,</span> <span class="dv">1000</span>)<span class="op">;</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> s <span class="kw">in</span> <span class="dv">8</span> { <span class="fu">step</span>(ps<span class="op">,</span> float3 { <span class="fl">0.0</span><span class="op">,</span> <span class="op">-</span><span class="fl">0.5</span><span class="op">,</span> <span class="fl">0.0</span> })<span class="op">;</span> }</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> highest <span class="op">=</span> ps[<span class="dv">0</span>]<span class="op">;</span>                    <span class="co">// lifted: an ordinary Particle</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> p <span class="kw">in</span> ps { <span class="kw">if</span> p<span class="op">.</span>pos<span class="op">.</span>y <span class="op">&gt;</span> highest<span class="op">.</span>pos<span class="op">.</span>y { highest <span class="op">=</span> p<span class="op">;</span> } }</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(ps<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; &quot;</span><span class="op">,</span> highest)<span class="op">;</span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> sorted<span class="op">:</span> <span class="dt">Particle</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>    sorted<span class="op">.</span><span class="bu">append</span>(ps)<span class="op">;</span>                      <span class="co">// the whole array lifted, to sort</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>    <span class="fu">sort</span>(sorted) { a<span class="op">,</span> b <span class="op">=&gt;</span> a<span class="op">.</span>pos<span class="op">.</span>y <span class="op">&gt;</span> b<span class="op">.</span>pos<span class="op">.</span>y }<span class="op">;</span></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>With <code>[||..]</code> replaced by <code>[&gt;..&lt;]</code>, this
+program compiles and runs today. A column array changes where the
+elements live and what else may be done with them, never what the
+program means.</p>
+<h2 id="why-a-new-array-kind">Why a new array kind</h2>
+<p>Today this layout is written by hand, one array per leaf:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> px<span class="op">:</span> <span class="dt">f32</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span> <span class="kw">var</span> py<span class="op">:</span> <span class="dt">f32</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span> <span class="kw">var</span> pz<span class="op">:</span> <span class="dt">f32</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> vx<span class="op">:</span> <span class="dt">f32</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span> <span class="kw">var</span> vy<span class="op">:</span> <span class="dt">f32</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span> <span class="kw">var</span> vz<span class="op">:</span> <span class="dt">f32</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> age<span class="op">:</span> <span class="dt">i32</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span></code></pre></div>
+<p>This requires seven pushes per element and seven parameters per
+helper. The programmer must keep all seven lengths equal. A struct
+cannot group the arrays because it can hold at most one resizable field
+(§3.4). The layout also has a performance cost. Every one of those
+arrays starts at the same page offset of its own stack, which costs 2x
+on a six-array version of the particles kernel through 4K aliasing
+(measurements below), and nothing tells the compiler the arrays are
+parallel.</p>
+<p>A complete struct-of-arrays feature, where element references and
+slices become proxies that ordinary functions accept, layouts are chosen
+per specialization, and arrays are returned into column destinations,
+was estimated at about 2,300 lines, 90% of it codegen, and most of that
+is the cost of letting an element or a slice escape into code written
+for ordinary arrays. A column array never lets anything escape: it is
+its own array kind, it coerces to nothing, and no reference, slice or
+view into it can exist. The remaining implementation consists of storage
+handling and a few array members, at about a third of the estimated
+size.</p>
+<h2 id="rules">Rules</h2>
+<p><strong>The type.</strong> <code>T[||..]</code> is resizable (§1.1)
+and both grows and shrinks, like <code>T[&gt;..&lt;]</code>:
+<code>||</code> for the columns, <code>..</code> for the changing
+length.</p>
+<p><strong>Elements.</strong> <code>T</code> must be fixed-size and flat
+(§1.1: no references, slices or relative references at any depth). A
+field whose type is a struct is split into its fields, recursively. Any
+other field is one column: a scalar, a <code>bool</code>, a fixed array,
+a static-capacity limited array (a <code>u8[..16]</code> name), or a
+fixed-mode enum. <code>pad</code> fields have no column. A
+<code>T</code> that is not a struct is one column, so generic code may
+write <code>T[||..]</code> for any fixed, flat <code>T</code>.</p>
+<p><strong>Where it lives.</strong> A local or global <code>var</code>
+or <code>let</code>, initialized with <code>[]</code> or an array
+literal. It is never a struct field, an array element, an ADT payload, a
+by-value parameter, a return value, a thread argument, a queue value, or
+a global that a thread program uses. Functions take it by reference: a
+<code>T[||..]&amp;</code> parameter, or an untyped one, which binds the
+array by reference (§4.1). A reference to the whole array is an ordinary
+reference under the ordinary rules.</p>
+<p><strong>Element access uses paths.</strong> <code>ps[i]</code>
+followed by any field steps and fixed-array index steps
+(<code>ps[i]</code>, <code>ps[i].pos</code>, <code>ps[i].pos.y</code>)
+is an <em>element path</em>. A path can be:</p>
+<ul>
+<li>read as a value (<code>let p = ps[i]</code>,
+<code>ps[i].pos + d</code>, <code>f(ps[i])</code> into a by-value
+parameter, <code>print(ps[i].vel)</code>): a copy, loaded from the
+columns the path spans;</li>
+<li>written (<code>ps[i] = p</code>, <code>ps[i].pos = v</code>,
+<code>ps[i].pos.y = 0.0</code>), with compound assignment and
+<code>++</code>/<code>--</code> on a numeric leaf.</li>
+</ul>
+<p>Nothing can refer to a path. <code>&amp;ps[i]</code>,
+<code>var r .= ps[i]</code>, passing a path where a reference is
+expected (<code>fn f(p: Particle&amp;)</code>), slicing
+(<code>ps[a..b]</code>, or a slice of a fixed-array leaf),
+<code>for</code> over a leaf array and <code>for &amp;p in ps</code> are
+compile errors that point at the copy-out and path forms. A path checks
+its index once against the one length, however many columns it touches,
+and the bounds-check pass elides that check as for any array.</p>
+<p><strong>Members.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.len -&gt; i64</code></td>
+<td>the element count</td>
+</tr>
+<tr>
+<td><code>.push(v)</code></td>
+<td>appends one element; no result (its index is
+<code>len - 1</code>)</td>
+</tr>
+<tr>
+<td><code>.pop() -&gt; T</code></td>
+<td>removes the last element and returns it by value</td>
+</tr>
+<tr>
+<td><code>.resize(n, v)</code>, <code>.resize(n)</code>,
+<code>.clear()</code></td>
+<td>as on <code>T[&gt;..&lt;]</code></td>
+</tr>
+<tr>
+<td><code>.append(src)</code></td>
+<td>appends every element of <code>src</code>: any array or slice of
+<code>T</code> (a call's array result included), or another `T[</td>
+</tr>
+</tbody>
+</table>
+<p>An ordinary growable array of <code>T</code> also accepts a column
+array in its own <code>append</code> (<code>sorted.append(ps)</code>
+above): that is the whole-array lift. <code>for p in ps</code> and
+<code>for p, i in ps</code> iterate by value (§6.5), re-reading the
+length as for any array. <code>print</code>, <code>str</code> and
+<code>format</code> render a column array as they render
+<code>T[&gt;..&lt;]</code>.</p>
+<p><strong>Shrinking.</strong> <code>pop</code>, <code>resize</code> and
+<code>clear</code> are legal wherever a grow-shrink array's are: on a
+local, through a reference, on a global (§5.2). The §5.2 test is kept
+for what can still involve a column array, an element path of the same
+array held earlier in the statement: <code>ps[i] = ps.pop()</code> is
+rejected exactly as it is for <code>T[&gt;..&lt;]</code> today, and so
+is a call that shrinks <code>ps</code> in the same position. The scan of
+reference and slice variables is skipped, since none can point into a
+column array.</p>
+<p><strong>Not in v1.</strong> <code>==</code>, <code>copy(ps)</code>,
+whole assignment, <code>index_of</code>, slices and views,
+<code>to_bytes</code>, <code>bytes_of</code> and
+<code>from_bytes</code>, <code>reusable</code>, <code>in pool</code>
+references to its elements, and every function that takes
+<code>T[:]</code> (<code>sort</code>, <code>find</code>,
+<code>filter</code> and the other slice functions of <code>std</code>)
+are compile errors. To use these operations, copy the elements out:
+<code>xs.append(ps)</code> into an ordinary array, and back with
+<code>ps.clear(); ps.append(xs)</code> where needed.</p>
+<h2 id="what-the-checker-does-not-need">What the checker does not
+need</h2>
+<p>Most of the checker's machinery is about references, and nothing
+refers into a column array:</p>
+<ul>
+<li><strong>Roots and lifetimes</strong> (§9.2). A column array is only
+ever the root of a reference to the whole array, which no shrink
+invalidates. Its elements hold no references, are never a read-back
+candidate, and are never the target of a relative reference, so
+read-back roots, holders and the liveness scans at shrinks never involve
+them.</li>
+<li><strong>Growth during construction</strong> (§4.2). A pushed element
+is fixed-size and holds no relative references, so it is evaluated
+before its slot is claimed, and <code>append</code> of a call result
+builds the result first. No column array is ever under construction
+while an expression runs.</li>
+<li><strong>Bounds-check elimination</strong> (§10.5). A column array is
+a place with one length, changed by the same operations as a
+<code>T[&gt;..&lt;]</code>'s.</li>
+</ul>
+<h2 id="representation">Representation</h2>
+<ul>
+<li><strong>The header</strong> lives in the owning frame, or in the
+program instance's globals: one typed pointer per column plus the count,
+<code>{ float *pos_x; ... int32_t *age; int64_t len; }</code>. A
+<code>T[||..]&amp;</code> is a plain pointer to it.</li>
+<li><strong>Columns</strong> each take a data stack: a local takes N
+stack indices from its function's block (§10.3), a global N reservations
+of its own. Column k's first element sits at its own page offset, k ×
+4096 / N past a page boundary, so parallel columns never share their low
+12 address bits at the same index. This costs at most a page of address
+space per column.</li>
+<li><strong>Stack tops are never used.</strong> A column is the only
+value on its stack for the array's whole life, and its elements are
+fixed-size, so its next slot is always <code>base + len * size</code>.
+Push stores N leaves and increments <code>len</code>; pop, resize and
+clear store <code>len</code> (resize also fills). The stack's
+<code>top</code> is read once, at the declaration, and never written.
+Column arrays therefore need none of the stack-top caching and
+synchronization of implementation.md §6.10, no watermark restores, and
+no stack identity in references: pushing through a
+<code>T[||..]&amp;</code> needs only the header.</li>
+<li><strong>Element paths</strong> are one new codegen location: the
+header, the checked index held in a temporary, and the range of columns
+the path spans. A field step narrows the range, and a path that reaches
+a leaf is an ordinary C lvalue (<code>ps.pos_y[ix]</code>), so compound
+assignment, <code>++</code>, <code>match</code> on an enum leaf and
+indexing into a fixed-array leaf need nothing new. A path spanning
+several columns has two consumers: a load gathers the columns into a C
+value, and a store scatters one out. Elementwise math between paths of
+one array goes through <code>GenElemwiseInto</code> with column-mapped
+members, so <code>ps[i].pos = ps[i].pos + ps[i].vel</code> compiles to
+per-column loads and stores with no gathered temporaries, as the
+array-of-structs form does today.</li>
+<li><strong>Loops.</strong> Column pointers never change while the array
+lives (growth never moves, and there is no whole assignment), so a loop
+reads each one into a local once. They are declared
+<code>restrict</code> where the loop reaches the array through them
+alone: no growth, shrink or call that can reach the array inside the
+loop (the <code>hoistrefs</code> conditions, implementation.md §5.10),
+and no second column array that could be the same one.</li>
+</ul>
+<h2 id="implementation">Implementation</h2>
+<p>Estimates are rough (±30%). They come from the inventory of the full
+design, with everything a column array does not have taken out.</p>
+<ul>
+<li><strong>Parser, AST, dump</strong> (~10 lines): <code>[</code>
+<code>||</code> <code>..</code> <code>]</code> in the type postfix loop
+(<code>||</code> already lexes as <code>T_OROR</code>), an
+<code>A_COLS</code> array kind, and its spelling in
+<code>--dump</code>.</li>
+<li><strong>Checker</strong> (~150–200):
+<ul>
+<li><code>ValidateType</code>: the element is fixed-size and flat, and
+the type appears only as a variable's type or a reference's pointee.
+<code>ClassOf</code> makes it resizable. <code>CanContain</code> leaves
+it out, so it is no read-back candidate.</li>
+<li><code>CheckLValue</code>: an element-path bit on <code>LVal</code>,
+set at the index step and kept through field and fixed-array index
+steps. <code>CheckRefOf</code>,
+<code>AutoRef</code>/<code>BindsRef</code>, <code>.=</code> declarations
+and rebinds, slices and <code>for</code> over a path reject it, with one
+diagnostic naming the copy-out and path forms.</li>
+<li>Builtins: a <code>BR_COLS</code> receiver bit on <code>len</code>,
+<code>push</code> (no result), <code>pop</code>, <code>resize</code>,
+<code>clear</code> and <code>append</code> (its three source forms),
+plus a column-array source for <code>append</code> on ordinary arrays.
+Shrinks go to <code>ShrinkGrowShrink</code> with the variable scan off.
+<code>for &amp;</code> is rejected and rendering is allowed.</li>
+<li>Calls: no array-to-slice coercion for <code>A_COLS</code>, neither
+in overload tiers nor in <code>BindTypes</code>. Thread arguments,
+queues, thread-program globals and <code>extern fn</code> reject
+it.</li>
+<li>BCE and the optimizer: their array-kind switches only.</li>
+</ul></li>
+<li><strong>Codegen</strong> (~550–700):
+<ul>
+<li><code>codegen_types.h</code>: the header typedef, and a
+per-element-type leaf table giving each column's C type, size and index,
+and each struct field's column range.</li>
+<li><code>codegen_values.h</code>:
+<code>VarLoc</code>/<code>DerefLoc</code> for the header, the
+<code>IndexLoc</code> branch returning an element path,
+<code>FieldLocAt</code> narrowing it, the gather in
+<code>LoadLoc</code>, a scatter helper, and column-mapped
+<code>GenElemwiseInto</code>.</li>
+<li><code>codegen_nodes.h</code>, <code>codegen_stmts.h</code>: the
+scatter in <code>Assign::CgStmt</code>; <code>ForLoop::CgStmt</code>'s
+by-value binding with hoisted, <code>restrict</code> columns;
+<code>BindLocal</code> taking N stack indices and placing the
+columns.</li>
+<li><code>codegen_builtins.h</code>: the members. <code>append</code>
+has three sources: an array view, a call result built on a scratch
+stack, and another column array. It also covers an ordinary array
+appending a column array.</li>
+<li><code>codegen_emit.h</code>, <code>codegen_render.h</code>,
+<code>codegen_frames.h</code>: globals, printing, and the plain-pointer
+parameter.</li>
+</ul></li>
+<li><strong>Tests</strong> (~350 lines):
+<ul>
+<li>a runtime fixture exercising every member and path form on a local,
+through a reference, on a global and inside a generic function, with
+<code>// bce:</code> annotations on its loops;</li>
+<li>a check that pushes interleaved with calls through a reference keep
+the columns aligned;</li>
+<li><code>test/errors_tc/</code> fixtures for each rejected use.</li>
+</ul></li>
+<li><strong>Documentation</strong>: a row in the §3.3 table and a
+subsection after §5.3, the §12 member table, a tutorial paragraph, and
+an entry in implementation.md §6.1.</li>
+</ul>
+<p>That is roughly 750–900 lines of compiler: about the size of
+<code>to_bytes</code> and <code>from_bytes</code> (+779 in
+<code>src/</code>), and a third of the full design.</p>
+<h2 id="measurements">Measurements</h2>
+<p>The hand-written six-array version of
+<code>bench/goose/particles_scalar.goose</code> is the layout Goose
+offers today, and it is compared with the array-of-structs original. N =
+4,000,000, best of five, on a Ryzen 9 9950X3D. Checksums were identical,
+and repeated sessions varied by up to 8%.</p>
+<table>
+<thead>
+<tr>
+<th>ms</th>
+<th style="text-align: right;">MSVC 19.51 /O2</th>
+<th style="text-align: right;">clang 20 -O2</th>
+<th style="text-align: right;">clang 20 -O2 -march=native</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>array of structs (<code>particles_scalar.goose</code>)</td>
+<td style="text-align: right;">1039</td>
+<td style="text-align: right;">956</td>
+<td style="text-align: right;">1375</td>
+</tr>
+<tr>
+<td>six <code>f32[&gt;..]</code> arrays, as generated today</td>
+<td style="text-align: right;">2015</td>
+<td style="text-align: right;">1968</td>
+<td style="text-align: right;">674</td>
+</tr>
+<tr>
+<td>the same C, column starts 688 bytes apart</td>
+<td style="text-align: right;">1101</td>
+<td style="text-align: right;">1063</td>
+<td style="text-align: right;">691</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>The 2x at the default targets is 4K aliasing.</strong> Every
+array starts at offset 0 of a fresh stack, so <code>px[i]</code> and
+<code>vx[i]</code> share their low 12 address bits, and each load after
+a store predicts a forward that is not there. Moving the starts apart
+removes it.</li>
+<li><strong>Placed apart, the columns stay within 6–11% of the array of
+structs</strong> at the default targets. The loop touches every field on
+every iteration and branches, which is the array-of-structs layout's
+best case, and at clang's default target it does not vectorize: turning
+vectorization off changes nothing.</li>
+<li><strong>With <code>-march=native</code> (AVX-512) the columns
+vectorize</strong>: 691 ms, against 1033 with vectorization off. The
+array of structs gets slower there (1375 ms, against 917 with
+vectorization off), so the fair margin is about 1.3x.</li>
+<li><strong>The elementwise loop also needed <code>restrict</code> under
+MSVC.</strong> A six-column lowering of <code>particles.goose</code>'s
+elementwise loop reads the global <code>G</code> inside the loop, and
+without <code>restrict</code> a C compiler must assume any float store
+may change it. That version took 3317 ms as is, 1623 staggered, 1295
+with <code>restrict</code> and 1005 with both, against 1182 for the
+array of structs.</li>
+</ul>
+<p>The stagger belongs in any column layout the compiler controls.
+Whether ordinary data stacks should start at staggered offsets too is a
+separate question, since unrelated arrays that one loop reads and writes
+meet the same aliasing today.</p>
+<h2 id="possible-extensions-ordered-by-expected-benefit">Possible
+extensions, ordered by expected benefit</h2>
+<table>
+<thead>
+<tr>
+<th>Extension</th>
+<th>What it adds</th>
+<th>Rough cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>for &amp;p in ps</code> as a place alias</td>
+<td><code>p</code> stands for <code>ps[i]</code> in paths and still has
+no address; kernels then read like their array-of-structs versions</td>
+<td>~100 lines</td>
+</tr>
+<tr>
+<td>Column views</td>
+<td>a real slice over one column (<code>ps.pos.x</code> as an
+<code>f32[:]</code>, in some spelling), for FFI and <code>std</code>
+kernels, held by variables only as §5.2's slices are, which brings back
+the variable scan at shrinks</td>
+<td>~150</td>
+</tr>
+<tr>
+<td><code>==</code>, <code>copy</code>, whole assignment</td>
+<td>per-column compares and copies</td>
+<td>~60</td>
+</tr>
+<tr>
+<td>Reference and <code>in pool</code> leaves</td>
+<td>elements that hold links, checked as element fields of any array
+are</td>
+<td>probably small</td>
+</tr>
+<tr>
+<td>Struct tails</td>
+<td>a frame object (C.2) whose tail is a column header</td>
+<td>~200</td>
+</tr>
+<tr>
+<td>Threads, queues, <code>to_bytes</code></td>
+<td>images in array-of-structs order, since images carry no layout</td>
+<td>~100</td>
+</tr>
+<tr>
+<td>Returns and by-value parameters</td>
+<td>N destination stacks and named results placed in columns (§7.3);
+most of the full design's cost</td>
+<td>several hundred</td>
+</tr>
+</tbody>
+</table>
+<h2 id="open-questions">Open questions</h2>
+<ol type="1">
+<li><strong>Spelling.</strong> <code>T[||..]</code> reads as columns
+with a changing length. <code>T[&gt;..||]</code> would keep the family's
+<code>&gt;</code> for stack growth.</li>
+<li><strong><code>push</code>'s result.</strong> Should
+<code>push</code> return the new index, the counterpart of the reference
+other arrays return?</li>
+<li><strong>Split depth.</strong> Split struct fields only, or fixed
+arrays too (a <code>f32[4]</code> leaf as four columns)?</li>
+<li><strong><code>append(f())</code>.</strong> It builds the result on a
+scratch stack and then splits it into the columns. Is that acceptable
+against §4.3? Static-capacity limited arrays already take a call's array
+result that way (implementation.md §6.5). The alternative is for
+<code>append</code> to take stored sources only.</li>
+<li><strong>The place alias.</strong> Should
+<code>for &amp;p in ps</code> be in v1? It is what makes a kernel read
+like its array-of-structs version.</li>
+</ol>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/soa.md"><code>docs/design/soa.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

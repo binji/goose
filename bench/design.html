@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>design.md · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#where-the-gains-should-compound"
+id="toc-where-the-gains-should-compound">Where the gains should
+compound</a></li>
+<li><a href="#where-we-should-expect-goose-to-lose"
+id="toc-where-we-should-expect-goose-to-lose">Where we should expect
+Goose to lose</a></li>
+<li><a href="#candidate-algorithms"
+id="toc-candidate-algorithms">Candidate algorithms</a></li>
+<li><a href="#measurement-notes" id="toc-measurement-notes">Measurement
+notes</a></li>
+<li><a href="#the-suite-as-built" id="toc-the-suite-as-built">The suite
+as built</a></li>
+</ul>
+</nav>
+</aside>
+<main>
+<p>Goose tests whether inline data structures and language-level memory
+management can outperform C++ and Rust while preserving memory
+safety.</p>
+<p>The benchmarks cover common algorithms that may benefit from this
+design, as well as workloads where Goose is likely to struggle. The aim
+is to measure both the benefits and the limitations and identify
+possible language improvements.</p>
+<p>The suite tests the effects of these features:</p>
+<ul>
+<li>Compact inline data structures.</li>
+<li>In-place construction and pointer-bump growth for push and
+append.</li>
+<li>Less copying overhead.</li>
+<li>No "realloc" of resizable data structures, while allowing element
+pointers.</li>
+<li>Variable size enums.</li>
+<li>No allocator at all: no malloc/free call, no per-allocation header,
+no size class rounding, no free list to walk, no fragmentation, and no
+lock or thread cache in the path. Deallocation is a pointer reset.
+<code>reusable</code> pools (spec 5.4) cover the mutation-heavy cases
+that would otherwise force an allocator back in.</li>
+<li>No destructors and no drop glue: releasing a large nested structure
+is O(1), not an O(n) pointer chasing traversal. C++/Rust pay for
+teardown of every unique_ptr/Box/ String they built, and it is the same
+cache hostile walk as building it was.</li>
+<li>Relative references: 1-2 byte links where C++ and Rust spend 8. Note
+the idiomatic Rust workaround for pointer heavy graphs is already an
+index based arena (<code>Vec&lt;Node&gt;</code> plus u32 indices), so
+that, not <code>Box</code>, is the Rust comparison point, and it still
+costs 4 bytes plus a base+scale computation per hop.</li>
+<li>Compact scalars inside aggregates generally: packed structs (no
+padding), u8/u16/ varint array length fields, u8 enum tags, varint
+payload fields. Rust and C++ round enums up to
+max-variant-plus-alignment and cannot express any of the rest without
+hand rolled bit twiddling.</li>
+<li>Nested containers stay flat and contiguous:
+<code>u8[][&gt;..]</code> is one block, where
+<code>Vec&lt;String&gt;</code>/<code>vector&lt;string&gt;</code> is 1 +
+N allocations each carrying a 24 byte header (mitigated only for short
+strings, by SSO, in C++). Worth testing both short (SSO sized) and long
+strings for exactly this reason.</li>
+<li>Guaranteed construct-in-destination (4.3, 7.3): no
+construct-then-copy anywhere, guaranteed NRVO, callees writing their
+result directly into the caller's container (<code>v.push(f())</code>).
+C++ has non-guaranteed NRVO and an <code>emplace_back</code> that cannot
+do this for variable size values; Rust memcpy-moves large values around
+freely, which is a well known weakness of it.</li>
+<li>Tag dispatch instead of vtables (8.2): no vtable pointer per object
+(8 bytes on every polymorphic node), a jump table instead of an indirect
+call, and the arms stay inlinable.</li>
+<li>Exact size growth: a grown-to-n array occupies n elements, where
+Vec/vector carry up to 2x capacity slack on top of the allocator's own
+rounding.</li>
+<li>Goose data is already its own serialized form: a relative-reference
+structure loads by memcpy or mmap with no parse and no pointer fixup
+pass. Load time is a real and frequently occurring cost that this
+reduces to I/O.</li>
+<li>Cheap long distance errors (<code>return from</code>, 7.9): a
+discriminant check per frame, versus C++ exceptions (catastrophic on the
+throwing path) and Rust <code>?</code> chains that also copy the error
+payload up each frame.</li>
+<li>Thread queues (11.2) move flat contiguous values: no per-element
+pointer chasing, no serialization step, no shared ownership
+machinery.</li>
+</ul>
+<p>We will want to test against performance conscious (but still
+idiomatic) C++ and Rust. C++ can reproduce many of these layouts through
+manual pointer management and data packing. Those techniques belong in
+the expert comparisons; Goose aims to make them convenient and memory
+safe in ordinary code.</p>
+<p>Besides speed, we will want to test memory usage, and the combination
+of both, by running with at least 3 different data sizes for each
+algorithm, where the smallest one focuses on pure CPU, but the 2 bigger
+sizes will stress cache and memory subsystems increasingly, to see if
+the Goose advantage appears or widens.</p>
+<p>We will want to test all reasonably idiomatic forms per language,
+e.g. for an algorithm that works on variant/polymorphic data, for Goose
+we'll want to see both fixed and variable enums if possible, for Rust
+just fixed enums, and for C++ we'll want to compare subclasses (most
+idiomatic but slow), std::variant (faster but unergonomic) and C-style
+unions (fastest, but very unsafe).</p>
+<p>If an algorithm does a lot of resizable array pushing, we'll want to
+be fair to C++ and compare both what happens if the programmer optimally
+chooses <code>reserve</code>, and what if they don't bother to use
+it.</p>
+<p>We'll also want to find examples of code that Goose is currently weak
+at, and some where performance is similar because the languages use the
+same compiler backend.</p>
+<h2 id="where-the-gains-should-compound">Where the gains should
+compound</h2>
+<p>Most of the advantages above are the same advantage seen from
+different angles: they shrink the bytes touched per unit of work. An
+algorithm's benefit should therefore be roughly proportional to how
+pointer rich and allocation rich its data is, and should widen with data
+size as the working set falls out of each cache level in turn. The
+biggest expected wins, in rough order:</p>
+<ol type="1">
+<li>Anything that builds many small linked things: parse trees, ASTs,
+s-expressions, scene graphs. Allocation cost, node size (relative refs,
+varints, u8 tags, no vtable pointer) and teardown cost all stack up in
+the same benchmark.</li>
+<li>Anything holding a collection of variable size things: lists of
+strings, lists of records, jagged arrays. One block versus 1+N
+allocations.</li>
+<li>Anything that grows while holding pointers into what it grew. In
+C++/Rust this forces the programmer into indices, a chunked arena
+(deque-like, extra indirection), or reserving a hard upper bound. All
+three are worth benchmarking as separate rows, because it is exactly the
+workaround cost we are trying to delete.</li>
+<li>Load/save and cross thread paths, where Goose does no work at all
+and the others serialize or pointer fixup.</li>
+</ol>
+<p>If a benchmark's data is a flat array of scalars, expect no
+advantage. That is a useful control case.</p>
+<h2 id="where-we-should-expect-goose-to-lose">Where we should expect
+Goose to lose</h2>
+<p>The suite should measure these potential limitations:</p>
+<ul>
+<li>Arithmetic runs at the operands' own width (6.2), so an i32 kernel
+uses 32-bit arithmetic, but Goose's packed, unaligned layouts may still
+cost SIMD performance against aligned C++ data. A straightforward
+integer array kernel should quantify what remains.</li>
+<li>Packed, unaligned layouts (3.2) may cost real SIMD performance for
+the same reason: no padding means no alignment guarantee. Also TODO 10.
+A float/vector math benchmark (particles, n-body, image kernel) is the
+test, and it doubles as the exercise for elementwise struct math
+(6.1).</li>
+<li>No aliasing information. Rust hands LLVM <code>noalias</code> on
+<code>&amp;mut</code>, C++ has <code>restrict</code> when someone
+bothers, and Goose deliberately permits aliasing and so tells the
+backend nothing. Any in-place transform over two array arguments is
+where this shows.</li>
+<li>Bounds checks on everything non-fixed, like Rust, unlike C++. The
+compiler now proves most of them away (10.5), and <code>--no-bce</code>
+gives a direct A/B for what the rest cost --
+<code>bench/bce_ab.py</code> runs it. The checked number stays the
+headline: this compares Goose and Rust with bounds checking enabled,
+using C++ as the unchecked baseline.</li>
+<li>Copies are real. By-value semantics with no move operation (4.1,
+TODO 3) means idioms a Rust programmer would express as a cheap move are
+an O(size) copy in Goose. A benchmark that returns different locals on
+different paths (7.3), or reassigns large values around, will show it.
+This is the most likely place to find something worth fixing in the
+language.</li>
+<li>Stack discipline friction. Workloads whose lifetimes are not nested
+(caches, long lived mutable graphs, anything wanting free-then-alloc at
+differing sizes) must go through <code>reusable</code> pools, and
+recursive cycles cannot own growable locals at all (7.8). Include a
+benchmark that is awkward in Goose to measure the cost of the
+workaround. (<code>lru</code> is that benchmark. The pool itself turned
+out to cost nothing; the relative links it relinks cost 1.5x against
+indices -- the offset arithmetic sits on the pointer-chasing path -- so
+compact links are a build-once-walk-many trade, not a free one.)</li>
+<li>Address space accounting: report committed pages, not the multi-GB
+reservations (10.4), to avoid counting reserved but unused address space
+as memory use. Conversely, Goose commits at page granularity per stack,
+so at the smallest data sizes it may legitimately look worse than
+malloc.</li>
+</ul>
+<h2 id="candidate-algorithms">Candidate algorithms</h2>
+<p>Familiar, widely written code, each chosen to hit specific axes
+above:</p>
+<ul>
+<li>Word frequency count over a text corpus: flat list of strings, hash
+map growth, string keys. Hits axes 2 and 3, and the map is spec
+A.3.</li>
+<li>JSON or s-expression parse, then walk/query: axis 1 in full, plus
+variable mode enums, relative references (A.2), varint fields, and
+<code>return from</code> on the error path. Probably the flagship
+benchmark.</li>
+<li>Expression or bytecode interpreter: case function dispatch vs
+virtual calls vs std::variant visit vs Rust match. Isolates dispatch and
+node size from allocation.</li>
+<li>Graph build plus BFS/Dijkstra: adjacency built incrementally (axis
+3), then traversed. Compare Goose's nested resizables against hand built
+CSR in C++/Rust, which is the performance conscious thing to do there
+and requires more code.</li>
+<li>Particle/n-body or image kernel: the SIMD and packed-layout
+questions. Expect a wash or a loss; this tests a potential
+weakness.</li>
+<li>Save/load round trip of a built structure: mmap and use, vs parse
+and fixup.</li>
+<li>Sort of a flat scalar array: the control. Should be a dead
+heat.</li>
+<li>Binary trees (the well known benchmark game one) is worth including
+for recognizability, with the caveat stated in the writeup that it is
+really an allocator benchmark, which is why we don't lean on it.</li>
+</ul>
+<h2 id="measurement-notes">Measurement notes</h2>
+<ul>
+<li>Goose compiles to C, so build the C++ and the generated Goose C
+through the same clang version and optimization level, and note that
+Rust goes through LLVM too. The intent is to compare data structure and
+memory strategy, not backends.</li>
+<li>Measure teardown inside the timed region. Freeing the structure is a
+real cost that Goose does not pay, so it must be included for a fair
+comparison.</li>
+<li>Give C++/Rust a fair allocator: system malloc is the default idiom,
+but a mimalloc or jemalloc row is the strong baseline, and a hand rolled
+bump/arena row is the "an expert wrote this" tier. Same tiering idea as
+the <code>reserve</code> fairness point above.</li>
+<li>For memory, report peak RSS and the payload size the program thinks
+it has, so allocator overhead, capacity slack and per-object headers
+show up as the gap between the two. That gap is a headline result in its
+own right.</li>
+<li>Pin to a core, fix the clock where possible, run each size cold and
+warm, and report a distribution rather than a best of N.</li>
+</ul>
+<h2 id="the-suite-as-built">The suite as built</h2>
+<p><code>bench/goose/</code>, <code>bench/cpp/</code> and
+<code>bench/rust/</code> hold sixteen benchmarks against this design.
+The first ten are small, one construct each, from <code>sum</code> (the
+control) to <code>sexp</code> (the flagship). The six added after that
+are a little larger and were chosen to fill the gaps the first ten left:
+<code>lru</code> (a cache: the <code>reusable</code> pool,
+free-then-alloc out of scope order, the mutation-heavy shape the stack
+discipline is worst placed for), <code>scene</code> (a scene graph with
+inline child arrays of relative references, mutated every frame),
+<code>calc</code> (many small parses into per-input local pools, with
+<code>return from</code> taken as a real error path a quarter of the
+time), <code>bintrees</code> (the Benchmarks Game's allocator benchmark,
+for recognisability), <code>respond</code> (a web handler's DTO with a
+string and a list of records, built and rendered per request), and
+<code>blur</code> (an image stencil: flat scalar work, bounds checks and
+no aliasing information, chosen to test a likely weakness).
+<code>bench/run_bench.py</code> builds and runs them at three sizes
+each, checks that every implementation of a benchmark prints the same
+checksum, and writes <code>bench/results.md</code>; the commentary that
+file ends with lives in <code>bench/notes.md</code>.</p>
+<p>The suite does not benchmark saving and loading relative-reference
+structures or sending them through thread queues. Serialization has
+since been implemented with validation (see
+<code>docs/design/serialization.md</code>). Queues can carry the
+serialized byte image, but cannot directly carry values with relative
+references because those values are not flat (TODO 9).</p>
+<p>C++ is measured at two tiers, idiomatic and expert, because the
+language admits such a wide range of implementation techniques that one
+row would misrepresent it. For Rust, the benchmarks compare safe,
+idiomatic implementations. Where a benchmark has two idiomatic Rust
+representations they are both listed, but the reason is always a
+semantic difference (owned versus borrowed strings) or a structural one
+(owning <code>Box</code> nodes versus the <code>Vec</code>-plus-indices
+arena the community recommends for pointer-heavy data), never just that
+one is faster. The prediction made above -- that the arena, not
+<code>Box</code>, is the real Rust comparison point -- held: it is 2.8x
+to 5.9x faster than <code>Box</code> on the three benchmarks that have
+both.</p>
+<p>The comparison also has a usability dimension that timing does not
+measure: when Rust uses <code>u32</code> indices and Goose uses typed,
+nullable references, similar performance still comes with different
+programming interfaces.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/bench/design.md"><code>bench/design.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

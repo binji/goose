@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>summary.md · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page">
+<main>
+<p><strong>The October 16, 2026 run puts Goose at 3.51x / 3.54x the
+speed of idiomatic C++, 1.24x / 1.26x the speed of expert C++, and 1.13x
+/ 1.19x the speed of the best safe Rust rows</strong>, under MSVC /
+clang respectively. These are geometric means over the sixteen
+benchmarks at their large sizes. Peak-memory ratios are 1.95x, 1.32x and
+1.25x in Goose's favor. The full suite was rebuilt and rerun at all
+three sizes, including the separate JIT measurements.</p>
+<p><strong>The source improvement in this refresh is check-free graph
+traversal.</strong> Both Goose graph rows store vertex IDs as
+<code>u32 in dist</code>; CSR also stores prefix offsets as
+<code>u32 upto out</code>. Validation happens during construction, and
+<code>checkfree fn bfs</code> verifies that none remains in traversal.
+The entries are still four bytes, and construction and validation are
+still timed. The fresh large CSR times are 699/617 ms, against C++
+784/761 and Rust 811: 1.12x/1.23x ahead of matching C++, and 1.16x/1.32x
+ahead of Rust. Linked adjacency remains much slower than CSR in every
+language. Alternating same-compiler trials against the original Goose
+sources measured speedups of 1.21x/1.19x for linked adjacency and
+1.08x/1.17x for CSR at the large size (<code>notes.md</code>). These
+measure the whole source rewrite; the full-suite table alone does not
+isolate a source change from other changes since the previous
+report.</p>
+<p><strong>Compact representation remains the clearest
+advantage.</strong> <code>records</code> is 2.02-2.26x faster than Rust
+on 3.98x less memory: variable-mode enums pay for each record's own
+payload, including inline text. <code>interp</code> is 1.29-1.41x faster
+on 2.04x less memory for the same distinction in a tree.
+<code>sexp</code> uses 2.43x less memory than the Rust arena and 5.04x
+less than the C++ owning nodes. For <code>strlist</code>, distinguish
+Goose's owned inline strings from the borrowing
+<code>string_view</code>, flat-offset and
+<code>Vec&lt;&amp;str&gt;</code> rows; those have different lifetime
+requirements.</p>
+<p><strong>Losses and near-ties remain.</strong> <code>calc</code> takes
+481/491 ms against the Rust arena's 436 ms. <code>lru</code> takes
+2,760/2,068 ms against Rust's 2,249, so it loses under MSVC and wins
+under clang. <code>scene</code> is 460/371 ms against Rust 379, again a
+loss under MSVC and approximately level under clang. This refresh
+measures these differences; it does not re-establish the older
+diagnostic claims about which individual compiler mechanisms caused
+them.</p>
+<p><strong>A check-free kernel can still be limited by backend
+optimization.</strong> The flat blur is now explicitly
+<code>checkfree</code> and takes 952/266 ms. The row-slice form, also
+<code>checkfree</code> including slice construction, takes 298/269 ms.
+Rust's two forms take 299-300 ms. Removing bounds checks therefore does
+not by itself close the MSVC flat-kernel gap. The scene composition and
+recursive update also carry <code>checkfree</code> contracts. The
+fastest particle rows are nearly level across Goose, Rust and clang C++;
+small differences are not evidence of a language advantage on this flat
+numeric workload.</p>
+<p><strong>Allocation and interfaces matter to the comparison.</strong>
+<code>bintrees</code> takes 206/204 ms, against C++'s arena at 393/407
+and Rust's arena at 235. The per-node allocation rows exceed three
+seconds. Goose uses typed references into growing storage where the safe
+Rust arena rows use integer indices. In <code>respond</code>, the inline
+Goose DTO takes 507/491 ms against Rust's DTO at 1,338, while Goose
+streaming takes 454/400 against Rust streaming at 540. Compare matching
+interfaces when deciding which result applies to an application.</p>
+<p><strong>Read the aggregate with the row-level controls.</strong> It
+selects the fastest Goose implementation separately for each backend and
+comparison tier; memory independently selects the smallest
+implementation. Thus <code>graph</code> speed uses CSR while its memory
+figure uses linked adjacency, and <code>words</code> speed uses the
+hand-written table while memory uses <code>dictionary</code>. The
+<code>respond</code> headline uses streaming, and <code>blur</code> uses
+row slices under MSVC and flat indexing under clang. These are not the
+resource profiles of a single implementation. <code>words</code> also
+compares different hash functions and table policies; the Goose
+dictionary uses less memory than its hand-written table but runs more
+slowly.</p>
+<p><strong>These are whole-process measurements on one machine.</strong>
+They include input generation, construction and teardown, use the best
+of three runs after two warm-ups, and do not pin cores. Treat small
+differences cautiously, especially in cache-sensitive graph and LRU
+workloads. The empty-process floor is now 13.1 ms for Goose and 13.8 ms
+for C++, versus about 8 ms in the October 10 report, and MSVC has
+changed from 19.51.36257 to 19.51.36260. Cross-date timing changes
+cannot be attributed solely to Goose compiler improvements. The older
+diagnostic studies are retained, explicitly marked historical, in
+<code>notes.md</code>; current comparisons come from the fresh
+tables.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/bench/summary.md"><code>bench/summary.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

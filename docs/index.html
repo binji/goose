@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goose documentation · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#goose-documentation" id="toc-goose-documentation">Goose
+documentation</a>
+<ul>
+<li><a href="#the-language-in-reading-order"
+id="toc-the-language-in-reading-order">The language, in reading
+order</a></li>
+<li><a href="#library-and-tools" id="toc-library-and-tools">Library and
+tools</a></li>
+<li><a href="#benchmarks" id="toc-benchmarks">Benchmarks</a></li>
+<li><a href="#the-compiler" id="toc-the-compiler">The compiler</a>
+<ul>
+<li><a href="#design-notes" id="toc-design-notes">Design notes</a></li>
+</ul></li>
+<li><a href="#getting-the-compiler"
+id="toc-getting-the-compiler">Getting the compiler</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="goose-documentation">Goose documentation</h1>
+<p>Goose is a memory-safe systems language with no heap allocator,
+garbage collector or lifetime annotations (<a href="../index.html">what
+it is and why</a>). This page is the map of its documentation. The
+language is described four times, at increasing depth, and the rest of
+the documents cover the library, the tools and the compiler.</p>
+<h2 id="the-language-in-reading-order">The language, in reading
+order</h2>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>What it is</th>
+<th>Read it when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../index.html">README</a></td>
+<td>What Goose is and why, in one page, with the numbers.</td>
+<td>You want to know whether to look further.</td>
+</tr>
+<tr>
+<td><a href="tutorial.html">Tutorial</a></td>
+<td>The language by example, concentrating on what is different about
+Goose: where values live, the array family, references that survive
+growth, enums in two sizes, <code>return … from</code>, threads.</td>
+<td>You are starting. An afternoon's read.</td>
+</tr>
+<tr>
+<td><a href="reference.html">Language reference</a></td>
+<td>Every feature, topic by topic, with a compiling example for each:
+the whole language laid out to be read, with a pointer into the
+specification for every rule.</td>
+<td>You know the basics and want all of it, or want to look something
+up.</td>
+</tr>
+<tr>
+<td><a href="goose_spec.html">Specification</a></td>
+<td>The exact rules, in the language an implementor needs: size classes,
+construction, the lifetime and shrink rules, the compilation model, the
+representation.</td>
+<td>You want to know why something did not compile, or are writing an
+implementation.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="library-and-tools">Library and tools</h2>
+<ul>
+<li><a href="stdlib.html">Standard library</a>: the fifteen modules,
+<code>std</code>, <code>dictionary</code>, <code>vec</code>,
+<code>math</code>, <code>os</code>, <code>binary</code>,
+<code>base64</code>, <code>csv</code>, <code>json</code>,
+<code>regex</code>, <code>exception</code>, and <code>gfx</code>,
+<code>audio</code>, <code>physics</code> and <code>ui</code> for
+graphics, sound, rigid bodies and widgets. All readable Goose under
+<code>stdlib/</code>.</li>
+<li><a href="packages.html">Building programs and using packages</a>:
+<code>goose build</code>, libraries from git repositories or
+directories, a program's own C, and how to make a package.</li>
+<li><a href="../samples/index.html">Samples</a>: thirty-one complete
+programs in reading order, from a tour of the language to a JSON parser,
+a threaded Mandelbrot, a spinning cube and two small games.</li>
+<li><a href="../vscode/index.html">VS Code extension</a>: highlighting,
+checks on save, and one-key runs.</li>
+</ul>
+<h2 id="benchmarks">Benchmarks</h2>
+<ul>
+<li><a href="../bench/summary.html">Summary</a>: what the sixteen
+benchmarks show, gains and losses, and why.</li>
+<li><a href="../bench/results.html">Results</a>: every measurement,
+against idiomatic and expert C++ and against safe Rust.</li>
+<li><a href="../bench/design.html">Design</a>: what the suite tests and
+how it is run.</li>
+</ul>
+<h2 id="the-compiler">The compiler</h2>
+<ul>
+<li><a href="implementation.html">Implementation notes</a>: how the
+compiler works, pass by pass: the typechecker's roots and provenance,
+the shrink rules, the optimizer, bounds-check elimination, code
+generation and the runtime.</li>
+<li><a href="testing.html">Testing</a>: the test suite, its fixtures and
+how to run it.</li>
+</ul>
+<h3 id="design-notes">Design notes</h3>
+<p>The reasoning behind features, kept as it was written. The
+specification and the reference describe what was built; these say
+why.</p>
+<ul>
+<li><a href="design/index_types.html">Index types and
+<code>checkfree</code> functions</a>: bounds checks moved to where data
+enters the program, and functions the compiler proves check-free.</li>
+<li><a href="design/const_for.html"><code>const for</code></a>:
+specialization-time expansion over a struct's fields, a list of types or
+a list of constants.</li>
+<li><a href="design/relative_references.html">Relative references</a>:
+self-relative against pool-relative links, measured.</li>
+<li><a href="design/serialization.html">Serialization</a>: the verified
+loader for structures of relative references.</li>
+<li><a href="design/namespaces.html">Namespaces</a>: minimal namespaces
+and qualified names.</li>
+<li><a href="design/packages.html">Builds and packages</a>: the design
+behind <code>goose build</code> and packages from git.</li>
+<li><a href="design/jit_backend.html">The in-process backend</a>: how
+TinyCC runs a program inside the compiler, and what it cannot do.</li>
+<li><a href="design/string_constants.html">String constants, writability
+and threads</a>: why read-only data cannot be laundered into writable
+data.</li>
+<li><a href="design/owning_dynamic_data.html">Independently owned
+dynamic data</a>: an editor's open documents as a worked example of
+slice pools.</li>
+<li><a href="design/stdlib_design.html">Standard library design</a>: the
+library's original scope and conventions.</li>
+<li><a href="design/analysis_inventory.html">Compiler analyses</a>: an
+inventory of the checker's analyses and options for simplifying
+them.</li>
+<li><a href="design/soa.html">Column arrays</a>: a struct-of-arrays
+storage proposal, not implemented.</li>
+<li><a href="design/wasm.html">WebAssembly</a>: running without
+address-space reservation, fixed partitions against relocating stacks; a
+proposal.</li>
+<li><a href="design/interpreter.html">An interpreter for the
+browser</a>: the compiler built to Wasm with clang, interpreting the C
+it emits, with pointers as segment handles so stacks can move, and the
+native packages behind generated thunks; a proposal.</li>
+</ul>
+<h2 id="getting-the-compiler">Getting the compiler</h2>
+<p>Prebuilt compilers for Windows, Linux and macOS are on the <a
+href="https://github.com/aardappel/goose/releases">releases page</a>;
+the <a href="../index.html#install-a-release">README</a> says what each
+platform needs beside them, and how to <a
+href="../index.html#build-and-run">build from source</a>. Questions and
+discussion: the <a href="https://discord.gg/397eZdbnsR">Discord</a> and
+the <a href="https://github.com/aardappel/goose">GitHub
+repository</a>.</p>
+<hr />
+<p>These pages are built from the repository's markdown by <a
+href="site/index.html"><code>docs/site/build.py</code></a>, so the same
+files read on GitHub and here.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/index.md"><code>docs/index.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

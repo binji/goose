@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building programs and using packages · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#building-programs-and-using-packages"
+id="toc-building-programs-and-using-packages">Building programs and
+using packages</a>
+<ul>
+<li><a href="#1-running-and-building" id="toc-1-running-and-building">1.
+Running and building</a></li>
+<li><a href="#2-using-a-package" id="toc-2-using-a-package">2. Using a
+package</a></li>
+<li><a href="#3-a-program-with-c-of-its-own"
+id="toc-3-a-program-with-c-of-its-own">3. A program with C of its
+own</a></li>
+<li><a href="#4-making-a-package" id="toc-4-making-a-package">4. Making
+a package</a>
+<ul>
+<li><a href="#the-native-part" id="toc-the-native-part">The native
+part</a></li>
+<li><a href="#files-a-package-needs-at-run-time"
+id="toc-files-a-package-needs-at-run-time">Files a package needs at run
+time</a></li>
+<li><a href="#publishing" id="toc-publishing">Publishing</a></li>
+</ul></li>
+<li><a href="#5-the-cache" id="toc-5-the-cache">5. The cache</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="building-programs-and-using-packages">Building programs and
+using packages</h1>
+<p>How to turn a Goose program into an executable, how to use libraries
+that are not part of the compiler, and how to make one. The design
+behind it, and the compiler's side of it, is in <a
+href="design/packages.html">design/packages.md</a>.</p>
+<h2 id="1-running-and-building">1. Running and building</h2>
+<p><code>goose foo.goose</code> (or <code>goose run foo.goose</code>)
+compiles the program into the compiler's own process and runs it there:
+no C compiler, no build step, the arguments after <code>--</code> go to
+the program. <code>goose build foo.goose</code> makes an executable,
+<code>foo</code> or <code>foo.exe</code> beside the source:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> build foo.goose <span class="kw">&amp;&amp;</span> <span class="ex">./foo</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> build <span class="at">-o</span> out/foo foo.goose        <span class="co"># the executable elsewhere</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> build <span class="at">--debug</span> foo.goose           <span class="co"># GS_DEBUG checks, debug information, no C optimization</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> build <span class="at">--standalone</span> foo.goose      <span class="co"># the runtime inside the one C file</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> build <span class="at">--dry-run</span> foo.goose         <span class="co"># print the commands instead of running them</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> build <span class="at">-v</span> foo.goose                <span class="co"># print them as they run</span></span></code></pre></div>
+<p><code>build</code> finds a C compiler on the machine
+(<code>goose toolchain</code> says which: MSVC or clang on Windows, cc,
+gcc or clang elsewhere; <code>--cc clang</code>, <code>GOOSE_CC</code>,
+or <code>cc = "clang";</code> in <code>~/.goose/config</code> choose),
+compiles the runtime once per compiler into <code>~/.goose</code>, and
+links the program with the native parts of every package it uses.
+<code>goose check foo.goose</code> only typechecks. A build defaults to
+<code>-O2</code>, a run to <code>-O1</code>.</p>
+<p>Everything the compiler makes on the way goes under
+<code>~/.goose</code> (<code>GOOSE_HOME</code> moves it): fetched
+packages, their builds, the runtime objects and each program's C.
+<code>goose build --dry-run</code> shows the commands with their paths,
+for a Makefile or CMake project that wants to drive the C compiler
+itself.</p>
+<p>Work that takes a while (fetching a package, building a package's C,
+compiling the runtime) prints one line as it starts. On a terminal a
+live line below it shows what is running, for how long, and the last
+line the tool printed, and is erased when the work is done. When the
+output goes anywhere else (a file, a pipe, a CI log, an agent running
+the command) there is no live line, only those one-line notes.
+<code>GOOSE_PROGRESS=plain</code> or <code>GOOSE_PROGRESS=live</code>
+overrides the choice; <code>-v</code> and <code>--dry-run</code> print
+plainly.</p>
+<h2 id="2-using-a-package">2. Using a package</h2>
+<p>A <em>package</em> is a library in a directory of its own: a module
+named after it, <code>name.goose</code>, further modules beside it, and
+possibly C. The packages the compiler knows by name are the
+<em>blessed</em> ones (<code>src/blessed.txt</code>): a program imports
+them like any module,</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> gfx<span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> physics<span class="op">;</span></span></code></pre></div>
+<p>and the compiler fetches the package from its repository at the
+pinned tag the first time, into <code>~/.goose/pkg</code>, builds its C
+with cmake and the C compiler, and keeps both. A compiler configured
+with <code>-DGOOSE_BUILTIN_LIBS=all</code> has the blessed packages
+compiled in and runs such a program with nothing else installed;
+<code>goose toolchain</code> lists what is built in.</p>
+<p>Any other package, or another version of a blessed one, is declared
+in the program's <em>root file</em> (the one named on the command line),
+with its source:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> mylib <span class="kw">from</span> <span class="st">&quot;joe/mylib@v2&quot;</span><span class="op">;</span>                  <span class="co">// GitHub, at tag v2</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> mylib <span class="kw">from</span> <span class="st">&quot;github.com/joe/mylib@3f2c1a9&quot;</span><span class="op">;</span>  <span class="co">// any host, at a commit</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> mylib <span class="kw">from</span> <span class="st">&quot;https://git.example.com/x/mylib.git@main&quot;</span><span class="op">;</span>   <span class="co">// any git URL, at a branch</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> mylib <span class="kw">from</span> <span class="st">&quot;../mylib&quot;</span><span class="op">;</span>                      <span class="co">// a directory, used in place</span></span></code></pre></div>
+<p><code>import name from "source";</code> declares the package
+<code>name</code> and imports its module <code>name.goose</code>; its
+other modules are <code>import name.other;</code>. A git source needs a
+ref after <code>@</code>: a tag or a commit is a pin, and a branch is
+one too until <code>goose fetch --update program.goose</code> fetches it
+again. A path is relative to the file that writes it, and nothing is
+copied: edit the library and run the program.</p>
+<p><strong>Only the root file declares packages.</strong> Every other
+file, the library's own included, imports by name alone. A library that
+needs another package writes the same
+<code>import other from "…";</code> line in its own files, and the
+compiler reads it as a <em>requirement</em>: if the root does not
+declare <code>other</code>, the error says exactly what line to add to
+the root. The root declaring the same package from a different ref gets
+a warning; from a different source, an error. So a program's
+dependencies are flat, pinned, and in one place, and one version of each
+package exists in a program.</p>
+<p><code>goose fetch program.goose</code> fetches everything the root
+declares, for an offline session later. The tools involved are reported
+by name when they are missing: <code>git</code> to fetch,
+<code>cmake</code> for a package built with CMake, a C compiler for any
+C at all. A program with no C and no such packages needs none of
+them.</p>
+<h2 id="3-a-program-with-c-of-its-own">3. A program with C of its
+own</h2>
+<p>C that belongs to the program goes in a sidecar beside the root file,
+<code>foo.build</code> beside <code>foo.goose</code>:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">// foo.build</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>c_sources <span class="op">=</span> [<span class="st">&quot;impl.c&quot;</span><span class="op">,</span> <span class="st">&quot;vendor/stb_impl.c&quot;</span>]<span class="op">;</span>   <span class="co">// compiled with the program&#39;s build</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>c_include <span class="op">=</span> [<span class="st">&quot;vendor&quot;</span>]<span class="op">;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>c_defines <span class="op">=</span> [<span class="st">&quot;IMPL_FAST=1&quot;</span>]<span class="op">;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>c_libs <span class="op">=</span> [<span class="st">&quot;m&quot;</span>]<span class="op">;</span>                                <span class="co">// system libraries, by name</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>c_libs_windows <span class="op">=</span> [<span class="st">&quot;user32&quot;</span>]<span class="op">;</span>                   <span class="co">// one platform&#39;s part</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>output <span class="op">=</span> <span class="st">&quot;foo&quot;</span><span class="op">;</span>                                <span class="co">// the executable&#39;s name, if not the file&#39;s</span></span></code></pre></div>
+<p>The file looks like Goose (<code>//</code> comments,
+<code>key = value;</code>, strings, <code>true</code> and
+<code>false</code>, <code>[lists]</code>), and every <code>c_*</code>
+key takes a <code>_windows</code>, <code>_linux</code> or
+<code>_macos</code> suffix for a platform-only part.
+<code>goose build</code> compiles and links that C;
+<code>goose run</code> builds it into a library the in-process run
+loads. Either way an <code>extern fn</code> in the program reaches
+it:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">impl_sum</span>(a<span class="op">:</span> <span class="dt">i32</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">i32</span>) <span class="op">-&gt;</span> <span class="dt">i32</span><span class="op">;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">impl_count</span>(s<span class="op">:</span> <span class="kw">const</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> c<span class="op">:</span> <span class="dt">u8</span>) <span class="op">-&gt;</span> <span class="dt">i64</span><span class="op">;</span>   <span class="co">// a slice arrives as { data, len }</span></span></code></pre></div>
+<p>A single-header library is one <code>impl.c</code> that defines its
+implementation macro and includes the header. A header spliced into the
+generated C instead, <code>--include shim.h</code> on the command line,
+still works for small shims written against the generated types (spec
+§7.10).</p>
+<h2 id="4-making-a-package">4. Making a package</h2>
+<p>A package is a git repository (or any directory) laid out like
+this:</p>
+<pre><code>mylib/
+  mylib.goose        the entry: `namespace mylib;`, its declarations
+  mylib.build        the sidecar, when there is C to build (optional)
+  extra.goose        another module: `import mylib.extra;`
+  src/, include/     the C, if any
+  examples/, test/   programs of its own, each a root file
+  README.md</code></pre>
+<p>Inside the package, <code>import helper;</code> finds
+<code>helper.goose</code> under the package's root,
+<code>import .helper;</code> finds it relative to the importing file,
+and <code>import std;</code> reaches the standard library. By convention
+a package's files declare its name as their namespace.</p>
+<p>A library that needs another package writes the requirement in its
+entry,
+<code>import vec_extras from "github.com/x/vec_extras@v2";</code>, which
+the compiler checks against the program's root as described above. Its
+own examples and tests are root files, so there the line is honored and
+the examples run on their own.</p>
+<h3 id="the-native-part">The native part</h3>
+<p>The sidecar names the C, one of two ways. Plain sources, which the
+compiler compiles with the includes, defines, flags and libraries
+given:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">// mylib.build</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>c_sources <span class="op">=</span> [<span class="st">&quot;src/mylib.c&quot;</span>]<span class="op">;</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>c_include <span class="op">=</span> [<span class="st">&quot;include&quot;</span>]<span class="op">;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>c_libs_linux <span class="op">=</span> [<span class="st">&quot;m&quot;</span>]<span class="op">;</span></span></code></pre></div>
+<p>Or a CMake project at the package root, by the name of its static
+library target:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">// mylib.build</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>cmake_target <span class="op">=</span> <span class="st">&quot;mylib&quot;</span><span class="op">;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>cmake_options <span class="op">=</span> [<span class="st">&quot;MYLIB_SIMD=ON&quot;</span>]<span class="op">;</span></span></code></pre></div>
+<p>The compiler then configures and builds a small wrapper project
+around the package's own CMakeLists and takes the target's whole link
+line, so a package can be a thin Goose layer over an existing C library
+with no CMake written for Goose's sake. Submodules the package needs are
+cloned with it. Either way the part is built once per C compiler under
+<code>~/.goose/build</code>, and a program links it statically.</p>
+<p>The functions the package's <code>extern fn</code>s name must be
+defined by that C (or by the C library); the runtime's own
+<code>gs_os_*</code> and friends belong to the standard library. Every
+<code>.goose</code> file under the package root counts as the package's,
+except in a directory below the root holding a sidecar of its own (an
+example program with its own C, say) and in the directories the sidecar
+lists as not the package's:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">// mylib.build</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>exclude <span class="op">=</span> [<span class="st">&quot;tools&quot;</span><span class="op">,</span> <span class="st">&quot;third_party/demo&quot;</span>]<span class="op">;</span></span></code></pre></div>
+<p>Most values an <code>extern fn</code> passes have layouts C can
+declare for itself, a slice as <code>{ data, len }</code>, say (spec
+§7.10). A builder, <code>u8[&gt;..]&amp;</code>, is the exception: C
+appends to it through the runtime, which <code>goose.h</code> gives C
+compiled on its own. The compiler puts that header on the include path
+of every native part, the program's own included, CMake targets too, and
+builds them all again when it changes:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&quot;goose.h&quot;</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> mylib_name<span class="op">(</span>gs_rref out<span class="op">,</span> <span class="dt">int64_t</span> id<span class="op">)</span> <span class="op">{</span>   <span class="co">/* extern fn mylib_name(out: u8[&gt;..]&amp;, id: i64); */</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    gs_bld_append<span class="op">(</span>out<span class="op">,</span> <span class="st">&quot;item&quot;</span><span class="op">,</span> <span class="dv">4</span><span class="op">);</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>A package's C is self-contained: two packages that must share C share
+a repository, as <code>gfx</code>, <code>audio</code> and
+<code>ui</code> do. A package whose functions keep one state for the
+process, or that may only be called from the main thread, says so in its
+sidecar, <code>main_thread_only = true;</code>, and a
+<code>thread_fn</code> calling it is then a compile error.</p>
+<h3 id="files-a-package-needs-at-run-time">Files a package needs at run
+time</h3>
+<p><code>embed_file("path")</code> reads a file when the program is
+compiled, relative to the file with the call, and gives its bytes as a
+<code>const u8[:]</code> into static data: a font, a table, a shader
+source. That is how a package ships data without a deployment story.
+Files read at run time belong to the program
+(<code>resource_dir()</code>, <code>docs/stdlib.md</code>).</p>
+<h3 id="publishing">Publishing</h3>
+<p>Push the repository, tag a version, and tell users the line to
+write:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> mylib <span class="kw">from</span> <span class="st">&quot;github.com/you/mylib@v1&quot;</span><span class="op">;</span></span></code></pre></div>
+<p>There is no registry to register with. A tag can move and a branch
+always does, so users who need a build to be reproducible pin a commit.
+Code from a fetched package runs on the user's machine when its C is
+built, as with any build script; that is the trust a pin expresses.</p>
+<h2 id="5-the-cache">5. The cache</h2>
+<pre><code>~/.goose/
+  config                          cc = &quot;clang&quot;;
+  pkg/&lt;host&gt;/&lt;owner&gt;/&lt;repo&gt;/&lt;ref&gt;/   fetched packages, submodules included
+  build/pkg/.../&lt;toolchain&gt;/      their native parts, per C compiler
+  build/runtime/&lt;hash&gt;/...        the runtime object, per C compiler and configuration
+  build/prog/&lt;name&gt;-&lt;hash&gt;/       each program&#39;s C, objects and logs
+  toolchain/                      what finding the C compiler took (vcvars on Windows)</code></pre>
+<p>Deleting it loses nothing that a build does not make again.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/packages.md"><code>docs/packages.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

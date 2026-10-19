@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relative references: self-relative or
+base-relative? · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#relative-references-self-relative-or-base-relative"
+id="toc-relative-references-self-relative-or-base-relative">Relative
+references: self-relative or base-relative?</a>
+<ul>
+<li><a href="#1-what-each-encoding-means"
+id="toc-1-what-each-encoding-means">1. What each encoding means</a></li>
+<li><a href="#2-speed" id="toc-2-speed">2. Speed</a></li>
+<li><a href="#3-expressivity" id="toc-3-expressivity">3.
+Expressivity</a></li>
+<li><a href="#4-compiler-complexity" id="toc-4-compiler-complexity">4.
+Compiler complexity</a></li>
+<li><a href="#5-options" id="toc-5-options">5. Options</a></li>
+<li><a href="#recommendation"
+id="toc-recommendation">Recommendation</a></li>
+<li><a href="#outcome" id="toc-outcome">Outcome</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="relative-references-self-relative-or-base-relative">Relative
+references: self-relative or base-relative?</h1>
+<p>A relative reference (<code>T&amp;&lt;u8&gt;</code>,
+<code>T&amp;&lt;u16&gt;</code>, <code>T&amp;&lt;u32&gt;</code>,
+<code>T&amp;&lt;u64&gt;</code>, <code>T&amp;&lt;varint&gt;</code>, spec
+§3.9) is a reference stored as a narrow offset. This note compares two
+encodings. At the time of the experiment, the spec defined the first;
+the second was built behind a flag on the branch
+<code>opt/pool-relative</code> and measured
+(<code>bench/adoption.md</code> 3.1). The comparison covers semantics,
+cost, and supported uses. The Outcome section records the subsequent
+implementation of both forms. The numbers are from the benchmark suite
+at the <code>large</code> size unless stated otherwise.</p>
+<h2 id="1-what-each-encoding-means">1. What each encoding means</h2>
+<p><strong>Self-relative</strong> (the original form): the stored value
+is <code>target - &amp;field</code>, the distance from the field's own
+address to the target, signed. Loading is
+<code>&amp;field + offset</code>; storing needs both addresses. Zero
+means null for the optional form. The invariant the checker enforces is
+that the target lies in the same root array as the field (§3.9), which
+is what makes a structure linked this way <em>position independent</em>:
+move or map the whole array anywhere and every link still holds, because
+both ends moved together.</p>
+<p><strong>Base-relative</strong>: the stored value is
+<code>target - base(P)</code> where <code>P</code> is the pool the
+target lives in, plus one so that zero stays null. Loading is
+<code>base(P) + offset - 1</code>; storing is
+<code>target - base(P)</code>. The invariant is that the target lies in
+<code>P</code>, and that <code>P</code> is known wherever the value is
+stored or loaded. A structure linked this way is position independent
+<em>as a pool</em>: map the pool anywhere and the links hold, because
+they are measured from its start. The value is an index in disguise:
+<code>&amp;P[i]</code> encodes as <code>i * sizeof(T)</code> with no
+base in sight, and the index is recovered by one shift.</p>
+<p>The two agree on width, on null, on what may be pointed at, and on
+the serialization of a whole array. They differ in what the address
+arithmetic needs to know (the field's address, or the pool's base), and
+that one difference is behind every row below.</p>
+<h2 id="2-speed">2. Speed</h2>
+<p>Measured, baseline compiler against the flag, both toolchains (v145 /
+clang):</p>
+<table>
+<thead>
+<tr>
+<th>row</th>
+<th style="text-align: right;">base-relative vs self-relative</th>
+<th>why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>lru (relinks six links per hit, converts index to reference and
+back)</td>
+<td style="text-align: right;">1.04 / <strong>1.41</strong></td>
+<td>store needs no field address and no range check;
+<code>&amp;pool[i]</code> is <code>i * 16</code></td>
+</tr>
+<tr>
+<td>graph (one-pass linked adjacency, pointer chase)</td>
+<td style="text-align: right;">1.03 / 1.18</td>
+<td>load is <code>base + off</code> with <code>base</code>
+loop-invariant in a register</td>
+</tr>
+<tr>
+<td>bintrees, tree, interp, scene (build once, walk)</td>
+<td style="text-align: right;">0.93-0.96 / 0.93-1.00</td>
+<td>a hot recursion had to carry the base as a hidden argument</td>
+</tr>
+<tr>
+<td>calc</td>
+<td style="text-align: right;">does not compile</td>
+<td>a plain reference read back out of a container has no base (§4
+below)</td>
+</tr>
+</tbody>
+</table>
+<p>Per operation, on the pointer-chasing path:</p>
+<ul>
+<li><strong>Load.</strong> Self-relative:
+<code>p = &amp;n-&gt;next; p += *(int32_t *)p</code>, two dependent
+operations on the address that was just computed. Base-relative:
+<code>p = base + *(int32_t *)&amp;n-&gt;next - 1</code>, one load and
+one add against a value that was in a register before the loop started.
+clang schedules the second form better; v145 does not, which is the
+whole difference between the two columns.</li>
+<li><strong>Store.</strong> Self-relative:
+<code>*(int32_t *)&amp;n-&gt;next = (int32_t)(t - &amp;n-&gt;next)</code>,
+a subtraction of two addresses, plus the range check where the
+reservation exceeds the width (gone since the 2 GB harness reservation
+for <code>u32</code>, §3.9). Base-relative: <code>t - base</code>, or
+for <code>&amp;pool[i]</code>, just <code>i * 16</code>.</li>
+<li><strong>Index conversions.</strong> Any code that keeps indices
+elsewhere (<code>lru</code>'s map, every arena-style workload) converts
+at each use. Base-relative makes the conversion a shift; self-relative
+makes it a subtraction against the field's address. This is where
+<code>lru</code>'s 1.41x comes from, not from the chase itself.</li>
+<li><strong>Hidden base.</strong> Where the base is not a global's
+constant, a local, or a fat reference's header, base-relative has to
+carry it: a hidden argument on every call whose reference parameter's
+class is not pinned to one pool. <code>bintrees</code> and
+<code>tree</code> pay 4-7% for it on their recursion. Self-relative
+carries nothing.</li>
+</ul>
+<p>The net over the suite is small and one-sided by workload:
+relink-heavy rows gain, build-once rows lose a few percent, walkers are
+level. Under clang the gains are large; under v145 they are within noise
+except <code>lru</code>.</p>
+<h2 id="3-expressivity">3. Expressivity</h2>
+<ul>
+<li><strong>What a width bounds.</strong> Self-relative: the
+<em>distance</em> between field and target. A <code>u16</code> link is
+fine in a multi-megabyte pool as long as the two ends are within 32 KB
+of each other, which is what <code>calc</code> relies on (2-byte links
+in a per-input tree that is never far from itself). Base-relative: the
+<em>size of the pool</em>. A <code>u16</code> link caps the pool at 64
+KB, whatever the distance; <code>calc</code>'s per-input pool fits, a
+<code>u16</code> link in <code>sexp</code>'s pool would not. Narrow
+widths therefore mean different things, and code written for one
+encoding can be wrong under the other without any type changing.</li>
+<li><strong>Cross-array links.</strong> Self-relative <em>could</em>
+encode a link from one array into another (the arithmetic does not
+care), and the spec forbids it (§3.9) so that a structure stays a
+self-contained blob. Base-relative can link from anywhere into a
+<em>named</em> pool -- a map slot in <code>slots</code> pointing into
+<code>pool</code> with 4 bytes -- and the blob property becomes
+"relative to that pool", which is the only sensible meaning for such a
+link. This is the one thing self-relative cannot express at all: today
+<code>lru</code>'s map holds indices because a 4-byte reference from
+<code>slots</code> into <code>pool</code> is not a self-relative
+reference.</li>
+<li><strong>Position independence and copies.</strong> Whole-array
+moves, maps and saves work for both. Copying a <em>sub-region</em> to
+another place (spec TODO 16) keeps self-relative links whose targets are
+inside the region and needs nothing else; base-relative links need
+rebasing unless the region lands at the same offset in a pool of the
+same shape. Threads' queues (TODO 9) are the same question.</li>
+<li><strong>Who must know the pool.</strong> Self-relative needs to know
+nothing at load time: the field's address is in hand. Base-relative
+needs the target's pool at every load and store, which the checker must
+know <em>exactly</em>. Root tracking gives that for
+<code>&amp;pool[i]</code>, for <code>push</code> results, for parameters
+whose class is one pool, and, with the read-back rule of §9.5, for a
+reference read back out of a container when one variable in scope can
+hold its type; it cannot give it when two pools of the same element type
+are in scope, or when the container came from a caller. Self-relative
+works in all of those cases, since it only needs the lifetime
+bound.</li>
+<li><strong>References in the map, measured.</strong> With exact
+read-back roots, <code>lru</code> can hold <code>Node&amp;?</code> in
+its map slots and relink through them (measured as
+<code>lru_refslots.goose</code>, since removed). Under self-relative it
+is <em>slower</em> than the index form, 1.11-1.13x under v145 and 1.09x
+under clang: the slots double to 16 bytes, each node carries its index
+for <code>free</code>, and the relative stores still subtract the field
+address. This is the shape base-relative would make cheap, since a
+<code>Node&amp;&lt;u32&gt;</code> into <code>pool</code> from a slot is
+then the index itself.</li>
+<li><strong>Sentinels, self, null.</strong> Identical: <code>self</code>
+stores <code>-(field offset)</code> in one and
+<code>-(offset of the value in the pool)</code> in the other; zero is
+null in both.</li>
+<li><strong>Reading the value as data.</strong> A base-relative offset
+is meaningful on its own -- it is the element's position in the pool, so
+it can be printed, hashed, compared across nodes, or used as an index
+without any address arithmetic. A self-relative offset means nothing
+without its own address.</li>
+</ul>
+<h2 id="4-compiler-complexity">4. Compiler complexity</h2>
+<ul>
+<li><strong>Self-relative</strong> is implemented. Its whole cost is
+root tracking, which the checker does anyway for lifetimes, plus a
+store-time check that is now elided where the width covers the
+reservation.</li>
+<li><strong>Base-relative</strong> needs three things the compiler did
+not have, all built on the flag branch (<code>+405 -41</code> in
+<code>src/</code>): a way to resolve a root to a base expression in
+codegen (a global's stack, a local's, a fat reference's header, or a
+hidden argument threaded through calls whose parameter class is not
+pinned to one pool); a checker fixpoint saying which parameter classes
+stand for exactly one pool at every call site; and the exactness bit on
+roots, so that a reference read back out of a container is never
+resolved against the wrong base. The third item is worth having for its
+own sake and is now being done for the spec's rooting rule; the first
+two exist only to serve this encoding. Every future feature that moves
+data -- sub-region copies, queues, save and load -- has to know about
+rebasing.</li>
+<li><strong>Both, per field</strong> costs the syntax and a second code
+path in the relative store and load emitters, but no new analysis beyond
+the exactness bit: a base-relative field is only legal where its pool's
+base is known, and the checker already knows whether it is.</li>
+</ul>
+<h2 id="5-options">5. Options</h2>
+<p><strong>A. Keep self-relative only.</strong> Simplest, position
+independent per array, works with inexact roots, and the store-time
+check is gone. Leaves <code>lru</code> 1.45x behind the Rust arena under
+v145 and 1.19x under clang, and leaves "4-byte link from a map into a
+pool" inexpressible: such programs keep indices, which is also what the
+Rust and C++ arenas do.</p>
+<p><strong>B. Switch to base-relative.</strong> Fastest for relink and
+index-conversion workloads, gives cross-array links, and offsets that
+are indices. Adds hidden-argument overhead to recursion, changes what
+every narrow width means, makes copies and queues need rebasing, and
+makes a reference read back out of a container unusable wherever two
+pools of its type are in scope. The last point is a language-level
+restriction the current encoding does not have.</p>
+<p><strong>C. Both, chosen per field.</strong> Self-relative stays the
+default and the only form without a named pool. A field may instead be
+declared relative to a named pool -- a global pool, or a parameter or
+local that is a pool -- and then stores and loads use that pool's base,
+cross-array links are allowed into that pool, and the width bounds the
+pool. The checker admits a store into such a field only from a reference
+whose root is exactly that pool. Costs: the syntax, two emitter paths,
+and the exactness rule; no fixpoint and no hidden arguments, because the
+pool is named at the declaration rather than discovered per call site.
+<code>lru</code>'s map would hold
+<code>Node&amp;&lt;u32 in pool&gt;</code> in 8-byte slots and relink
+through them; every build-once structure would stay self-relative and
+pay nothing.</p>
+<p><strong>D. Compiler's choice per array.</strong> Not viable: the
+encoding changes what a declared width means, so it has to be visible in
+the source.</p>
+<h2 id="recommendation">Recommendation</h2>
+<p>Option C preserves existing programs and their meaning while allowing
+links between arrays. It improves relinking against a named pool without
+adding overhead to recursion elsewhere. The only new analysis it needs
+-- exact roots for read-back references -- is the rooting change already
+in progress. The syntax is the open question;
+<code>T&amp;&lt;u32 in pool&gt;</code> reads naturally for a global
+pool, and for a local or parameter pool the name is in scope at the
+declaration of the field's struct only when the struct is declared
+inside the function, which suggests the pool-named form is mostly a
+global-pool feature, and that is where the relink-heavy structures
+live.</p>
+<h2 id="outcome">Outcome</h2>
+<p>Option C was implemented: <code>T&amp;&lt;u32 in pool&gt;</code>
+where <code>pool</code> is a global grow-only array (spec §3.9), plus
+<code>a.index_of(r)</code> (§3.3). The pool is named at the field's
+declaration and is part of the type, so a store measures from that
+global's base and a load is rooted there exactly -- no fixpoint over
+parameter classes and no hidden arguments; a call site passing a
+reference rooted in a different pool is simply a different
+specialization, as every other root difference already is. The
+<code>in pool</code> form is restricted to global pools, which is where
+the note expected the relink-heavy structures to be; a local or
+parameter pool keeps the self-relative form, which is why
+<code>graph</code> stays self-relative (its pool is a local of
+<code>main</code>), as intended.</p>
+<p><code>lru</code> was rewritten onto it: the map holds
+<code>Node&amp;&lt;u32 in pool&gt;?</code> in 8-byte slots and relinks
+through them, <code>pool.free(pool.index_of(n))</code> closes the loop,
+and the pool's base is held in one local per function; the index form is
+kept as <code>lru_indices.goose</code>. Against it the reference form is
+level under v145 and 1.31x faster under clang. No other benchmark's
+generated C changed. In the suite the row is 3,255/2,133 ms against the
+Rust arena's 2,237 and the C++ arena's 2,413/2,261: level with both
+under clang, 1.45x behind under v145, where the base-plus-offset load is
+scheduled worse.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/relative_references.md"><code>docs/design/relative_references.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

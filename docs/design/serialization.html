@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serialization of relative-reference structures: a verified
+loader · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a
+href="#serialization-of-relative-reference-structures-a-verified-loader"
+id="toc-serialization-of-relative-reference-structures-a-verified-loader">Serialization
+of relative-reference structures: a verified loader</a>
+<ul>
+<li><a href="#1-serialization-guarantees"
+id="toc-1-serialization-guarantees">1. Serialization guarantees</a></li>
+<li><a href="#2-why-loading-requires-validation"
+id="toc-2-why-loading-requires-validation">2. Why loading requires
+validation</a></li>
+<li><a href="#3-the-image" id="toc-3-the-image">3. The image</a></li>
+<li><a href="#4-what-must-be-verified"
+id="toc-4-what-must-be-verified">4. What must be verified</a></li>
+<li><a href="#5-the-builtins" id="toc-5-the-builtins">5. The
+builtins</a></li>
+<li><a href="#6-generating-the-verifier-per-type"
+id="toc-6-generating-the-verifier-per-type">6. Generating the verifier
+per type</a></li>
+<li><a href="#7-open-points" id="toc-7-open-points">7. Open
+points</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1
+id="serialization-of-relative-reference-structures-a-verified-loader">Serialization
+of relative-reference structures: a verified loader</h1>
+<p><em>Implemented. This document describes the serialization
+guarantees, the loader's validation rules, and how the implementation
+preserves §9's safety guarantees.</em></p>
+<h2 id="1-serialization-guarantees">1. Serialization guarantees</h2>
+<p>A structure whose links are all self-relative references (§3.9) is
+position-independent: a tree of
+<code>Node { v: i32, l: Node&amp;&lt;u32&gt;?, r: Node&amp;&lt;u32&gt;? }</code>
+in a <code>Node[&gt;..]</code>, or a <code>Sexp..[&gt;..]</code> pool,
+is a contiguous sequence of bytes whose links remain valid when the
+sequence is relocated. <code>bench/design.md</code> counts "Goose data
+is already its own serialized form" among the design's advantages:
+saving is a write of the element region, loading is a read of it, and
+there is no pointer fixup pass because there are no pointers.</p>
+<p>Three builtins (§12) express that.
+<code>samples/25_serialize.goose</code> is the worked example;
+<code>test/storage/serialize.goose</code> is the coverage.</p>
+<h2 id="2-why-loading-requires-validation">2. Why loading requires
+validation</h2>
+<p><code>from_bytes&lt;T[&gt;..]&gt;(bytes)</code> that reinterpreted
+the bytes would be the first operation in the language that can produce
+a reference the checker did not prove valid: a corrupted or malicious
+offset is an address anywhere in memory, which breaks the first priority
+of §9.1 outright. Every other unsafety Goose admits is type-safe reuse
+(§9.4); this one is not. The loader must therefore validate the bytes
+before accepting them as a value, as a FlatBuffers verifier does.</p>
+<p>What is verified is <em>safety</em>, not integrity. An image whose
+data bytes were edited still describes a well-formed structure and is
+accepted with the wrong numbers in it; a checksum, not the verifier, is
+what says the file is the one that was written. Nor does anything say
+the file came from <em>this</em> program: the type is not in the image,
+which is a container format's job and not the language's.</p>
+<h2 id="3-the-image">3. The image</h2>
+<pre><code>uleb128(payload byte count)  payload = the array&#39;s element region</code></pre>
+<p>The prefix is what lets a reader of a stream or a long file size its
+read before it has the whole image; it is the ULEB128 of §3.6, and
+<code>format_uleb</code> / <code>parse_uleb</code> in
+<code>stdlib/std.goose</code> are the same encoding for a program that
+wants to write or read it itself. <code>from_bytes</code> requires the
+prefix to account for <em>exactly</em> the rest of the slice, so
+truncation and extension are both caught before the walk starts.</p>
+<p>The payload is little-endian by construction: the layouts of C.2 are,
+and every target this compiles for is. That is now a stated requirement
+rather than an accident — <code>to_bytes</code>, <code>bytes_of</code>
+and <code>from_bytes</code> each test the host and abort
+(<code>GS_E_ENDIAN</code>) on a big-endian one, which is a folded
+constant on every real target. A big-endian port would have to either
+prove an image never leaves the program or emit byte-swapping
+variants.</p>
+<h2 id="4-what-must-be-verified">4. What must be verified</h2>
+<p>For a candidate payload of <code>T[...]</code>:</p>
+<ol type="1">
+<li><strong>Framing.</strong> The payload parses as a sequence of
+<code>T</code> values: for fixed <code>T</code> the byte length is a
+multiple of <code>sizeof(T)</code>; for variable <code>T</code> a
+sequential walk of the elements (the same walk <code>print</code> and
+<code>==</code> use) ends exactly at the payload's end, every varint
+terminates, every tag is in range, every nested length fits what is
+left.</li>
+<li><strong>Element starts.</strong> The walk yields the set of element
+start offsets, and for variable-mode ADTs the tag at each start.</li>
+<li><strong>Links.</strong> For every self-relative reference field at
+absolute offset <code>f</code> with stored offset <code>o</code>:
+<code>o == 0</code> is null and legal only where the field is optional;
+otherwise <code>f + o</code> is an element start. A reference typed at a
+<em>variant</em> addresses that variant's payload, so what must be an
+element start is <code>f + o − sizeof(tag)</code>, and the tag there
+must be that variant's. A reference whose pointee type is neither the
+element type nor a variant of it — an <code>i64&amp;&lt;u16&gt;</code>
+into a field of an element — would need every valid address of that type
+enumerated; v1 rejects such element types for <code>from_bytes</code>,
+at the call, by name (see §7).</li>
+<li><strong>Excluded types.</strong> Plain references and slices (they
+are addresses) and <code>in pool</code> references (they mean an offset
+into a <em>named</em> global pool, not into the image) are rejected for
+all three builtins. Resizable fields cannot be array elements in the
+first place.</li>
+</ol>
+<p>Everything §3.9 already guarantees about a self-relative structure
+built by the program — both ends in one root array — is exactly what
+step 3 checks for one arriving from outside. A verified image is then
+indistinguishable from a constructed one, and the ordinary rules apply
+to it from then on: the result is rooted at its own variable, it grows,
+and relative stores into it are checked like any other.</p>
+<p>A <code>reusable</code> pool (§5.4) writes and loads like any other
+array. Its freelist is separate state that no image carries, so a loaded
+pool starts with an empty freelist and all slots live, consistent with
+§5.4.</p>
+<h2 id="5-the-builtins">5. The builtins</h2>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="bu">to_bytes</span>(a) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]                            <span class="co">// the image, as a fresh value</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="bu">to_bytes</span>(a<span class="op">,</span> out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>)                        <span class="co">// the image, appended to a builder</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="bu">bytes_of</span>(a) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>]                              <span class="co">// the payload alone, as a view</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="bu">from_bytes</span><span class="op">&lt;</span><span class="dt">T</span>[<span class="op">&gt;..</span>]<span class="op">&gt;</span>(bytes<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span>[<span class="op">&gt;..</span>]<span class="op">,</span> <span class="dt">bool</span>  <span class="co">// a verified copy, or [] and false</span></span></code></pre></div>
+<p>All three are safe for any array or slice whose element type contains
+no plain references, slices or <code>in pool</code> references (a static
+check), and are spelled either way per UFCS: <code>a.to_bytes()</code>
+or <code>to_bytes(a[1..])</code>.</p>
+<p><code>to_bytes</code> copies. The two-argument form appends to a
+growable <code>u8</code> array the caller owns — resizable or limited —
+so a message or file header can go in front of the image without a
+second copy, and the one-argument form builds a fresh
+<code>u8[&gt;..]</code> at its destination like any other result
+(§7.3).</p>
+<p><code>bytes_of</code> copies nothing: it is a <code>u8[:]</code> over
+the element region, rooted at the array exactly as a slice of it would
+be, so §5.1 and §5.2 keep the array from shrinking under it and §9 keeps
+it from outliving it. It is <strong>never writable</strong>, whatever
+the array's own provenance: writing through it could create relative
+references that the checker had not validated. Its length is what the
+framing prefix would have said, so a save that writes its own header
+(<code>format_uleb</code>) and then the payload produces a file
+<code>from_bytes</code> reads back, with no image ever built in
+memory.</p>
+<p><code>from_bytes</code> checks the prefix, runs the verifier over the
+payload, then copies it into the result's element region; the count the
+verifier returns becomes the result's length. Its result is a fresh
+array rooted at its own variable, exactly as if the program had pushed
+the elements itself, so it needs no new rule in §9. It builds any array
+kind whose contents are an element run plus a count —
+<code>T[&gt;..]</code>, <code>T[&gt;..&lt;]</code>, and the
+<code>T[]</code> family, whose count goes into the destination's own
+length prefix. A fixed or limited array would additionally need the
+count to match a capacity the image does not carry, so those are
+rejected.</p>
+<p>The <code>bool</code> is the verifier's verdict; on failure the array
+is empty. It may be dropped
+(<code>var a = from_bytes&lt;T&gt;(b);</code>), when the caller accepts
+an empty array as the result of invalid input.</p>
+<p>Both are ordinary builtins with custom typechecking (like
+<code>default&lt;T&gt;()</code>); <code>from_bytes</code> needs its
+explicit type argument (§7.7).</p>
+<p>The pair round-trips:
+<code>from_bytes&lt;T[&gt;..]&gt;(a.to_bytes())</code> is
+<code>a</code>, for every element type <code>from_bytes</code>
+accepts.</p>
+<h2 id="6-generating-the-verifier-per-type">6. Generating the verifier
+per type</h2>
+<p>The verifier is generated per element type, like the equality and
+size functions codegen already emits (<code>gs_size_T</code>,
+<code>EmitEqWalk</code>):
+<code>gs_verify_T(const uint8_t *p, int64_t n, uint8_t *bm) -&gt; int64_t</code>
+returns the element count, or −1. It is <code>EmitVerifyWalk</code> in
+<code>codegen_types.h</code>, a case per type kind driven by the layout
+(<code>Layout</code>, C.2), recursing into struct fields and variant
+payloads, with a check per relative-reference field — about 250 lines of
+codegen rather than a new subsystem.</p>
+<ul>
+<li><strong>Fixed elements.</strong> Element starts are implicit, so one
+walk does everything: it range-checks tags, bounds limited-array
+lengths, and validates a link with
+<code>0 &lt;= f + o &lt; n &amp;&amp; (f + o) % sizeof(T) == 0</code>.
+No scratch at all, and <code>bm</code> is passed as null.</li>
+<li><strong>Variable elements.</strong> Two walks of the same shape. The
+first frames the payload and sets a bit per element start in
+<code>bm</code>, a bitmap of one bit per payload byte on a scratch data
+stack; the second re-walks and asks the bitmap about each link. The
+scratch is <code>(n + 7) / 8</code> bytes on a statement-scoped stack,
+so it is gone at the end of the statement.</li>
+<li><strong>Bounds.</strong> Every read is bounded before it happens,
+and the varint decoders are the bounded <code>gs_uleb_check</code> /
+<code>gs_zig_check</code> (runtime.h) rather than the ordinary ones,
+which loop until a terminator the image may not contain.</li>
+<li><strong>Element types with no relative reference at all</strong>
+skip the link pass entirely; <strong>types the walk has nothing to say
+about</strong> (fixed, no tag to range-check, no limited-array length to
+bound, no link) are skipped over as opaque bytes rather than walked
+field by field.</li>
+<li>Cost: one or two linear passes over the payload, no allocation for
+fixed elements, one bitmap for variable ones. Verification is O(n) and
+branch-light — the same order as the copy that follows it, which is the
+FlatBuffers experience as well. <code>samples/25_serialize.goose</code>
+reports the measured time for its own index on stderr.</li>
+</ul>
+<p>The limited-array case is the one worth calling out: slots past the
+stored length were never written (§5.3), so the walk checks the links in
+the live slots only, and then skips the cursor over the whole
+capacity.</p>
+<p><strong>The bitmap ceiling.</strong> One bit per payload byte, on one
+data stack, so the largest verifiable image of <em>variable</em>
+elements is eight times a stack's reservation — 16 GB at the default
+<code>GS_STACK_RESERVE</code> of 2 GB, and it moves with that constant.
+A payload past it is rejected (<code>false</code>) rather than growing
+into the guard region, which would be an abort. Fixed-element images
+have no such limit, since they need no scratch. The alternative — an
+array of element offsets and a binary search per link — has no ceiling
+but costs 8 bytes per element instead of one bit per byte, which is
+worse for every element under 64 bytes and turns an O(1) test into an
+O(log n) one.</p>
+<h2 id="7-open-points">7. Open points</h2>
+<ul>
+<li><strong>References into payload fields</strong>
+(<code>i64&amp;&lt;u16&gt;</code> at a field of an element) are rejected
+for <code>from_bytes</code>. What they need is not conceptually harder —
+the framing pass would mark, per <em>pointee type</em>, every offset at
+which a value of that type lives, and the link pass would consult the
+bitmap for the reference's own pointee type. The costs are that one
+bitmap becomes one per distinct pointee type, that the fixed-element
+fast path (no scratch at all, a modulo test for links) is lost the
+moment such a reference exists, and that "the valid offsets" stop being
+a static residue set as soon as a limited array's live length or an
+ADT's tag decides them. The first version therefore rejects the element
+type at the call and names it in the diagnostic.</li>
+<li><strong><code>from_bytes</code> into a fixed or limited
+array</strong> would have to reject an image whose count does not match
+a capacity that is not in the image; the result is also a fixed-size C
+value rather than a stack destination, which is a different codegen
+path.</li>
+<li><strong>Big-endian hosts</strong> abort. Either half of the fix
+(prove the bytes stay inside the program, or emit byte-swapping variants
+keyed off the element layout) is real work that no current target
+needs.</li>
+<li><strong>Queues</strong> already carry images:
+<code>qput(pool.to_bytes())</code> and
+<code>from_bytes&lt;T[&gt;..]&gt;(qget&lt;u8[&gt;..]&gt;())</code> work
+today, since a <code>u8[&gt;..]</code> is flat. What is <em>not</em>
+wired up is <code>qput(pool)</code> on a non-flat type doing the
+to_bytes/verify implicitly — a convenience, not a capability (TODO
+9).</li>
+<li><strong>Element types whose values can occupy zero bytes</strong> (a
+struct of nothing) have no recoverable element count; their verifier
+accepts the empty payload and nothing else.</li>
+<li><strong>A container format</strong> — magic, version, type identity,
+checksum — is deliberately outside this. The length prefix is the one
+piece of metadata simple and useful enough to be the language's.</li>
+</ul>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/serialization.md"><code>docs/design/serialization.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

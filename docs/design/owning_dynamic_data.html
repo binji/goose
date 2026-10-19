@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Independently owned dynamic data: an editor's open
+documents · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a
+href="#independently-owned-dynamic-data-an-editors-open-documents"
+id="toc-independently-owned-dynamic-data-an-editors-open-documents">Independently
+owned dynamic data: an editor's open documents</a>
+<ul>
+<li><a href="#the-ordinary-owning-representation"
+id="toc-the-ordinary-owning-representation">The ordinary owning
+representation</a></li>
+<li><a href="#documents-as-runs-in-a-slice-pool"
+id="toc-documents-as-runs-in-a-slice-pool">Documents as runs in a slice
+pool</a></li>
+<li><a href="#what-the-slice-pool-costs"
+id="toc-what-the-slice-pool-costs">What the slice pool costs</a></li>
+<li><a href="#the-other-goose-representations"
+id="toc-the-other-goose-representations">The other Goose
+representations</a></li>
+<li><a href="#future-option-a-bounded-independent-dynamic-stacks"
+id="toc-future-option-a-bounded-independent-dynamic-stacks">Future
+option A: bounded independent dynamic stacks</a></li>
+<li><a href="#future-option-c-opaque-api-resources"
+id="toc-future-option-c-opaque-api-resources">Future option C: opaque
+API resources</a></li>
+<li><a href="#extending-slice-pools"
+id="toc-extending-slice-pools">Extending slice pools</a></li>
+<li><a href="#evaluating-what-remains"
+id="toc-evaluating-what-remains">Evaluating what remains</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1
+id="independently-owned-dynamic-data-an-editors-open-documents">Independently
+owned dynamic data: an editor's open documents</h1>
+<p>Research example. The requirement is a runtime-sized set of
+independently editable buffers, with memory reclaimed when each document
+closes. The difficulty is independent growth and release in arbitrary
+order, rather than simply representing a list of strings.
+<code>reusable[]</code> slice pools (spec 5.4) now express this inside
+the language. This note shows that representation and what it costs,
+which earlier workarounds remain useful, and two possible future
+extensions for what slice pools leave out: bounded independent dynamic
+stacks and opaque API resources. Neither extension is an implemented
+language feature.</p>
+<h2 id="the-ordinary-owning-representation">The ordinary owning
+representation</h2>
+<p>In C++ the core could be:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Document <span class="op">{</span> <span class="bu">std::</span>vector<span class="op">&lt;</span><span class="bu">std::</span>byte<span class="op">&gt;</span> text<span class="op">;</span> <span class="op">};</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">std::</span>unordered_map<span class="op">&lt;</span>DocumentId<span class="op">,</span> <span class="bu">std::</span>unique_ptr<span class="op">&lt;</span>Document<span class="op">&gt;&gt;</span> open<span class="op">;</span></span></code></pre></div>
+<p>The corresponding Rust shape is
+<code>HashMap&lt;DocumentId, Document&gt;</code> with
+<code>Document { text: Vec&lt;u8&gt; }</code>; a
+<code>Box&lt;Document&gt;</code> is optional if the document object
+itself needs a stable address. These examples do not promise that an
+interior pointer survives a text-buffer reallocation. Edits can use
+offsets or temporary borrows. Stable interior references are a separate
+requirement.</p>
+<p>For example: open A (1 MB), open B (20 MB), append 5 MB to A, close A
+while B stays open, open C (2 MB), grow B, close C. There is no useful
+stack ordering: both allocation and release interleave. A document may
+later own undo history or tokens too, but one buffer per document
+already exposes the issue.</p>
+<h2 id="documents-as-runs-in-a-slice-pool">Documents as runs in a slice
+pool</h2>
+<p>A document is a descriptor in a <code>reusable</code> pool of slots,
+and its text is one run of bytes in a <code>reusable[]</code> pool. The
+open documents are a list of links into the descriptor pool (§3.9),
+which is also what lets the operations take a
+<code>Document&amp;</code>:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Document</span> { id<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span> text<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>] }   <span class="co">// the document&#39;s current run of bytes</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">reusable</span> <span class="kw">var</span> docs<span class="op">:</span> <span class="dt">Document</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">reusable</span>[] <span class="kw">var</span> bytes<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> open<span class="op">:</span> <span class="dt">Document</span><span class="op">&amp;&lt;</span><span class="dt">u32</span> <span class="kw">in</span> docs<span class="op">&gt;?</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span>   <span class="co">// in tab order; pruned elsewhere</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">open_doc</span>(id<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span> size<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">Document</span><span class="op">&amp;</span> {</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> d <span class="op">.=</span> docs<span class="op">.</span><span class="bu">alloc_ref</span>(<span class="dt">Document</span> { id<span class="op">:</span> id<span class="op">,</span> text<span class="op">:</span> bytes<span class="op">.</span><span class="bu">alloc_slice</span>(size) })<span class="op">;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    open<span class="op">.</span><span class="bu">push</span>(d)<span class="op">;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> d<span class="op">;</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">grow</span>(d<span class="op">:</span> <span class="dt">Document</span><span class="op">&amp;,</span> extra<span class="op">:</span> <span class="dt">i64</span>) {</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    d<span class="op">.</span>text <span class="op">=</span> bytes<span class="op">.</span><span class="bu">realloc_slice</span>(d<span class="op">.</span>text<span class="op">,</span> d<span class="op">.</span>text<span class="op">.</span><span class="bu">len</span> <span class="op">+</span> extra)<span class="op">;</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">close</span>(d<span class="op">:</span> <span class="dt">Document</span><span class="op">&amp;</span>) {</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    bytes<span class="op">.</span><span class="bu">free_slice</span>(d<span class="op">.</span>text)<span class="op">;</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    docs<span class="op">.</span><span class="bu">free</span>(docs<span class="op">.</span><span class="bu">index_of</span>(d))<span class="op">;</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>alloc_slice</code> places a run at the first free span, in
+index order, that holds it, or else at the end of the array.
+<code>realloc_slice</code> grows a run in place where it ends the array
+or free bytes follow it, and otherwise moves it where a new run of the
+new size would go, its own old place included. <code>free_slice</code>
+returns a run, merged with the free spans beside it. Every byte a run
+gains is zero.</p>
+<p>In the example, A and B are placed end to end. Appending 5 MB to A
+finds B directly behind it and no free 6 MB run, so A's megabyte is
+copied to the end of the array. Closing A leaves two free runs: A's
+first place and the 6 MB at the end, which C then takes the front of.
+Growing B, now followed by C, copies B's 20 MB to the first free run
+that holds the new size: B's own place merged with the megabyte before
+it if the growth fits there, or else the end of the array, starting in
+the 4 MB left free after C. Closing C merges its bytes with whichever
+free bytes border them.</p>
+<p>Views keep the <code>reusable</code> semantics (spec 9.4). A slice or
+byte reference taken before a move or a close keeps its original range,
+and reads whatever bytes a later allocation puts there; it never reaches
+outside the array. Editing code therefore reads the document's
+<code>text</code> again after anything that can grow or close it, and
+keeps cursors as offsets rather than references. A link in the tab list
+outlives its document's close the same way: it reads a valid
+<code>Document</code>, which may by then be another one.</p>
+<p><code>index_of</code> is what turns a <code>Document&amp;</code> back
+into the slot <code>free</code> takes, and it recognises a reference a
+caller passed in as one of <code>docs</code>' slots only because a type
+names that pool (spec 3.9). A pool no
+<code>T&amp;&lt;w in pool&gt;</code> type names has to pass slot numbers
+around instead; <code>docs/implementation.md</code> §10 records what
+would lift that.</p>
+<p>The checker cannot always tell which array a slice read out of
+<code>docs</code> points into: any other global able to hold a
+<code>u8</code>, a log buffer say, is as good a candidate as
+<code>bytes</code> (spec 9.5). <code>realloc_slice</code> and
+<code>free_slice</code> do not need it to. A slice they are not shown to
+be <code>bytes</code>' own is checked when the call runs, and the call
+aborts unless the slice lies inside <code>bytes</code> on an element
+boundary: a few compares beside the work the call does anyway. A slice
+type naming its pool (<code>u8[: in bytes]</code>, like
+<code>T&amp;&lt;u32 in pool&gt;</code>) would make that knowledge
+static, if a program needs to avoid the runtime check or detect an
+invalid pool assignment earlier.</p>
+<h2 id="what-the-slice-pool-costs">What the slice pool costs</h2>
+<ul>
+<li><strong>One reservation for all documents.</strong> The pool is one
+grow-only array on one data stack, so all documents together are capped
+by that stack's reservation (<code>GS_STACK_RESERVE</code>, 2 GB by
+default; spec 10.4 allows up to 2^48 bytes). Exceeding it aborts at the
+guard region: there is no recoverable allocation failure.</li>
+<li><strong>The array never shrinks.</strong> Closed documents' runs are
+reused, but the array's high-water length stays committed and is never
+returned to the OS.</li>
+<li><strong>A move copies.</strong> Growth that cannot happen in place
+is O(current length), and a document grown in small steps while another
+follows it can be copied at each step. Growing by a factor is the
+caller's policy.</li>
+<li><strong>Fragmentation.</strong> Placement is first fit in index
+order, with neighbors merged on release. Enough free bytes in total does
+not guarantee a free run of the needed size; the array then grows. First
+fit was measured against best fit: it was faster everywhere, best fit's
+array came out at most 12% smaller on buffers grown a step at a time,
+and first fit's came out smaller on mixed sizes.</li>
+<li><strong>Views do not follow a move.</strong> Store positions as
+offsets into the current run so they remain usable after it moves, as
+described above.</li>
+<li><strong>Element types.</strong> Elements are fixed-size, and
+<code>realloc_slice</code> rejects element types holding self-relative
+references, whose offsets a copy would leave measuring from the old
+place (spec 3.9).</li>
+<li><strong>Per-operation cost.</strong> Placement, growth and release
+each walk a tree of the free spans, so their cost grows with the
+logarithm of the number of simultaneously free runs
+(docs/implementation.md 9.7). A slice handed back that the checker
+cannot place in the pool also pays a range test.</li>
+</ul>
+<h2 id="the-other-goose-representations">The other Goose
+representations</h2>
+<p>The placement rules are unchanged: an array still cannot contain
+resizable elements (spec 3.4), so a growable array of growable documents
+remains inexpressible, and cycle functions still cannot keep nonfixed
+locals across a call into their cycle (spec 7.8). Slice pools are the
+in-language substitute. Several earlier workarounds are superseded by
+them: append-only byte storage with per-document offsets (retention
+followed edit history until a whole-region reset), one big grow-shrink
+buffer with application-managed shifting (the pool now does the
+placement and moving), runtime-capacity limited arrays
+<code>u8[..]</code> (which could neither grow nor live in a slot pool),
+and a table of references to separately scoped locals (which never owned
+anything). The following approaches remain useful:</p>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Where it still fits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Inline limited arrays, <code>u8[..MAX]</code>, as fixed-size slots
+in a <code>reusable</code> pool</td>
+<td>A real and small bound. Nothing is ever copied or fragmented, and
+each document is one fixed slot. Every slot pays the full capacity, and
+exceeding it cannot grow that buffer.</td>
+</tr>
+<tr>
+<td>Reusable fixed-size chunks linked by indices or relative references,
+possibly as a rope or piece table</td>
+<td>Very large documents, or frequent inserts in the middle, which a
+contiguous run copies on every move. Chunks never move, so references
+into them stay current, growth copies at most a chunk, and fragmentation
+is bounded by the chunk size. It needs chunk addressing, cross-chunk
+iteration and a stale-slot policy, which a library could hide.</td>
+</tr>
+<tr>
+<td>A worker owning each document</td>
+<td>Document actors wanted anyway. Reclamation happens at worker exit,
+at the cost of a message protocol, an OS thread per document and copying
+whatever crosses a queue.</td>
+</tr>
+<tr>
+<td>Foreign owning storage</td>
+<td>Memory the program does not own. Option C below gives it a typed
+representation.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="future-option-a-bounded-independent-dynamic-stacks">Future
+option A: bounded independent dynamic stacks</h2>
+<p>What a slice pool cannot give: element addresses that stay put while
+a document grows, growth that never copies, release of a closed
+document's memory to the OS, isolation of one document's fragmentation
+from the others, and more total storage than one reservation. This
+option extends the dynamic stacks idea in spec 11.3 to a runtime-sized
+collection whose elements each own an independently growing stack: a
+resizable array of resizable arrays. This is a new owning container, not
+something today's placement rules already permit. Its descriptor table
+can grow or reuse slots while the element storage stays in separately
+reserved address regions.</p>
+<p>For a supported 64-bit target, define a virtual-address reservation
+budget rather than assuming that a 64-bit pointer provides 2^64 usable
+bytes. A runtime profile could guarantee a budget by reserving it before
+the collection accepts work; failure to obtain that reservation is
+reported at initialization. With usable capacity <code>R</code> per
+stack, guard space <code>G</code>, descriptor space <code>H</code> and
+reserved budget <code>B</code>, the configured total stack count must
+satisfy <code>N * (R + G) + H &lt;= B</code>. This is a bound on all
+stacks using that budget, not a separate allowance for every container.
+Additional stacks for undo history or tokens count too.</p>
+<p>An editor could choose a maximum of 256 open documents, each with a 1
+GiB text ceiling. That requires about 256 GiB of reserved virtual
+address space plus guards and metadata, not 256 GiB of resident RAM.
+Such a configuration is usable only on a target where that reservation
+can be guaranteed. It is a reasonable trade for a bounded number of
+substantial buffers; many small buffers belong in a slice pool
+instead.</p>
+<ul>
+<li><strong>Opening and growing:</strong> opening document 257 returns a
+recoverable limit error that the editor can explain to the user. Growth
+beyond a document's byte ceiling likewise fails before changing its
+contents. The configured bounds permit explicit checks rather than
+relying on an overflow guard to abort the process. Address reservation
+does not guarantee physical memory; the commit policy must separately
+define allocation-failure behavior.</li>
+<li><strong>Stable data, movable owners:</strong> growth within an inner
+stack's reservation preserves its element addresses. Moving an owning
+descriptor or growing the outer table need not move that data. An outer
+table index is not a permanent document identity if slots can be removed
+and reused; use a stable handle or another explicit identity
+policy.</li>
+<li><strong>Reference safety:</strong> unlike a slice pool, closing a
+document releases its storage, so it must be forbidden while references
+or slices into it can still be used. The checker needs to track an inner
+owner's lifetime, not merely the outer table's lifetime. One
+conservative first design permits access through scoped borrows of a
+document handle; borrowing the whole collection is simpler but restricts
+unrelated closes. Precise per-document borrowing is further design work.
+A generation check on a handle prevents stale-handle reuse, but does not
+protect an escaped raw slice.</li>
+<li><strong>Release:</strong> closing a document decommits its pages and
+recycles its region slot independently of other documents. Keeping the
+address reservation allows the runtime to guarantee reuse of its budget;
+the reservation itself is released when its owning collection or runtime
+budget ends. No document's live data is copied to release another's
+storage.</li>
+</ul>
+<p>The two compose: a stack from this option can back a slice pool of
+its own, for example one per class of document, combining stable large
+buffers with pooled small ones. The remaining questions include
+per-stack versus pooled size budgets, the owning descriptor's transfer
+rules, and how much per-document lifetime precision the checker can
+provide without annotation-heavy APIs. Fixed size and count limits are
+part of this option's contract, not an accidental failure mode to hide.
+This option is only worth that checker work where measurements of slice
+pools show copies, retained memory or a reservation limit that
+matters.</p>
+<h2 id="future-option-c-opaque-api-resources">Future option C: opaque
+API resources</h2>
+<p>Introduce a fixed-size <code>resource&lt;U&gt;</code> value,
+internally a <code>u64</code>, for arbitrary API pointers and handles
+such as GPU buffers, native byte buffers and file mappings.
+<code>U</code> is a binding-defined tag identifying the resource kind.
+The binding creates and interprets the opaque representation, whether it
+holds a native pointer, a native handle or an entry in a binding-owned
+table.</p>
+<p>A resource can be stored wherever a fixed-size value is allowed:
+locals, globals, aggregate fields, array elements, arguments and return
+values. Its operations in Goose are limited to copying/storing it and
+passing it to APIs accepting the compatible resource type. Code cannot
+dereference it, perform arithmetic or comparisons on it, or convert it
+to or from a general integer. Copying the value copies the opaque
+handle; it does not itself duplicate the native allocation. The tag
+prevents mixing resource kinds, but native resource lifetimes and API
+validity still need binding-defined rules.</p>
+<p>For example, a GPU binding could return a
+<code>resource&lt;GpuBuffer&gt;</code> and accept it in upload, draw and
+release operations. A byte-buffer binding could provide allocate,
+resize, release and bulk read/write or copy operations through a
+<code>resource&lt;ByteBuffer&gt;</code>. With slice pools in the
+language, this is no longer the way to get independently growing Goose
+buffers; it is the way to hold memory and objects that belong to someone
+else, accessed through functions and copies. Slice pools and option A
+remain preferable when the program wants direct array indexing, slices
+and ordinary Goose element references.</p>
+<p>Existing FFI already passes scalar handles and Goose buffers to C,
+including builders that a C API can append copied bytes into. The
+proposed tagged resource type adds an opaque representation to that
+interface; it is not an implemented way to obtain a native pointer as a
+Goose reference.</p>
+<p>A file-mapping binding is another example: a map operation could
+return a <code>resource&lt;FileMapping&gt;</code>, with API functions to
+query it, copy a range into a Goose buffer and unmap it. Ordinary
+growable Goose arrays use the runtime's own reserved address regions;
+the current runtime does not map a file into such an array. Holding a
+mapping resource therefore would not automatically make the mapped bytes
+a Goose array or slice. Direct mapped views would need a separate design
+connecting their bounds and lifetime to the resource.</p>
+<p><strong>Cleanup remains unresolved.</strong> A binding might
+optionally supply cleanup to run when a local resource leaves scope;
+whether or how that extends to resources inside aggregates is also open.
+Which copies would trigger cleanup, what happens to aliases after an
+explicit release, how repeated cleanup or double-free is prevented, and
+what aggregate copying means are unresolved. The proposal does not yet
+promise RAII, destructors or automatic ownership transfer. These
+questions must be settled before a cleanup hook could be given reliable
+language semantics.</p>
+<h2 id="extending-slice-pools">Extending slice pools</h2>
+<p>Smaller steps than either option, each addressing one of the costs
+above:</p>
+<ul>
+<li><strong>A slice type naming its pool</strong>, as described above,
+turning the run-time check on a slice handed back into a static
+one.</li>
+<li><strong>Recoverable allocation:</strong> a form of
+<code>alloc_slice</code> and <code>realloc_slice</code> that reports a
+run the reservation cannot hold instead of aborting, leaving the
+original run intact.</li>
+<li><strong>Returning free memory:</strong> whole pages inside free
+spans could be decommitted and recommitted zeroed on the next touch.
+Stale views can still read those pages, so this is sound only for
+element types whose all-zero bytes are a valid value, such as
+<code>u8</code>; a type holding a non-optional reference has none.</li>
+<li><strong>Per-pool reservations:</strong> a pool on a stack of its own
+size, or on a stack from option A.</li>
+<li><strong>Relocating self-relative references:</strong> tracking the
+region a relative reference ranges over (spec TODO 16) would let a run
+of linked elements move whole.</li>
+</ul>
+<h2 id="evaluating-what-remains">Evaluating what remains</h2>
+<p>Run the open/edit/close sequence against slice pools first, now that
+they exist. Measure live bytes, the array's high-water and committed
+bytes, copied bytes and latency separately, including repeated
+fragmenting growth and release, a document that outgrows the
+reservation, and old views read after a move, a close and reuse. That
+establishes where option A's stable, releasable storage justifies the
+additional lifetime analysis: its evaluation adds the 257th document, a
+document exceeding its size ceiling, and references held across a
+document close. For option C, evaluate API buffer transfers and
+file-mapping access while keeping the unresolved cleanup policy
+explicit.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/owning_dynamic_data.md"><code>docs/design/owning_dynamic_data.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

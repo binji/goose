@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results of the compiler changes proposed in
+plan.md · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#results-of-the-compiler-changes-proposed-in-planmd"
+id="toc-results-of-the-compiler-changes-proposed-in-planmd">Results of
+the compiler changes proposed in plan.md</a>
+<ul>
+<li><a href="#summary" id="toc-summary">Summary</a></li>
+<li><a href="#merged-changes" id="toc-merged-changes">Merged
+changes</a></li>
+<li><a
+href="#21-optfatref-tops----cache-stack-tops-through-fat-references"
+id="toc-21-optfatref-tops----cache-stack-tops-through-fat-references">2.1
+<code>opt/fatref-tops</code> -- cache stack tops through fat
+references</a></li>
+<li><a
+href="#22-optbase-case-inline----inline-a-self-recursive-functions-base-case"
+id="toc-22-optbase-case-inline----inline-a-self-recursive-functions-base-case">2.2
+<code>opt/base-case-inline</code> -- inline a self-recursive function's
+base case</a></li>
+<li><a href="#23-opttre----accumulator-tail-recursion-elimination"
+id="toc-23-opttre----accumulator-tail-recursion-elimination">2.3
+<code>opt/tre</code> -- accumulator tail-recursion elimination</a></li>
+<li><a
+href="#24-optfatref-views----hoist-array-views-reached-through-references"
+id="toc-24-optfatref-views----hoist-array-views-reached-through-references">2.4
+<code>opt/fatref-views</code> -- hoist array views reached through
+references</a></li>
+<li><a
+href="#25ab-optbce-slice-product----slice-lengths-and-product-indices"
+id="toc-25ab-optbce-slice-product----slice-lengths-and-product-indices">2.5a+b
+<code>opt/bce-slice-product</code> -- slice lengths and product
+indices</a></li>
+<li><a
+href="#25c-optbce-array-contents----index-postconditions-and-contents-invariants"
+id="toc-25c-optbce-array-contents----index-postconditions-and-contents-invariants">2.5c
+<code>opt/bce-array-contents</code> -- index postconditions and contents
+invariants</a></li>
+<li><a
+href="#26-optinline-nrvo-dest----inlined-named-results-built-at-the-destination"
+id="toc-26-optinline-nrvo-dest----inlined-named-results-built-at-the-destination">2.6
+<code>opt/inline-nrvo-dest</code> -- inlined named results built at the
+destination</a></li>
+<li><a
+href="#27-optper-loop-tops----cache-stack-tops-only-in-loops-that-grow"
+id="toc-27-optper-loop-tops----cache-stack-tops-only-in-loops-that-grow">2.7
+<code>opt/per-loop-tops</code> -- cache stack tops only in loops that
+grow</a></li>
+<li><a
+href="#28-optcycle-return-roots----return-roots-of-a-recursive-cycle-by-fixpoint"
+id="toc-28-optcycle-return-roots----return-roots-of-a-recursive-cycle-by-fixpoint">2.8
+<code>opt/cycle-return-roots</code> -- return roots of a recursive cycle
+by fixpoint</a></li>
+<li><a
+href="#29-optrelref-rangecheck----skip-the-relative-reference-range-check"
+id="toc-29-optrelref-rangecheck----skip-the-relative-reference-range-check">2.9
+<code>opt/relref-rangecheck</code> -- skip the relative-reference range
+check</a></li>
+<li><a href="#210-optvarint-fastpath----varint-decode-fast-path"
+id="toc-210-optvarint-fastpath----varint-decode-fast-path">2.10
+<code>opt/varint-fastpath</code> -- varint decode fast path</a></li>
+<li><a href="#211-optdispatch-merge----merge-repeated-tag-dispatch"
+id="toc-211-optdispatch-merge----merge-repeated-tag-dispatch">2.11
+<code>opt/dispatch-merge</code> -- merge repeated tag dispatch</a></li>
+<li><a href="#212-optretfrom-register----the-return-from-discriminant"
+id="toc-212-optretfrom-register----the-return-from-discriminant">2.12
+<code>opt/retfrom-register</code> -- the <code>return from</code>
+discriminant</a></li>
+<li><a
+href="#31-optpool-relative----pool-relative-offsets-behind---relref-base"
+id="toc-31-optpool-relative----pool-relative-offsets-behind---relref-base">3.1
+<code>opt/pool-relative</code> -- pool-relative offsets, behind
+<code>--relref-base</code></a></li>
+<li><a href="#32-optself-reference----self-in-literals"
+id="toc-32-optself-reference----self-in-literals">3.2
+<code>opt/self-reference</code> -- <code>self</code> in
+literals</a></li>
+<li><a href="#35-optclear-grow-only----clear-on-grow-only-locals"
+id="toc-35-optclear-grow-only----clear-on-grow-only-locals">3.5
+<code>opt/clear-grow-only</code> -- <code>clear()</code> on grow-only
+locals</a></li>
+<li><a href="#merge-order-and-interactions"
+id="toc-merge-order-and-interactions">Merge order and
+interactions</a></li>
+<li><a href="#pre-existing-bugs-the-agents-found"
+id="toc-pre-existing-bugs-the-agents-found">Pre-existing bugs the agents
+found</a></li>
+<li><a href="#measurement-notes" id="toc-measurement-notes">Measurement
+notes</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="results-of-the-compiler-changes-proposed-in-planmd">Results of
+the compiler changes proposed in plan.md</h1>
+<p><em>This document records a completed round of compiler changes,
+their measurements, and the reasons for adopting or rejecting each one.
+See <code>results.md</code> for the benchmark report.</em></p>
+<p>Sixteen branches, one per item of <code>bench/plan.md</code>, each
+implemented on its own <code>opt/&lt;name&gt;</code> branch from master
+<code>caf3b65</code> by its own agent, with tests, and each measured the
+same way afterwards on a quiet machine: every Goose row of the suite at
+the <code>large</code> size, generated by the baseline compiler and by
+the branch's compiler, built under both toolchains (clang with
+<code>-falign-loops=32</code> on both sides), run interleaved
+baseline/candidate, best of five, outputs checked identical. Ratios are
+baseline time over candidate time: above 1.00 is faster. A row a branch
+does not touch emits byte-identical C; across all sixteen runs those
+rows read 0.94-1.08 and mostly within 2%, so a single row under about 5%
+is noise and only <code>graph</code>/<code>graph_csr</code> (the
+cache-bound random-access rows) are noisy beyond that. Where an item can
+only show on a source the suite does not have, the branch carries a
+variant and it was timed the same way (marked <em>variant</em>).</p>
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr>
+<th>branch</th>
+<th>item</th>
+<th>rows that changed, large, v145 / clang</th>
+<th style="text-align: right;">diff: compiler src, all files</th>
+<th>verdict</th>
+<th>future code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>opt/fatref-tops</code></td>
+<td>2.1 tops through fat refs</td>
+<td>bintrees <strong>1.12 / 1.16</strong>, calc 1.00 / 1.03, respond
+1.01 / 1.00; <em>variant</em> push-by-reference 1.08 / 1.08</td>
+<td style="text-align: right;">+121 -9; all +256 -9</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/base-case-inline</code></td>
+<td>2.2 inline the base case</td>
+<td>bintrees <strong>1.35 / 1.13</strong>, tree 1.02 / 1.01, sexp 1.00 /
+0.98</td>
+<td style="text-align: right;">+238 -3; all +369 -3</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/tre</code></td>
+<td>2.3 accumulator TRE</td>
+<td>bintrees <strong>1.09</strong> / 1.00, sexp 1.02 / 1.00, calc 1.02 /
+1.01, tree 1.01 / 0.99</td>
+<td style="text-align: right;">+490 -4; all +659 -4</td>
+<td>adopt, one decision</td>
+<td>medium</td>
+</tr>
+<tr>
+<td><code>opt/fatref-views</code></td>
+<td>2.4 hoist views through fat refs</td>
+<td>blur <strong>0.94 / 6.96</strong></td>
+<td style="text-align: right;">+129 -1; all +169 -1</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/bce-slice-product</code></td>
+<td>2.5a+b slice lengths, products</td>
+<td>scene 1.02 / 1.00; <em>variant</em> blur with a length assert
+<strong>2.07 / 7.02</strong></td>
+<td style="text-align: right;">+179 -23; all +349 -23</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/bce-array-contents</code></td>
+<td>2.5c array contents</td>
+<td>graph 1.07 / 0.97, graph_csr 0.97 / 1.02, lru 1.01 / 1.01</td>
+<td style="text-align: right;">+493 -16; all +715 -21</td>
+<td>hold</td>
+<td>low as speed</td>
+</tr>
+<tr>
+<td><code>opt/inline-nrvo-dest</code></td>
+<td>2.6 inlined named results in place</td>
+<td>respond <strong>1.06 / 1.06</strong>, records 1.01 / 1.03</td>
+<td style="text-align: right;">+215 -58; all +343 -58</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/per-loop-tops</code></td>
+<td>2.7 tops only in growing loops</td>
+<td>particles 1.00 / <strong>1.06</strong>, particles_scalar 1.00 /
+<strong>1.06</strong>, all push rows within 2%</td>
+<td style="text-align: right;">+236 -47; all +279 -47</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/cycle-return-roots</code></td>
+<td>2.8 cycle return roots</td>
+<td>no code change; <em>variant</em> calc without its Paren node
+<strong>1.04 / 1.09</strong></td>
+<td style="text-align: right;">+373 -3; all +721 -15</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/relref-rangecheck</code></td>
+<td>2.9 skip the range check</td>
+<td>no-op at the harness's 8 GB; lru +5-12% at 2 GB (agent)</td>
+<td style="text-align: right;">+35 -6; all +66 -8</td>
+<td>adopt with a 2 GB harness</td>
+<td>medium</td>
+</tr>
+<tr>
+<td><code>opt/varint-fastpath</code></td>
+<td>2.10 varint fast path</td>
+<td>records 1.00 / 1.05, sexp 0.98 / 1.03, calc 1.00 / 1.00</td>
+<td style="text-align: right;">+65 -19; all +93 -19</td>
+<td>adopt (prefixes only)</td>
+<td>medium</td>
+</tr>
+<tr>
+<td><code>opt/dispatch-merge</code></td>
+<td>2.11 merge dispatch</td>
+<td>sexp 1.01 / 1.01</td>
+<td style="text-align: right;">+328 -124; all +420 -124</td>
+<td>drop for now</td>
+<td>low</td>
+</tr>
+<tr>
+<td><code>opt/retfrom-register</code></td>
+<td>2.12 <code>return from</code> discriminant</td>
+<td>calc <strong>1.04 / 1.04</strong>, sexp 1.03 / 1.02</td>
+<td style="text-align: right;">+41 -34; all +267 -37</td>
+<td>adopt</td>
+<td>high</td>
+</tr>
+<tr>
+<td><code>opt/pool-relative</code></td>
+<td>3.1 pool-relative offsets (flag)</td>
+<td>lru 1.04 / <strong>1.41</strong>, graph 1.03 / 1.18, bintrees 0.96 /
+0.93, walkers 1.00; calc does not compile</td>
+<td style="text-align: right;">+405 -41; all +517 -41</td>
+<td>hold, language decision</td>
+<td>medium</td>
+</tr>
+<tr>
+<td><code>opt/self-reference</code></td>
+<td>3.2 <code>self</code> in literals</td>
+<td>no code change; <em>variant</em> lru with non-optional links
+<strong>1.10 / 1.01</strong></td>
+<td style="text-align: right;">+126 -26; all +373 -29</td>
+<td>adopt</td>
+<td>medium</td>
+</tr>
+<tr>
+<td><code>opt/clear-grow-only</code></td>
+<td>3.5 <code>clear()</code> on grow-only locals</td>
+<td>no code change; <em>variant</em> calc over slices 0.92 / 0.90</td>
+<td style="text-align: right;">+85 -2; all +433 -5</td>
+<td>adopt as expressiveness</td>
+<td>medium</td>
+</tr>
+</tbody>
+</table>
+<p><em>Adopt</em> means the change is sound, its complexity is
+justified, and it benefits the suite or similar code. <em>Hold</em>
+means keep the branch, do not merge yet. The last column is a prediction
+of how often future Goose code hits the construct, judged from the
+shapes the spec's examples and the sixteen benchmarks are built
+from.</p>
+<p>The measurements support the expected combined gains: by hand, 2.1 +
+2.2 + 2.3 took <code>bintrees</code> from 356 to 229 ms under v145
+against Rust's 227; on the branches, 2.2 alone is 1.35, 2.1 1.12, 2.3
+1.09, and their effects are on different parts of the same recursion.
+<code>blur</code> needs 2.4 for clang (7x) and 2.5b for v145 (2x, once
+the length of the reference parameter is known); 2.4 alone costs v145 6%
+on that row, which 2.5b's elision then removes.</p>
+<h2 id="merged-changes">Merged changes</h2>
+<p>Merged onto master from <code>caf3b65</code>, in this order:
+<code>/bigobj</code> for the compiler build; 2.7 per-loop-tops; 2.1
+fatref-tops; 2.4 fatref-views; 2.5a+b bce-slice-product; 2.12
+retfrom-register; 2.6 inline-nrvo-dest; 3.2 self-reference; 2.9
+relref-rangecheck, with the harness reservation lowered to 2 GB; 2.10
+varint-fastpath; 3.5 clear-grow-only; 2.2 base-case-inline; 2.8
+cycle-return-roots; 2.3 tre; then the fixes for the pre-existing bugs
+listed below. Decisions taken on the way:</p>
+<ul>
+<li>2.3's footnote was resolved by loosening the guarantee rather than
+the pass: a debug build aborts on a signed overflow per operation <em>as
+it executes</em>, and the optimizer may regroup or drop operations (spec
+§6.2, §9.3).</li>
+<li>The three large, self-contained analyses moved to their own headers
+so the passes they hang off stay readable:
+<code>src/optimize_tre.h</code> (<code>TailRecursion</code>),
+<code>src/optimize_basecase.h</code> (<code>BaseCaseInliner</code>) and
+<code>src/typecheck_cycles.h</code> (<code>CycleRoots</code>);
+<code>optimize.h</code> and <code>typecheck.h</code> keep one
+declaration and one call each.</li>
+<li>2.5c bce-array-contents and 2.11 dispatch-merge were dropped and
+their branches deleted. The while-exit guard listed below as a fix on
+2.5c turned out to protect that branch's own index postconditions, not a
+base bug, so nothing was ported from it.</li>
+<li>3.1 pool-relative was held on its branch pending the language-level
+question of what a compressed reference denotes; the answer is the
+<code>in pool</code> form of spec §3.9
+(<code>docs/design/relative_references.md</code>), implemented
+afterwards without the flag branch's hidden arguments or fixpoint.</li>
+<li>The variant sources the branches used for their claims stay in
+<code>bench/goose/</code> beside the rows (<code>push_ref</code>,
+<code>blur_assert</code>, <code>lru_nonopt</code>,
+<code>calc_slices</code>, <code>calc_noparen</code>,
+<code>calc_noerr</code>); the manifest does not list them.</li>
+</ul>
+<p>Everything together, baseline <code>caf3b65</code> against the landed
+compiler, large, 2 GB reservation, both toolchains, same method as above
+(measured before the fixes branch went in; of the suite's generated C,
+the fixes change only <code>lru</code>'s two alloc literals, which are
+now built in their slot instead of copied from a temporary, and the
+harness rows for <code>lru</code> and <code>calc</code> were re-measured
+after):</p>
+<table>
+<thead>
+<tr>
+<th>row</th>
+<th style="text-align: right;">v145</th>
+<th style="text-align: right;">clang</th>
+<th>row</th>
+<th style="text-align: right;">v145</th>
+<th style="text-align: right;">clang</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sum</td>
+<td style="text-align: right;">0.99</td>
+<td style="text-align: right;">0.99</td>
+<td>particles</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1.06</td>
+</tr>
+<tr>
+<td>push</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1.01</td>
+<td>particles_scalar</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1.07</td>
+</tr>
+<tr>
+<td>strlist</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">0.98</td>
+<td>sexp</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1.05</td>
+</tr>
+<tr>
+<td>records_var</td>
+<td style="text-align: right;">1.04</td>
+<td style="text-align: right;">1.09</td>
+<td>lru</td>
+<td style="text-align: right;"><strong>1.13</strong></td>
+<td style="text-align: right;"><strong>1.14</strong></td>
+</tr>
+<tr>
+<td>records_fixed</td>
+<td style="text-align: right;">1.01</td>
+<td style="text-align: right;">1.00</td>
+<td>scene</td>
+<td style="text-align: right;">1.01</td>
+<td style="text-align: right;">0.99</td>
+</tr>
+<tr>
+<td>tree</td>
+<td style="text-align: right;">1.05</td>
+<td style="text-align: right;">0.98</td>
+<td>calc</td>
+<td style="text-align: right;">1.04</td>
+<td style="text-align: right;">1.06</td>
+</tr>
+<tr>
+<td>interp</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">0.99</td>
+<td>bintrees</td>
+<td style="text-align: right;"><strong>1.53</strong></td>
+<td style="text-align: right;"><strong>1.37</strong></td>
+</tr>
+<tr>
+<td>graph</td>
+<td style="text-align: right;">1.03</td>
+<td style="text-align: right;">1.01</td>
+<td>respond</td>
+<td style="text-align: right;">1.08</td>
+<td style="text-align: right;">1.09</td>
+</tr>
+<tr>
+<td>graph_csr</td>
+<td style="text-align: right;">0.99</td>
+<td style="text-align: right;">1.06</td>
+<td>respond_stream</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1.00</td>
+</tr>
+<tr>
+<td>words</td>
+<td style="text-align: right;">1.01</td>
+<td style="text-align: right;">1.03</td>
+<td>blur</td>
+<td style="text-align: right;"><strong>0.94</strong></td>
+<td style="text-align: right;"><strong>6.85</strong></td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td>blur_rows</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1.00</td>
+</tr>
+</tbody>
+</table>
+<p><code>bintrees</code> under v145 went from 360 to 235 ms against
+Rust's 227, the composition the plan predicted. The one loss is
+<code>blur</code> under v145, also as predicted: the nine checks per
+pixel stay because the reference parameter's length is not known inside
+<code>blur</code>, and the hoisted views cost two live locals; a
+one-line <code>assert(src.len == W * W)</code> in the benchmark makes
+the row 2.07x / 7.0x (the <code>blur_assert</code> variant), a
+benchmark-source decision left open.</p>
+<hr />
+<h2
+id="21-optfatref-tops----cache-stack-tops-through-fat-references">2.1
+<code>opt/fatref-tops</code> -- cache stack tops through fat
+references</h2>
+<p><strong>What.</strong> A function holding a resizable by reference
+(<code>pool: T[&gt;..]&amp;</code>) keeps <code>ref.stk-&gt;top</code>
+in a local, flushed before and reloaded after calls, where before any
+such function fell back to the memory form for every stack. Eligibility
+comes from the checker's root classes: one cache per fat-reference
+<em>parameter</em>; same-class pairs rejected (same class does not prove
+same stack); any fat reference in a local, binding, field or by-value
+resizable parameter disables the mode; a global whose type matches a
+parameter's pointee keeps the memory form. All in
+<code>codegen.h</code>.</p>
+<p><strong>Measured.</strong> bintrees 1.12 / 1.16; calc 1.00 / 1.03
+(its pushes are a small share of the parse); respond level; the
+<code>push</code> loop moved behind two fat references
+(<code>push_ref.goose</code>, on the branch) 170.5 to 157.7 ms under
+v145 and 166.8 to 154.0 under clang, 1.08 both. Every other row
+byte-identical.</p>
+<p><strong>Complexity and side effects.</strong> One predicate, one
+flag, one string set, and the flush discipline the global caching
+already uses. Two conservative choices limit the speedup while
+preserving soundness: every call flushes everything in this mode, and
+globals are not cached alongside. It also fixed a pre-existing
+unsoundness in <code>CanCacheTops</code> -- a fat reference read out of
+a field or element was invisible to it, so a body pushing to a global
+both directly and through such a reference cached one spelling and wrote
+the other (repro printed <code>2,3,0</code> for <code>1,2,3</code>) --
+with a regression test. That fix is useful independently of the
+optimization.</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: high.</strong>
+"Recursive builder into a pool the caller owns" is the idiom the
+previous round's checker change made possible, and every per-request or
+per-input arena is written that way.</p>
+<h2
+id="22-optbase-case-inline----inline-a-self-recursive-functions-base-case">2.2
+<code>opt/base-case-inline</code> -- inline a self-recursive function's
+base case</h2>
+<p><strong>What.</strong> A <code>recursive fn</code> whose body starts
+with <code>if c { return e }</code> (or the <code>guard</code> form)
+gets, at each direct self-call,
+<code>if c' { e' } else { f(...) }</code> with the arguments bound to
+temporaries, once per site, under a whitelist: all parameters
+fixed-size, a pure test, a result that does not call into the cycle,
+size under the inliner's thresholds. <code>optimize.h</code>, reusing
+the inliner's copier.</p>
+<p><strong>Measured.</strong> bintrees 1.35 / 1.13, tree 1.02 / 1.01,
+sexp level. It fires on <code>bintrees.make</code>,
+<code>tree.build</code> and <code>sexp.walk_chain</code>; not on
+<code>interp</code> and <code>scene</code> (a statement precedes their
+base case), <code>calc</code> (mutual recursion) or
+<code>bintrees.check</code> (binds a local first).</p>
+<p><strong>Complexity and side effects.</strong> Code growth is bounded
+by the existing thresholds (<code>make</code> 32 to 62 nodes). The test
+is evaluated twice on the recursing path, so it must be pure, which the
+whitelist enforces; chain recursion is roughly neutral. The agent
+avoided a real hazard -- a non-fixed parameter would give a cycle member
+a non-fixed local, which the checker rejects when written by hand and
+codegen silently accepts -- and found the <code>INT32_MIN</code> bug
+listed below.</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: high</strong>
+for tree walks and builders, which is most recursion in this language.
+Extending it to a base case that is not the first statement
+(<code>scene</code>, <code>interp</code>) is the obvious follow-up.</p>
+<h2 id="23-opttre----accumulator-tail-recursion-elimination">2.3
+<code>opt/tre</code> -- accumulator tail-recursion elimination</h2>
+<p><strong>What.</strong> Self-recursive integer-returning functions
+whose returns fold with an associative operator become a loop with an
+accumulator; parameters become rebindable locals. It bails on floats, on
+callees that can <code>return ... from</code> the function, on tails
+inside loops, and on relative, fat or pool parameters. Adds
+<code>/bigobj</code> to the build.</p>
+<p><strong>Measured.</strong> bintrees 1.09 under v145 and 1.00 under
+clang, which already does this; sexp 1.02 / 1.00; calc 1.02 / 1.01 (its
+generator is a plain tail call); tree level at depth 24, where the row
+is memory-bound.</p>
+<p><strong>Complexity and side effects.</strong> The largest optimizer
+branch (485 new lines in <code>optimize.h</code>, against 238 for 2.2),
+and the one with a semantic footnote: regrouping a signed
+<code>+</code>/<code>*</code> chain changes the intermediate values, so
+a debug build's overflow abort can fire where it did not, or not fire
+where it did; release builds are bit-identical. That bends the
+optimizer's "aborts included" rule once, documented; the strict
+alternative (unsigned and bitwise operators only) would disable all four
+benchmark instances. Expression-bodied folds
+(<code>if c { 0 } else { 1 + f(x) }</code>) are not matched.</p>
+<p><strong>Verdict: adopt after deciding the footnote</strong> -- accept
+it as documented, or gate the signed case behind <code>-O2</code>. It
+exists to level v145 with clang. <strong>Future code: medium.</strong>
+<code>return e op self(x)</code> is common in walks and sums, and half
+the users are on the backend that already has it.</p>
+<h2
+id="24-optfatref-views----hoist-array-views-reached-through-references">2.4
+<code>opt/fatref-views</code> -- hoist array views reached through
+references</h2>
+<p><strong>What.</strong> A loop that indexes an array reached through a
+fat reference loads its base and length once before the loop when BCE's
+kill summary says the body cannot change that array (no growth or shrink
+of it, no call that can reach it); element stores through any reference
+do not block it. Half analysis (<code>bce.h</code>), half codegen.</p>
+<p><strong>Measured.</strong> blur 6.96 under clang (1,858 to 267 ms)
+and 0.94 under v145, where the nine checks per pixel remain and two more
+live locals cost 6%. Every other row byte-identical.</p>
+<p><strong>Complexity and side effects.</strong> Small and
+self-contained; the analysis is the existing kill summary asked one more
+question, and the length lvalue used for growth is left on the real
+header so a missed growth could never silently miscompile. Both base and
+length must be hoisted for the win -- neither alone produced a
+measurable gain. The v145 loss on <code>blur</code> goes away once 2.5b
+can prove the checks in that function (which needs the reference
+parameter's length, below).</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: high.</strong>
+<code>fn kernel(a: T[&gt;..]&amp;, b: T[&gt;..]&amp;)</code> is how spec
+7.4 says to write a mutating range algorithm, and every such loop pays
+this today under clang.</p>
+<h2
+id="25ab-optbce-slice-product----slice-lengths-and-product-indices">2.5a+b
+<code>opt/bce-slice-product</code> -- slice lengths and product
+indices</h2>
+<p><strong>What.</strong> The bounds-check domain records
+<code>len(a[lo..hi]) = hi - lo</code> when the bounds are nameable, and
+does interval arithmetic for products and two-term sums of bounded
+counters, as one-shot bases and only where the result provably fits the
+expression's width. <code>bce.h</code>, plus nine annotated tests.</p>
+<p><strong>Measured.</strong> Elision: <code>scene</code> 9/13 to 12/13
+(the 3x3 <code>p.m[i * 3 + k]</code>), <code>blur_rows</code> without
+its asserts 0/10 to 10/10. <code>scene</code> 1.02 / 1.00.
+<code>blur</code> itself stays 0/10 because its checks sit in
+<code>fn blur(src: u8[&gt;..]&amp;, ...)</code>, which is not inlined,
+and the length fact lives in <code>main</code>; with one
+<code>assert(src.len == W * W)</code> per call
+(<code>blur_assert.goose</code>, on the branch) it reaches 10/10 and
+runs 1,922 to 930 ms under v145 (2.07) and 1,860 to 265 under clang
+(7.02).</p>
+<p><strong>Complexity and side effects.</strong> No new pass; terms for
+products and sums now flow into everything that consumes terms
+(<code>for i in n * m</code>, <code>resize(n * m)</code>,
+<code>let</code> equalities). Compile time +2%. The width check is what
+keeps it sound against release-mode wrapping.</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: high</strong>
+for the row-major idiom (images, matrices, tables) and for any slice
+taken with an arithmetic bound. The missing piece for <code>blur</code>
+as written -- the length of a reference parameter -- is an
+interprocedural fact and its own item.</p>
+<h2
+id="25c-optbce-array-contents----index-postconditions-and-contents-invariants">2.5c
+<code>opt/bce-array-contents</code> -- index postconditions and contents
+invariants</h2>
+<p><strong>What.</strong> After <code>a[i]</code> has executed,
+<code>0 &lt;= i &lt; len(a)</code> holds; and for local integer arrays
+whose every write provably satisfies <code>0 &lt;= v &lt;= const</code>
+or <code>v &lt;= len(P) + c</code> with <code>P</code> never shrinking,
+loads carry that fact. A third recording walk in <code>bce.h</code>.</p>
+<p><strong>Measured.</strong> Elision: <code>graph</code> 5/9 to 8/9,
+<code>graph_csr</code> 11/21 to 17/21, <code>lru</code> 0/18 to 2/18.
+Time: nothing -- graph 1.07 / 0.97, graph_csr 0.97 / 1.02, lru 1.01 /
+1.01, opposite signs per toolchain on the noisiest rows in the suite.
+These are perfectly predicted branches on register-resident values,
+which is what last round's <code>words</code> rewrites found; plan.md's
+5-10% came from the whole-pass <code>--no-bce</code> A/B, which also
+disables the loop-view hoist.</p>
+<p><strong>Complexity and side effects.</strong> The largest analysis
+change, and its risk is "did it enumerate every write" (push, append,
+store, pointee write, resize, whole-array assignment, freelist
+<code>free</code>). It also fixed a latent while-exit hazard in the
+existing analysis. Some of what remains cannot be had: the
+<code>out[fill[s]]</code> invariant is false at the last vertex.</p>
+<p><strong>Verdict: hold.</strong> Correct and thoroughly tested, but
+there is no measurable speedup and the analysis is large. Merge when a
+benchmark shows loaded indices costing time, or as the base for
+per-array index types (TODO 0e). <strong>Future code:</strong> medium as
+a foundation, low as a speedup.</p>
+<h2
+id="26-optinline-nrvo-dest----inlined-named-results-built-at-the-destination">2.6
+<code>opt/inline-nrvo-dest</code> -- inlined named results built at the
+destination</h2>
+<p><strong>What.</strong> When the optimizer inlines a builder whose
+result is a named resizable local into a construction context, the local
+is bound to the destination stack and the inlined <code>return</code>
+writes only the length prefix: fixed-width prefixes reserved and patched
+(no move), a varint prefix reserving one byte and moving the elements
+only when the count reaches 128. The same reserve-then-patch replaces
+the memmove in the non-inlined forms. <code>ast.h</code>,
+<code>optimize.h</code>, <code>codegen.h</code>.</p>
+<p><strong>Measured.</strong> respond 1.06 / 1.06 (557.8 to 524.5 ms,
+534.2 to 503.3), records 1.01 / 1.03. Zero result copies remain in
+respond's <code>handle</code>, and its data stacks drop from four to
+two. The DTO row's gap to the streaming row goes from 26% to 19%.</p>
+<p><strong>Complexity and side effects.</strong> Medium: one map
+replaces <code>nrvodst</code>, three helpers replace
+<code>EmitNrvoPrefix</code>. One forced behaviour change: a multi-name
+receive (<code>let a, b = f(); return a;</code>) is no longer an NRVO
+candidate because it was already miscompiled; it now copies, which is
+what spec 7.3 says. The agent found four more latent bugs around named
+results (below).</p>
+<p><strong>Verdict: adopt.</strong> It makes spec 7.3's guarantee hold
+for the inlined case, which is the common one. <strong>Future code:
+high</strong> -- DTOs, string builders, anything returning a built-up
+<code>u8[]</code> or <code>T[]</code> into a field or a push.</p>
+<h2
+id="27-optper-loop-tops----cache-stack-tops-only-in-loops-that-grow">2.7
+<code>opt/per-loop-tops</code> -- cache stack tops only in loops that
+grow</h2>
+<p><strong>What.</strong> The cached-top local is confined to the loops
+(or the whole body, when growth is outside every loop) that actually
+grow a stack; a float loop that only rewrites elements keeps the memory
+form. Deferred placeholders resolved after the body is emitted; escapes
+out of a pushing loop (<code>break</code>, an inlined early
+<code>return</code>) flushed by label position.
+<code>codegen.h</code>.</p>
+<p><strong>Measured.</strong> particles 1.06 and particles_scalar 1.06
+under clang (916 to 862 ms, 913 to 858), level under v145; every
+push-heavy row within 2% (sum 1.01 / 1.00, push 0.99 / 1.00, strlist
+0.99 / 0.98, sexp 1.00 / 1.00, bintrees 1.00 / 1.01, lru 1.00 / 1.00).
+This recovers the previous round's 6% clang regression on float kernels
+without a measurable regression elsewhere.</p>
+<p><strong>Complexity and side effects.</strong> The most intricate
+codegen change of the set: textual post-processing over label positions,
+and the Debug object is at MSVC's section limit. Every function's temp
+numbering shifts, so generated-C diffs against master are noisy. Stacks
+grown only by callees are also no longer cached, which removes
+flush/reload pairs from <code>bintrees</code> and <code>lru</code>.</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: high</strong>
+-- any array filled once and then processed in place, which is every
+simulation and image loop.</p>
+<h2
+id="28-optcycle-return-roots----return-roots-of-a-recursive-cycle-by-fixpoint">2.8
+<code>opt/cycle-return-roots</code> -- return roots of a recursive cycle
+by fixpoint</h2>
+<p><strong>What.</strong> Before a <code>recursive fn</code> is checked,
+a syntactic scan over the cycle's returns (<code>X.push(...)</code>,
+<code>&amp;X[...]</code>, typed <code>let</code> locals, calls into the
+cycle) is iterated to a fixpoint and seeds each function's return root,
+verified against the real returns; a back-edge result whose root cannot
+be determined gets a sentinel root that cannot be stored or returned.
+Checker only; spec 7.8 updated, TODO 0g done.</p>
+<p><strong>Measured.</strong> No performance change by design:
+byte-identical C for all 22 sources. <code>calc</code> without its Paren
+node (<code>calc_noparen.goose</code>, on the branch) typechecks with
+relative links throughout, drops 311,505 nodes, keeps the checksum, and
+runs 545 to 526 ms under v145 (1.04) and 537 to 492 under clang (1.09).
+<code>sexp</code>'s back-edge result is now pool-rooted instead of
+static.</p>
+<p><strong>Complexity and side effects.</strong> Large for a checker
+change, but it closes a soundness hole the baseline has (a reference
+into a caller's local pool stored into a global is accepted today) and
+removes a language artefact a first-time parser writer would hit. One
+behaviour change: a back-edge result rooted at a non-pool reference
+parameter is now non-storable inside the cycle, where it was silently
+static.</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: high</strong>
+for anything mutually recursive returning references, which is every
+parser.</p>
+<h2
+id="29-optrelref-rangecheck----skip-the-relative-reference-range-check">2.9
+<code>opt/relref-rangecheck</code> -- skip the relative-reference range
+check</h2>
+<p><strong>What.</strong> The store-time range check is emitted under
+`#if GS_STACK_RESERVE</p>
+<blockquote>
+<p>(1ull &lt;&lt;
+(bits-1))<code>and only when no fixed-size root in the program is wider than the width, so a</code>u32`
+link on a stack under 2 GB stores unchecked. Spec 3.9 and 9.3 note the
+condition; a deterministic abort test at the default 256 MB.</p>
+</blockquote>
+<p><strong>Measured.</strong> At the harness's 8 GB reservation the
+branch is provably a no-op (identical preprocessed code; the suite A/B
+is all noise). At 2 GB the agent measured <code>lru</code> +5-12% in its
+best-controlled runs, and everything else noise; the largest Goose row
+needs 536 MB, so 2 GB has 4x headroom.</p>
+<p><strong>Complexity and side effects.</strong> Small. It found a
+pre-existing bug: a struct literal with relative-reference fields
+assigned into an <em>element</em>
+(<code>a[2] = C2 { link: &amp;a[1] }</code>) is built in a C temp and
+copied, so its offsets are wrong, and only the range check ever notices
+-- which is why that path keeps its check unguarded.</p>
+<p><strong>Verdict: adopt, together with lowering the harness
+reservation to 2 GB and fixing the literal bug.</strong> <strong>Future
+code: medium</strong> -- every relative store, but only relink-heavy
+code notices.</p>
+<h2 id="210-optvarint-fastpath----varint-decode-fast-path">2.10
+<code>opt/varint-fastpath</code> -- varint decode fast path</h2>
+<p><strong>What.</strong> A one-byte fast path with an out-of-line slow
+continuation, for array <em>length prefixes</em> only.</p>
+<p><strong>Measured.</strong> The item as written does not work and the
+agent showed why: <code>calc</code>'s values are 36% two-byte after
+zigzag and <code>sexp</code>'s <code>Num.v</code> 92% three-byte, so an
+out-of-line slow path for field values is a loss (both variants
+measured, reverted). For length prefixes -- one byte below 128 elements,
+and a walk of 128+ elements amortises the call -- records 1.00 / 1.05,
+sexp 0.98 / 1.03, calc unchanged.</p>
+<p><strong>Verdict: adopt the length-prefix half.</strong> The guidance
+in <code>notes.md</code> stands: <code>calc</code>'s 11% needs
+<code>u8</code>, not decoder work, since a value of 64 already costs two
+bytes. <strong>Future code: medium</strong> -- every variable array of
+variable elements walks its prefixes.</p>
+<h2 id="211-optdispatch-merge----merge-repeated-tag-dispatch">2.11
+<code>opt/dispatch-merge</code> -- merge repeated tag dispatch</h2>
+<p><strong>What.</strong> Two case-function calls on the same
+never-written scrutinee in one expression or statement sequence share a
+switch; includes a mechanical split of <code>EmitDispatch</code> into
+setup and arm.</p>
+<p><strong>Measured.</strong> Only <code>sexp</code> has the shape; sexp
+1.01 / 1.01. On a walk-dominated variant the walk itself gains 2-6%
+under clang and 0-2% under v145, about 1% of the row.</p>
+<p><strong>Verdict: drop for now.</strong> Correct and conservative, but
+nothing in the suite or the spec's idioms shows it above noise, and it
+is not small. Keep the branch; the <code>EmitDispatch</code> split is
+worth taking if that code is touched again. <strong>Future code:
+low.</strong></p>
+<h2 id="212-optretfrom-register----the-return-from-discriminant">2.12
+<code>opt/retfrom-register</code> -- the <code>return from</code>
+discriminant</h2>
+<p><strong>What.</strong> The discriminant moves from an
+<code>int32_t *</code> out-parameter on every propagating function to
+one thread-local that is zero except between a
+<code>return ... from</code> and its catch, so ordinary returns write
+nothing and a call site costs a load and a never-taken branch. A
+measurement flag <code>--unsafe-no-rf-check</code> is documented as
+unsound. Net simpler emitter; spec C.3 updated.</p>
+<p><strong>Measured.</strong> calc 1.04 / 1.04 (548.9 to 527.7 ms, 535.1
+to 514.1), sexp 1.03 / 1.02. The agent's decomposition: the checks alone
+were 2% (v145) / 4.7% (clang) of the error-free <code>calc</code>, the
+whole mechanism 5-7%; after the change the checks have no measurable
+cost (the flag adds no further speedup). NULL-signalling pointer
+results, a two-register struct return (Win64 returns 16 bytes through
+memory) and a plain global were measured and rejected.</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: high</strong>
+-- every parser, loader and validator uses <code>return from</code>, and
+every function on a propagation path paid the out-parameter.</p>
+<h2
+id="31-optpool-relative----pool-relative-offsets-behind---relref-base">3.1
+<code>opt/pool-relative</code> -- pool-relative offsets, behind
+<code>--relref-base</code></h2>
+<p><strong>What.</strong> Relative references encoded from the root
+pool's base, with the base found from the checker's roots: a global, a
+local, a fat reference's header, or a hidden <code>uint8_t *</code>
+argument where a plain reference parameter's class is not pinned to one
+pool. Two checker additions -- a least fixpoint over (class root,
+call-site root) pairs, and an "exact root" bit separating a real root
+from a container-laundered one -- so nothing is ever resolved against
+the wrong base. Flag off: byte-identical C.</p>
+<p><strong>Measured.</strong> With the flag: lru 1.04 / 1.41 (2,991 to
+2,123 ms under clang), graph 1.03 / 1.18, bintrees 0.96 / 0.93 (the
+hidden argument on a hot recursion), tree, interp and scene level, and
+<code>calc</code> does not compile: its Paren node holds a plain
+reference read back out of a container, the one construct with no base
+-- and the artefact 2.8 removes.</p>
+<p><strong>Complexity and side effects.</strong> The representation is
+40 lines; the rest implements root tracking that the compiler previously
+lacked. Narrow widths change meaning (a <code>u16</code> would bound the
+pool at 32 KB rather than the link distance) and sub-region copies (TODO
+16) would need rebasing.</p>
+<p><strong>Verdict: resolved at the language level</strong> -- the
+comparison is written up in
+<code>docs/design/relative_references.md</code>, and the outcome is the
+<code>in pool</code> form of spec §3.9: a field names a global pool, no
+hidden arguments, no per-call-site fixpoint; <code>lru</code> with
+8-byte reference slots is level with the index form under v145 and 1.31x
+faster under clang. The experiment answered plan.md 3.1: pool-relative
+recovers about half of the <code>lru</code> deficit under clang, little
+under v145, costs the build-once walkers nothing and a hot recursion
+4-7%. Not a default; a per-declaration choice
+(<code>T&amp;&lt;u32 pool&gt;</code>) would keep both encodings, with
+2.8 merged first so the blocker disappears. <strong>Future code:
+medium</strong> -- relinking structures only.</p>
+<h2 id="32-optself-reference----self-in-literals">3.2
+<code>opt/self-reference</code> -- <code>self</code> in literals</h2>
+<p><strong>What.</strong> A <code>self</code> keyword, valid as the
+whole initializer of a non-optional relative-reference field whose
+pointee is the literal's own type, storing minus the field's offset (a
+constant for fixed layouts, width-checked at compile time). Lexer,
+parser, checker, codegen, spec 2/3.9/4.2/D. Byte-identical C for
+existing sources.</p>
+<p><strong>Measured.</strong> <code>lru_nonopt.goose</code>
+(non-optional links, sentinels via <code>self</code>, no narrowing
+asserts) against <code>lru</code> on the same compiler: 3,734 to 3,387
+ms under v145 (1.10), 3,152 to 3,113 under clang (1.01).</p>
+<p><strong>Complexity and side effects.</strong> One keyword in one
+position. Non-optional relative references need
+<code>let p: Node&amp; = n.prev;</code> annotations, because an
+unannotated <code>let</code> decays a plain reference. <code>self</code>
+is preferable to defining offset 0 as the containing value: 0 is already
+null for optionals, and on a non-optional the representation reads 0 as
+the field's own address. Found another latent bug on the way
+(<code>alloc_index</code> with a relative-reference literal, below).</p>
+<p><strong>Verdict: adopt.</strong> <strong>Future code: medium</strong>
+-- sentinel-linked and circular structures, which are common in exactly
+the mutation-heavy code the <code>reusable</code> pool exists for.</p>
+<h2 id="35-optclear-grow-only----clear-on-grow-only-locals">3.5
+<code>opt/clear-grow-only</code> -- <code>clear()</code> on grow-only
+locals</h2>
+<p><strong>What.</strong> <code>clear()</code> on a grow-only
+<em>local</em> is accepted where no reference or slice rooted at it can
+be live: a scan over the open scopes' variables, plus a guard against
+clears inside value-producing constructs. Codegen is the grow-shrink
+clear; the bounds-check analysis already killed correctly. Spec 5.1, 3.3
+and TODO 4 updated; mostly tests and spec.</p>
+<p><strong>Measured.</strong> <code>calc_slices.goose</code> (grow-only
+local text cleared per input, parser over slices) is <em>slower</em>
+than <code>calc</code>: 544 to 589 ms under v145 (0.92), 532 to 588
+under clang (0.90) -- the generator's pushes through a fat reference
+(2.1's territory) and a 16-byte slice threaded through the recursion
+instead of a named global.</p>
+<p><strong>Verdict: adopt as an expressiveness item, not a speed
+one.</strong> It lets a scratch buffer support both reuse and slices. On
+master the same rule now covers <code>pop</code> and <code>resize</code>
+as well, and spec 5.1 defines grow-only as "never shrinks while a
+reference or slice into it can be live"; a shrink must also stand on its
+own (a statement, an initializer, or the right-hand side of an
+assignment to a variable), so no reference taken earlier in the same
+expression can outlive it. <strong>Future code: medium</strong> --
+per-iteration scratch buffers are everywhere; whether they need slicing
+is case by case.</p>
+<hr />
+<h2 id="merge-order-and-interactions">Merge order and interactions</h2>
+<p>The merge order is listed under "Merged changes" above. The conflicts
+were: 2.1 with 2.7 in the top-cache state and its per-function reset
+(2.7's machinery, 2.1's mode on top); 2.6 and 2.10 with 2.7 at the
+points that grow a stack, which now go through 2.7's growth-recording
+accessor, and 3.5 the same at <code>clear</code>; 2.9 with 2.12 in the
+CodeGen constructor and with 3.2 in the literal store; 2.2 and 2.3 with
+each other only in the optimizer's summary line and the header list;
+2.3's spec bullet with 2.9's. Every branch appended to the same test
+file and expected outputs, which merged mechanically apart from one test
+type name two branches both chose. <code>/bigobj</code> went in first,
+since three branches hit MSVC's per-object section limit in this
+single-translation-unit compiler. 2.8 before 3.1 if 3.1 is ever
+revisited: 3.1's "exact root" bit is what a default pool-relative
+encoding would build on, and 2.8 removes 3.1's one blocker.</p>
+<h2 id="pre-existing-bugs-the-agents-found">Pre-existing bugs the agents
+found</h2>
+<p>None was introduced by a branch; each was reproduced on the baseline.
+The first three are fixed on master (the third on 2.1's branch, the
+other two on <code>opt/fixes</code>, merged last); the rest are
+open.</p>
+<ul>
+<li><code>CodeGen::IntStr</code> emitted <code>INT32_MIN</code> as the
+unsuffixed <code>-2147483648</code>, which MSVC's C front end types as
+unsigned (C90 literal rules), so every checked <code>as i32</code>
+aborted in a <code>GS_DEBUG=1</code> build and an <code>i64</code>
+literal at that value printed positive in release (found by 2.2 and
+3.1). It is now <code>(-2147483647 - 1)</code>, the form
+<code>INT64_MIN</code> already used.</li>
+<li>A struct literal with relative-reference fields assigned into an
+element, stored whole through a reference, assigned into a struct-typed
+field, or built through <code>alloc_index</code>/<code>alloc_ref</code>,
+was constructed in a C temporary and copied, so its offsets were
+measured from the temporary (2.9, 3.2); array literals whose elements
+are relative references emitted invalid C. All of them now build at the
+destination.</li>
+<li><code>CanCacheTops</code> missed fat references read out of fields
+and elements -- unsound; fixed on 2.1's branch.</li>
+<li>A variable-class (not resizable) named result is not built at its
+destination at all:
+<code>fn mk() -&gt; R { let r = R{...}; return r; }</code> returns
+garbage at -O0 (2.6).</li>
+<li><code>GenArrayLit</code> writes the callee's length storage into a
+<code>u8[varint]</code> element slot for <code>[f(), g()]</code>
+(2.6).</li>
+<li>A global initializer whose builder needs an element-run twin fails
+to compile at -O0 (2.6).</li>
+<li><code>buf.append(f(&amp;buf))</code> was accepted although the
+callee grows the stack the result is being built on (2.6); the checker
+now rejects a growth of an array while a value is built in place in it
+(spec 1.3(4), 4.2).</li>
+<li>The <code>While</code> exit-flow hazard reported on 2.5c's branch is
+a guard for that branch's own index postconditions; the base has no such
+fact to shift, and its own <code>break</code> guard is already in
+place.</li>
+</ul>
+<h2 id="measurement-notes">Measurement notes</h2>
+<ul>
+<li><code>scratchpad/ab_goose.ps1</code> is the A/B driver;
+<code>ab_all.log</code> the full run (672 rows). The identical-code rows
+across all sixteen runs read 0.94-1.08, and only on
+<code>graph</code>/<code>graph_csr</code> outside 0.97-1.03.</li>
+<li>Every agent found the machine too noisy for sequential timing while
+fifteen others were building; the reported agent numbers were taken with
+interleaved or repeated runs and agree with the quiet-machine run within
+that noise everywhere except the two cache-bound rows.</li>
+</ul>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/bench/adoption.md"><code>bench/adoption.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

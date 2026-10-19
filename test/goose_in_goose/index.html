@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goose compiler bootstrap regression · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#goose-compiler-bootstrap-regression"
+id="toc-goose-compiler-bootstrap-regression">Goose compiler bootstrap
+regression</a></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="goose-compiler-bootstrap-regression">Goose compiler bootstrap
+regression</h1>
+<p>This is a compiler for a subset of Goose, written in Goose. It is a
+large integration fixture for the main compiler, not a second compiler
+whose feature coverage the suite promises to maintain.
+<code>main.goose</code> imports the other thirteen modules. Only the
+compiler sources live here; the exploratory probes, reports, and
+standalone build/test scripts are not part of the fixture.</p>
+<p>The implementation was written from <code>docs/goose_spec.md</code>,
+<code>docs/implementation.md</code>, Goose library interfaces/tests, and
+black-box host behavior, without inspecting the C++ implementation under
+<code>src/</code>. Its embedded C runtime is independent. It covers
+enough of the language to compile itself: parsing, types and generics,
+semantic checking, specialization, and C emission. Lifetime analysis and
+many language features remain incomplete. Do not use its acceptance or
+rejection as the language's expected behavior.</p>
+<p>The normal suite runs this fixture automatically. To run just this
+regression:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> test/run_tests.py <span class="at">--goose-in-goose-only</span> <span class="at">--exe</span> build/Release/goose.exe <span class="at">--cc</span> native</span></code></pre></div>
+<p>Use the appropriate <code>--exe</code> path for your build. The test
+uses the suite's selected native C compiler and profile:</p>
+<ol type="1">
+<li>The real compiler emits stage 1 from <code>main.goose</code>; native
+C compilation produces the first Goose-written compiler executable.</li>
+<li>Stage 1 compiles the same sources into stage 2; native C compilation
+builds that executable.</li>
+<li>Stage 2 compiles the sources into stage 3, which is also built and
+linked.</li>
+<li>Stage-2 and stage-3 C must be byte-identical. Stage 2 checks its own
+sources twice in one process, while stage 3 is emitted and built; both
+compilations must succeed and agree. The fixed point makes stage 2 the
+same compiler as stage 3.</li>
+<li>When TinyCC is available, the real compiler also executes the
+Goose-written compiler through its JIT. Its emitted C must match the
+native bootstrap.</li>
+</ol>
+<p>Baseline runs the entire chain with host/native O0 and O2 and
+requires the same self-compiled C at both settings. The sanitizer
+profile uses host O2 and native Clang O1 with the suite's ASan/UBSan
+flags on every native stage. <code>--no-jit</code> omits the JIT
+comparison; <code>--nocgen</code> retains host checking and JIT
+self-compilation when available, but explicitly skips the native
+chain.</p>
+<p>Generated files and per-stage logs are kept in
+<code>build/gen/&lt;profile&gt;/goose_in_goose/O&lt;level&gt;/</code>.
+Each command must succeed and each emission must produce nonempty C;
+stale outputs cannot satisfy a stage. Compiler executables receive a 64
+MiB stack budget where the platform permits it. The runner reports
+stage-specific failures, including timeouts and sanitizer diagnostics.
+The modules are excluded from ordinary standalone fixture discovery
+because they need imports and compiler command-line arguments.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/test/goose_in_goose/README.md"><code>test/goose_in_goose/README.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

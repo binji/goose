@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The in-process C backend (JIT mode) · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#the-in-process-c-backend-jit-mode"
+id="toc-the-in-process-c-backend-jit-mode">The in-process C backend (JIT
+mode)</a>
+<ul>
+<li><a href="#what-it-is" id="toc-what-it-is">What it is</a></li>
+<li><a href="#how-it-is-built" id="toc-how-it-is-built">How it is
+built</a></li>
+<li><a href="#testing" id="toc-testing">Testing</a></li>
+<li><a href="#follow-up-work" id="toc-follow-up-work">Follow-up work</a>
+<ul>
+<li><a href="#threads" id="toc-threads">Threads</a></li>
+<li><a href="#log2-on-windows"
+id="toc-log2-on-windows"><code>log2</code> on Windows</a></li>
+<li><a href="#the-sanitizer-profile" id="toc-the-sanitizer-profile">The
+sanitizer profile</a></li>
+<li><a href="#backtraces-and-bounds-checking"
+id="toc-backtraces-and-bounds-checking">Backtraces and bounds
+checking</a></li>
+<li><a href="#macos" id="toc-macos">macOS</a></li>
+<li><a href="#compilation-is-not-cached"
+id="toc-compilation-is-not-cached">Compilation is not cached</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="the-in-process-c-backend-jit-mode">The in-process C backend (JIT
+mode)</h1>
+<p>How the TinyCC backend works and its remaining limitations.</p>
+<h2 id="what-it-is">What it is</h2>
+<p>The compiler's normal output is C, written to a file for another
+compiler to build. The compiler also embeds TinyCC, and giving no
+<code>-o</code> compiles that same C into the compiler's own process and
+calls its <code>main</code> there. No file is written and no C toolchain
+has to be installed.</p>
+<pre><code>goose 01_tour.goose            # compiled and run in one process
+goose -o tour.c 01_tour.goose  # the C file, as before
+goose --jit prog.goose         # the same, asked for explicitly</code></pre>
+<p>Both modes use identical generated C for the program. Around it, the
+JIT run compiles the whole runtime in the same unit, as
+<code>--standalone</code> writes it, where the file <code>-o</code>
+writes by default declares most of the runtime extern for the object
+<code>--emit-runtime</code> makes (<code>docs/implementation.md</code>
+§7). <code>-D</code> writes its define into that C rather than passing
+it to a backend, so a JIT run and a compiled one receive identical
+source text. <code>--</code> passes the arguments after it to the
+program. The program shares the process: its exit status becomes the
+compiler's, its output goes to the same streams, and the compiler's own
+progress lines move to stderr so stdout belongs to the program alone. It
+does not share the compiler's stack: the compile runs on a thread of its
+own, and the program on the main thread. The compiler is linked to
+reserve 64 MB for that thread's stack on Windows and macOS, as much as
+the compile gets, where an executable built from the same C starts with
+1 MB and 8 MB; on Linux both have the stack limit the process started
+with (<code>ulimit -s</code>).</p>
+<h2 id="how-it-is-built">How it is built</h2>
+<p>TinyCC's sources are vendored under <code>third_party/tinycc</code>,
+whose <code>README.md</code> records the upstream commit; every compiler
+is built with them. TinyCC has a configure script and a makefile,
+neither reachable from CMake on all three platforms, so
+<code>cmake/libtcc.cmake</code> produces what they would have:</p>
+<ul>
+<li>a <code>config.h</code> with the version, the target, and the
+machine triplet Debian family systems need to find the C library;</li>
+<li>the library itself, as the single translation unit TinyCC's
+<code>ONE_SOURCE</code> build uses;</li>
+<li>the <code>tcc</code> driver, whose only job here is the next item:
+parts of the support library are TinyCC assembly, which only TinyCC
+assembles;</li>
+<li><code>libtcc1.a</code>, the compiler support routines every
+TinyCC-compiled program links against, built by that driver from
+TinyCC's own per-target object list minus the pieces only a standalone
+executable or DLL needs.</li>
+</ul>
+<p>Those, TinyCC's runtime headers, and on Windows the <code>.def</code>
+files naming what the system DLLs export, are staged into one directory,
+which is what the compiler hands <code>tcc_set_lib_path()</code>.
+<code>GOOSE_TCCLIB</code> overrides it; a <code>tcclib</code> directory
+beside the compiler binary wins over the build tree it was configured
+in. macOS keeps the C library's headers only in an SDK: the one
+xcode-select made active (found as TinyCC finds the SDK's libraries)
+comes before the one the compiler was configured with, so a compiler
+built elsewhere finds this machine's.</p>
+<h2 id="testing">Testing</h2>
+<p><code>test/run_tests.py</code> and
+<code>samples/run_samples.py</code> run every program a second way
+through the backend and compare it against the same expected output; the
+benchmark harness measures every Goose row a second way and reports
+those in a table of their own. See <code>docs/testing.md</code>.</p>
+<p>TinyCC provides a third C implementation for testing the generated
+code. It can expose accidental dependencies on another compiler or C
+library. Two runtime bugs came out of the first run: the wall clock used
+C11's <code>timespec_get</code>, which TinyCC's Windows C library does
+not have and glibc hides from a compiler announcing C99; and floats
+printed as <code>1e+016</code> under the older Microsoft C runtime
+TinyCC links, where C99 asks for two exponent digits. Both bugs made a
+Goose value's text representation depend on the backend, contrary to the
+language's requirements.</p>
+<h2 id="follow-up-work">Follow-up work</h2>
+<p>Remaining limitations and possible improvements, roughly ordered by
+their impact on the project.</p>
+<h3 id="threads">Threads</h3>
+<p>A program that spawns a worker or uses a queue (§11.2) is refused
+under this backend. TinyCC's in-memory runner rejects any section with
+<code>SHF_TLS</code> (<code>tccrun.c</code>: <em>thread-local storage
+not supported with -run</em>), and the runtime puts each thread
+program's globals pointer and its data-stack region registry in
+thread-local storage whenever <code>GS_NEED_THREADS</code> is set. This
+prevents seven test files and one sample from running through JIT; the
+others run.</p>
+<p>Possible directions:</p>
+<ul>
+<li><strong>Emulate thread-local storage in the runtime under
+<code>__TINYC__</code></strong>, over
+<code>TlsAlloc</code>/<code>TlsGetValue</code> on Windows and
+<code>pthread_key_create</code>/ <code>pthread_getspecific</code>
+elsewhere. Self-contained, perhaps thirty lines, but it turns every
+access to the globals pointer into a call, and the region registry and
+the thread's stack bounds are read by the fault handler, where
+<code>pthread_getspecific</code> is not formally async-signal-safe.
+Measure the cost on the benchmarks before committing to it.</li>
+<li><strong>Teach TinyCC's runner to allocate a thread-local
+block.</strong> This would address the limitation in TinyCC itself and
+would require upstream work.</li>
+<li><strong>Leave it refused.</strong> The diagnostic already says to
+compile with <code>-o</code>.</li>
+</ul>
+<p>Windows needs two more things whichever way this goes: TinyCC's
+bundled winapi headers do not declare <code>SRWLOCK</code> or
+<code>CONDITION_VARIABLE</code>, and its <code>kernel32.def</code> does
+not export the functions over them, so the runtime would need those
+declarations under <code>__TINYC__</code> and the staged
+<code>.def</code> file would need the names.</p>
+<h3 id="log2-on-windows"><code>log2</code> on Windows</h3>
+<p>TinyCC's bundled <code>math.h</code> defines <code>log2(x)</code> as
+<code>log(x) * log2(e)</code>, which can differ from native libm by a
+few ulp. <code>test/stdlib/stdlib_math.goose</code> allows small
+rounding differences in transcendental results and runs on both native
+and JIT backends without a <code>no-jit</code> marker.</p>
+<h3 id="the-sanitizer-profile">The sanitizer profile</h3>
+<p>The JIT runs are skipped under ASan/UBSan. The program is not itself
+instrumented, and because TinyCC's <code>exit()</code> longjmps back
+into <code>tcc_run</code> rather than terminating, the program's own
+heap allocations are still live when the compiler exits, which
+LeakSanitizer reports against the compiler. Freeing them would need a
+teardown entry point in the runtime that the JIT could call after
+<code>tcc_run</code> returns. The compiled path already has full
+sanitizer coverage, so this is a low priority.</p>
+<h3 id="backtraces-and-bounds-checking">Backtraces and bounds
+checking</h3>
+<p><code>config.h</code> turns both of TinyCC's own off, because the
+support objects behind them need the full Windows SDK headers TinyCC
+does not ship. A crash inside generated code therefore takes the
+compiler process down with no symbolic stack. They could be enabled on
+the ELF and Mach-O targets alone, where those objects build without
+<code>windows.h</code>.</p>
+<h3 id="macos">macOS</h3>
+<p>The build follows TinyCC's per-target object lists and CI builds it
+on all three platforms, but the macOS path has not been run here. Apple
+silicon is the least exercised of the three: Mach-O output, and a JIT
+that has to ask the kernel for writable-then-executable memory.</p>
+<h3 id="compilation-is-not-cached">Compilation is not cached</h3>
+<p>Every JIT run recompiles the runtime, about 1200 lines of C, along
+with the program. The benchmark report measures that floor. TinyCC has
+no serialized form for an in-memory result, so caching would require
+substantial work.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/jit_backend.md"><code>docs/design/jit_backend.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

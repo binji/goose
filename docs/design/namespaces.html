@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minimal namespaces · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#minimal-namespaces" id="toc-minimal-namespaces">Minimal
+namespaces</a>
+<ul>
+<li><a href="#rules" id="toc-rules">Rules</a></li>
+<li><a href="#implementation"
+id="toc-implementation">Implementation</a></li>
+<li><a href="#rust-and-zig-comparison"
+id="toc-rust-and-zig-comparison">Rust and Zig comparison</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="minimal-namespaces">Minimal namespaces</h1>
+<p>Files can declare a namespace and refer to declarations by qualified
+names. This extends the existing import loader and whole-program
+compiler.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// image/filters.goose</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">namespace</span> image<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Pixel</span> { r<span class="op">:</span> <span class="dt">u8</span><span class="op">,</span> g<span class="op">:</span> <span class="dt">u8</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">u8</span> }</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">brightness</span>(p<span class="op">:</span> <span class="dt">Pixel</span>) <span class="op">-&gt;</span> <span class="dt">i64</span> { p<span class="op">.</span>r <span class="op">+</span> p<span class="op">.</span>g <span class="op">+</span> p<span class="op">.</span>b }</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">// main.goose (a separate file)</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> image<span class="op">.</span>filters<span class="op">;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> p <span class="op">=</span> image<span class="op">::</span><span class="dt">Pixel</span> { <span class="dv">10</span><span class="op">,</span> <span class="dv">20</span><span class="op">,</span> <span class="dv">30</span> }<span class="op">;</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(image<span class="op">::</span><span class="fu">brightness</span>(p))<span class="op">;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h2 id="rules">Rules</h2>
+<ul>
+<li><code>namespace name;</code> occurs at most once, before
+declarations (imports may sit on either side of it). Files without it
+keep the global namespace. <code>name</code> is one identifier. Nested
+namespaces, aliases, and namespace-opening directives are not
+included.</li>
+<li>Multiple files may declare the same namespace. <code>import</code>
+still locates and loads a file once; its path does not create a
+namespace or import unqualified names out of an explicitly named
+namespace. All declarations are public.</li>
+<li><code>image::Pixel</code> and <code>image::brightness</code> name
+declarations explicitly. <code>::</code> is distinct from existing
+<code>.</code> field access, enum variants and UFCS; for example,
+<code>image::Shape.Circle</code> remains unambiguous. A leading
+<code>::name</code> selects a global declaration when a namespaced
+declaration shadows it, and reaches the builtins the same way.</li>
+<li>A declaration may also spell its namespace itself:
+<code>fn image::brightness</code>, <code>struct image::Pixel</code>,
+<code>let image::pool = ...</code>, or <code>fn ::main</code> for the
+global namespace from inside a namespaced file. The qualifier sets the
+declaration's namespace. Names inside the declaration resolve there
+first, rather than in the file's namespace. This lets
+<code>--dump</code> preserve namespaces when it combines declarations
+from multiple files. Nested functions are lexical and cannot be
+qualified.</li>
+<li>Unqualified resolution follows lexical locals/parameters/type
+parameters and nested functions, any of which hides the declarations of
+its name, then the current declaration's namespace, then the global
+declarations and builtins. For functions, the first scope that contains
+the name supplies the whole overload set; sets do not merge across
+namespaces, so a namespaced <code>hash</code> overload calls the global
+integer ones as <code>::hash(k.a)</code>. A generic body resolves names
+in its definition's namespace, not the instantiating caller's, and so
+does a field or parameter default, whatever the namespace of the
+construction or call that uses it.</li>
+<li>UFCS lookup follows those same function-name rules for the namespace
+the call is written in. A caller in another namespace uses
+<code>image::brightness(p)</code> explicitly; associated-namespace
+lookup and extension imports can be considered separately. Builtin array
+members retain their existing priority over user UFCS candidates.</li>
+<li>Custom <code>format</code> hooks are the one implicit lookup
+exception: the formatted nominal type's defining namespace is searched
+for a matching overload, then the global namespace, with the existing
+signature rules. Thus <code>print(p)</code> finds
+<code>image::format</code> for an <code>image::Pixel</code> anywhere,
+without opening that namespace. This preserves type-directed formatting
+instead of making rendering depend on the caller's namespace. Ordinary
+generic customization remains definition-site lookup: a namespaced key's
+<code>hash</code> overload needs a global bridge for the global
+<code>dictionary</code> module (for example
+<code>fn hash(k: image::Key) -&gt; u64 { image::hash(k) }</code>, or the
+same written as <code>fn ::hash(...)</code> inside the namespaced file).
+General associated-type lookup could remove that bridge later, but is
+not part of this feature.</li>
+<li><code>return ... from parse</code> resolves the target in the
+returning function's definition context -- a nested function in scope,
+else the name's overload set by the rules above;
+<code>return ... from image::parse</code> is explicit. The target frame
+is the innermost enclosing call of any function in that set, so an
+unrelated <code>parse</code> on the call path cannot catch the
+return.</li>
+<li>Namespace qualification affects type identity, overload lookup and
+generated symbol names. It adds no runtime representation or lifetime
+rule. An imported file's <code>main</code> remains ignored as today, and
+the root file must supply a global <code>main</code> entry point: a
+namespaced program declares it as <code>fn ::main()</code>.</li>
+</ul>
+<h2 id="implementation">Implementation</h2>
+<ul>
+<li>Lexer: the <code>namespace</code> keyword and the <code>::</code>
+token. Parser: the directive, qualified declaration names, and qualified
+references wherever a declaration can be named (expressions, types,
+<code>return ... from</code>, the pool of a
+<code>T&amp;&lt;w in pool&gt;</code> type, and the constants of an
+integer match's patterns). A qualified reference is interned as one
+string (<code>Ident::name</code> is <code>"image::Pixel"</code> as
+written), so it can never coincide with a local's name and every
+existing lexical comparison stays correct; every reference also records
+the namespace it was written in (<code>Ident::ns</code>,
+<code>TypeName::ns</code>, ...), since that is where an unqualified name
+resolves first and it must survive cloning and generic
+instantiation.</li>
+<li><code>Ast</code> keeps one <code>Namespace</code> of declaration
+maps per namespace name, and one lookup rule (<code>Ast::Lookup</code>)
+routes type resolution, function, global and enum lookup through it.
+Unknown qualified type names are errors in resolution rather than
+generic type-parameter candidates. The parser tries a <code>&lt;</code>
+after a name as a type argument list first (§7.7); when it takes the
+<code>&lt;</code> back as a comparison, it deletes the types it parsed
+in the attempt, so the <code>ns::limit</code> of
+<code>a &lt; ns::limit</code> is no type name
+(<code>test/syntax/namespace_comparisons.goose</code>).</li>
+<li>The dump prints declarations with their qualified names
+(<code>fn image::brightness(p: Pixel)</code>) and references as written,
+so a dump of a multi-file program reparses to the same program;
+resolution runs after the dump so it shows names as written.</li>
+<li>C symbols: a global name <code>x</code> is <code>x_g</code> as
+before; a namespaced <code>ns::x</code> is <code>ns_x_g</code> followed
+by the namespace's length (<code>image_Pixel_g5</code>). The digits keep
+the mapping injective without a lossy punctuation replacement:
+<code>a::b_c</code> and <code>a_b::c</code> differ in them, and no
+global name's C form ends in a digit. Foreign C linkage names stay
+separate: an <code>extern</code>'s explicit symbol, or its default leaf
+name, is unchanged. <code>in pool</code> names resolve by the same rules
+and the pool declaration's identity is retained as before.</li>
+<li>Tests: <code>test/syntax/namespaces.goose</code> with
+<code>test/syntax/ns/</code> and
+<code>test/syntax/namespaces_lib.goose</code> cover duplicate leaf names
+across namespaces, same-namespace overloads, generic definition-site
+lookup, qualified types/variants/pools, global fallback and shadowing,
+imported main handling, custom formatting across namespaces, a
+dictionary with a namespaced key and global hash bridge, same-leaf
+<code>return from</code> targets, and collision-free generated C
+symbols; <code>test/syntax/match_constants.goose</code> names another
+namespace's constants in match patterns;
+<code>test/errors*/ns_*.goose</code> cover the diagnostics.</li>
+</ul>
+<p>This extension changes name resolution. It does not add separate
+compilation, package resolution, privacy, re-exports, or first-class
+module values.</p>
+<h2 id="rust-and-zig-comparison">Rust and Zig comparison</h2>
+<p>Rust's <code>mod</code> builds a hierarchical module tree within a
+crate, <code>use</code> introduces bindings, and visibility is generally
+private by default with <code>pub</code> controls. This design borrows
+qualified-path spelling but keeps file loading separate from namespace
+declaration, permits several files to contribute to one namespace, and
+leaves declarations public. See the official <a
+href="https://doc.rust-lang.org/reference/items/modules.html">module
+reference</a>, <a
+href="https://doc.rust-lang.org/reference/items/use-declarations.html">use
+reference</a> and <a
+href="https://doc.rust-lang.org/reference/visibility-and-privacy.html">visibility
+rules</a>.</p>
+<p>Zig's <code>const image = @import("image.zig");</code> binds the
+imported file's container type; declarations are accessed with
+<code>.</code>, and <code>pub</code> controls external visibility. That
+fits Zig's compile-time type/value model. The Goose namespace is only a
+symbol-table scope: it cannot be assigned, returned, parameterized as a
+value or inspected at compile time. See the official <a
+href="https://ziglang.org/documentation/master/#import">Zig language
+reference</a>.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/namespaces.md"><code>docs/design/namespaces.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

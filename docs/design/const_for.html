@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>const for: specialization-time expansion (v1) · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#const-for-specialization-time-expansion-v1"
+id="toc-const-for-specialization-time-expansion-v1"><code>const for</code>:
+specialization-time expansion (v1)</a>
+<ul>
+<li><a href="#1-scope-and-cost-model" id="toc-1-scope-and-cost-model">1.
+Scope and cost model</a></li>
+<li><a href="#2-syntax" id="toc-2-syntax">2. Syntax</a></li>
+<li><a href="#3-expansion-sources" id="toc-3-expansion-sources">3.
+Expansion sources</a>
+<ul>
+<li><a href="#31-fields" id="toc-31-fields">3.1 Fields</a></li>
+<li><a href="#32-type-lists" id="toc-32-type-lists">3.2 Type
+lists</a></li>
+<li><a href="#33-constant-lists" id="toc-33-constant-lists">3.3 Constant
+lists</a></li>
+</ul></li>
+<li><a href="#4-bindings-and-hygiene" id="toc-4-bindings-and-hygiene">4.
+Bindings and hygiene</a></li>
+<li><a href="#5-fragment-contexts" id="toc-5-fragment-contexts">5.
+Fragment contexts</a>
+<ul>
+<li><a href="#51-statement-lists" id="toc-51-statement-lists">5.1
+Statement lists</a></li>
+<li><a href="#52-constructor-initializer-lists"
+id="toc-52-constructor-initializer-lists">5.2 Constructor initializer
+lists</a></li>
+</ul></li>
+<li><a href="#6-library-use-and-receiver-semantics"
+id="toc-6-library-use-and-receiver-semantics">6. Library use and
+receiver semantics</a></li>
+<li><a href="#7-compiler-integration" id="toc-7-compiler-integration">7.
+Compiler integration</a></li>
+<li><a href="#8-diagnostics-and-tooling"
+id="toc-8-diagnostics-and-tooling">8. Diagnostics and tooling</a></li>
+<li><a href="#9-validation-targets-for-an-implementation"
+id="toc-9-validation-targets-for-an-implementation">9. Validation
+targets for an implementation</a></li>
+<li><a href="#10-future-work-explicitly-outside-v1"
+id="toc-10-future-work-explicitly-outside-v1">10. Future work,
+explicitly outside v1</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1
+id="const-for-specialization-time-expansion-v1"><code>const for</code>:
+specialization-time expansion (v1)</h1>
+<p>Status: implemented. V1 supports the three sources below in statement
+lists and constructor initializer lists.</p>
+<p>This design replaces a family of compiler-provided field visitors
+with one expansion construct inside ordinary Goose functions. The
+compiler supplies a small set of structural sequences and specializes a
+source fragment once per entry. Libraries choose the resulting
+functions' names, signatures, callbacks, and runtime behavior.</p>
+<p>The motivating discussion is <a
+href="https://github.com/aardappel/goose/issues/35">issue #35</a>, which
+proposes field visitation to prevent handwritten field lists from
+silently falling behind their struct declarations. The direct builtin in
+<a href="https://github.com/aardappel/goose/pull/36">PR #36</a> is an
+alternative design.</p>
+<h2 id="1-scope-and-cost-model">1. Scope and cost model</h2>
+<p>V1 has exactly three expansion sources:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Bindings</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fields&lt;T&gt;</code></td>
+<td><code>&lt;N, A&gt;</code></td>
+<td>Each direct field's name and accessor, in declaration order</td>
+</tr>
+<tr>
+<td><code>types&lt;T1, T2, ...&gt;</code></td>
+<td><code>&lt;U&gt;</code></td>
+<td>An explicit sequence of types</td>
+</tr>
+<tr>
+<td><code>[c1, c2, ...]</code></td>
+<td><code>&lt;C&gt;</code></td>
+<td>An explicit sequence of constants</td>
+</tr>
+</tbody>
+</table>
+<p>Expansion is supported in statement lists and constructor initializer
+lists. The latter may contain named field initializers or positional
+expressions, subject to the existing prohibition on mixing those forms.
+Section 10 records additional sources and placements as future work.</p>
+<p>There is no general compile-time execution block, interpreter for
+arbitrary Goose code, user-defined expansion-source function, quotation
+API, or textual macro substitution. <code>const</code> qualifies the
+expansion: the source and its bindings are known during specialization.
+Ordinary code in the body still executes at runtime.</p>
+<p>An expansion emits ordinary Goose operations and constants. It
+introduces no runtime iterator, heterogeneous container, type registry,
+per-object metadata, or dynamic dispatch. A program that does not use
+the feature pays no runtime cost for it. Used expansions may increase
+compilation time, generated code, and retained constants such as printed
+field names. Existing allocation, copying, and runtime-check costs of
+the generated operations still apply.</p>
+<h2 id="2-syntax">2. Syntax</h2>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">N</span><span class="op">,</span> <span class="dt">A</span><span class="op">&gt;</span> <span class="kw">in</span> <span class="kw">fields</span><span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">F</span>(<span class="dt">N</span><span class="op">,</span> <span class="op">&amp;</span>value<span class="op">.</span><span class="dt">A</span>)<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">U</span><span class="op">&gt;</span> <span class="kw">in</span> <span class="kw">types</span><span class="op">&lt;</span><span class="dt">i8</span><span class="op">,</span> <span class="dt">i16</span><span class="op">,</span> <span class="dt">i32</span><span class="op">,</span> <span class="dt">i64</span><span class="op">&gt;</span> {</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    test_roundtrip<span class="op">&lt;</span><span class="dt">U</span><span class="op">&gt;</span>()<span class="op">;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">C</span><span class="op">&gt;</span> <span class="kw">in</span> [<span class="dv">1</span><span class="op">,</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">4</span><span class="op">,</span> <span class="dv">8</span>] {</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> buffer<span class="op">:</span> <span class="dt">u8</span>[<span class="dt">C</span>] <span class="op">=</span> [<span class="dv">0</span><span class="op">;</span> <span class="dt">C</span>]<span class="op">;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">test_buffer</span>(buffer)<span class="op">;</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>const</code>, <code>for</code>, and <code>in</code> are
+existing keywords. The angle brackets are required: they distinguish
+specialization bindings from ordinary loop variables and reuse the
+visual convention of generic parameter lists. Binding names need not be
+uppercase; capitalization has no semantic effect.</p>
+<p><code>fields</code> and <code>types</code> remain identifier tokens.
+They are contextual query names recognized only in a
+<code>const for</code> source. They are not ordinary callable functions,
+do not participate in overload resolution, and cannot be replaced or
+shadowed there by a user declaration. A user function or variable of
+either name is unaffected elsewhere. There are no parentheses after
+either query.</p>
+<p>Sketch of the added grammar:</p>
+<pre class="text"><code>expansion      := &quot;const&quot; &quot;for&quot; &quot;&lt;&quot; bindings &quot;&gt;&quot; &quot;in&quot; source &quot;{&quot; fragments &quot;}&quot;
+bindings       := ident (&quot;,&quot; ident)* &quot;,&quot;?
+source         := &quot;fields&quot; &quot;&lt;&quot; type &quot;&gt;&quot;
+                | &quot;types&quot; &quot;&lt;&quot; (type (&quot;,&quot; type)* &quot;,&quot;?)? &quot;&gt;&quot;
+                | &quot;[&quot; (const-expr (&quot;,&quot; const-expr)* &quot;,&quot;?)? &quot;]&quot;</code></pre>
+<p>Here the quoted <code>fields</code> and <code>types</code> spellings
+are contextual identifiers, not lexer keywords. <code>const-expr</code>
+is parsed using the expression grammar and validated against section 3.3
+during specialization. The enclosing list determines the grammar of
+<code>fragments</code>; the compiler does not guess the fragment
+category from the body after parsing it.</p>
+<p>The binding count is exact: two for <code>fields</code>, one for
+either explicit list. V1 has no third field-type binding, index binding,
+binding annotations, or optional outputs. A binding may simply go
+unused. The source is resolved before its own binders enter scope;
+enclosing expansion bindings remain available to it.</p>
+<h2 id="3-expansion-sources">3. Expansion sources</h2>
+<h3 id="31-fields">3.1 Fields</h3>
+<p><code>fields&lt;T&gt;</code> requires a concrete struct type after
+aliases and generic type arguments have been resolved. Const
+qualification does not change the field sequence. References, arrays,
+slices, and ADTs are not implicitly unwrapped or traversed. Enumeration
+of concrete variant payload types is also deferred.</p>
+<p>Fields are visited once each, in declaration order. Padding is
+omitted. An empty struct produces zero entries. Nested structs, arrays,
+and references remain single fields; there is no automatic recursive
+traversal.</p>
+<p>For each entry:</p>
+<ul>
+<li><code>N</code> is the field name as an immutable string constant,
+with the same semantics as an ordinary string literal. It may appear
+wherever that literal is a valid expression.</li>
+<li><code>A</code> identifies the field declaration in its concrete
+owning struct instantiation. It is neither a string nor a runtime
+value.</li>
+</ul>
+<p>The accessor has two substitution positions in v1:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>value<span class="op">.</span><span class="dt">A</span>             <span class="co">// member access</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="dt">T</span> { <span class="dt">A</span><span class="op">:</span> expression } <span class="co">// named initializer label</span></span></code></pre></div>
+<p>The receiver or constructor must have the accessor's owning struct
+type, allowing ordinary reference access and const qualifications. A
+different nominal type, or a different generic instantiation, does not
+match merely because it has a field with the same name. Structural
+matching by name would be a separate feature.</p>
+<p>Access through <code>A</code> has exactly the rules of accessing the
+actual field: copying and reference binding, writability, lifetime
+roots, construction restrictions, and representation adaptations are
+unchanged. In particular, <code>&amp;value.A</code> may be rejected
+where a direct reference to that field would be illegal. Iteration never
+skips a field because the generated operation fails.</p>
+<p><code>A</code> cannot be used as a standalone value, passed as an
+ordinary function argument, stored, used as a type, or turned into an
+offset. V1 does not expose its declared type, default expression,
+attributes, or layout metadata. <code>N</code> does not become an
+accessor simply because it contains a field's name.</p>
+<h3 id="32-type-lists">3.2 Type lists</h3>
+<p><code>types&lt;T1, T2, ...&gt;</code> uses the normal type grammar
+for every entry, including qualified names, aliases, generic
+instantiations, references, and array types. Entries resolve in their
+lexical environment and may mention enclosing generic or expansion
+bindings. Each entry must resolve to a concrete type when expanded. Its
+eventual use must satisfy the ordinary rules for that type and
+position.</p>
+<p>The sole binder behaves as a type parameter within each fragment
+instance:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">U</span><span class="op">&gt;</span> <span class="kw">in</span> <span class="kw">types</span><span class="op">&lt;</span><span class="dt">i32</span><span class="op">,</span> <span class="dt">Pair</span><span class="op">&lt;</span><span class="dt">u8</span><span class="op">&gt;,</span> <span class="kw">const</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">&gt;</span> {</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    check_type<span class="op">&lt;</span><span class="dt">U</span><span class="op">&gt;</span>()<span class="op">;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Types retain their identity and qualifiers; they do not become
+runtime values. Repeated entries produce repeated instances.
+<code>types&lt;&gt;</code> is empty.</p>
+<p>A distinct spelling avoids parsing an entry as both a possible type
+and a possible value expression. In particular,
+<code>[i32, u8[:]]</code> is not a type list.</p>
+<h3 id="33-constant-lists">3.3 Constant lists</h3>
+<p>The square-bracket form is an expansion source, not a runtime array.
+Each entry is validated independently, and entries need not have the
+same type. There is no common-element-type inference, array allocation,
+or runtime evaluation of the source. Repeated entries are preserved;
+<code>[]</code> is empty.</p>
+<p>The initial constant-expression subset is deliberately bounded:</p>
+<ul>
+<li>Integer, character, floating-point, boolean, and string literals; a
+signed numeric literal may use unary <code>-</code> subject to the
+normal representability rules.</li>
+<li>Named global constants that resolve to such values under the
+language's existing constant-use rules. A local merely declared
+<code>const</code> does not acquire compile-time evaluation through this
+feature.</li>
+<li>Integer constant expressions already supported for array sizes and
+fill counts, with their existing type, overflow, and validity
+rules.</li>
+<li>Constant bindings of enclosing <code>const for</code> expansions,
+including their use as operands in those supported integer
+expressions.</li>
+</ul>
+<p>Arbitrary function calls, runtime variables, aggregate construction,
+references, function values, and general floating-point or string
+computation are outside this subset. A nonconstant entry is an error; it
+does not fall back to runtime iteration. This is a specification of
+accepted forms, not permission to accept whatever an optimizer happens
+to fold.</p>
+<p>Materializing a constant binding preserves the distinction between an
+adaptable literal and a value with a declared type. It must not erase a
+named constant's type by replacing it with an untyped numeric token.
+String bindings obey the normal read-only string-literal rules. The
+binding itself is not an addressable loop variable; initializing an
+ordinary local from it follows ordinary value semantics.</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">Label</span><span class="op">&gt;</span> <span class="kw">in</span> [<span class="st">&quot;small&quot;</span><span class="op">,</span> <span class="st">&quot;medium&quot;</span><span class="op">,</span> <span class="st">&quot;large&quot;</span>] {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">register_label</span>(<span class="dt">Label</span>)<span class="op">;</span> <span class="co">// Three ordinary runtime calls.</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>There is no implicit integer range source, array-fill source, or
+lookup of a runtime array variable in v1.</p>
+<h2 id="4-bindings-and-hygiene">4. Bindings and hygiene</h2>
+<p>Substitution follows lexical binding identity, not matching
+identifier text. The compiler must distinguish a reference to an
+expansion binder from an unrelated identifier with the same spelling,
+including across cloned bodies and nested functions. Ordinary shadowing
+rules apply; generated local declarations have distinct identities in
+each instance.</p>
+<p>For member and initializer-label positions, an in-scope accessor
+binding takes precedence over interpreting that spelling as a literal
+field name. This choice must not depend on whether the receiver happens
+to declare a field with that spelling. For example, adding a real field
+named <code>A</code> must not change what <code>value.A</code> means
+inside an expansion binding <code>A</code>. To refer to that literal
+field within such code, choose another accessor binder name.</p>
+<p>Only accessor bindings cause member or initializer-label
+substitution. There is no general substitution into declaration names,
+namespace names, arbitrary tokens, or strings. A binding used in an
+unsupported category is diagnosed rather than stringified or interpreted
+as a runtime object.</p>
+<p>The usual definition-site lookup of generic functions remains in
+force. Expansion does not import names from the function's caller. No
+<code>$</code> token, bracketed member splice, or public compiler-AST
+API is introduced.</p>
+<h2 id="5-fragment-contexts">5. Fragment contexts</h2>
+<h3 id="51-statement-lists">5.1 Statement lists</h3>
+<p>In a function or block body, the expansion body is an ordinary
+statement block, instantiated once per source entry. Each instance has
+its own scope, so local declarations in different instances do not
+collide. The expansion has no result value. Its block must be valid as a
+statement block after the normal handling of trailing expressions.</p>
+<p>Instances execute in source order if control reaches them. Ordinary
+runtime <code>if</code>, <code>for</code>, and <code>while</code>
+constructs inside an instance retain their runtime meaning. They do not
+select which fragments are generated or suppress normal typechecking of
+a branch.</p>
+<p><code>return</code>, <code>return ... from</code>, and returns in
+static function-value callbacks retain their existing lexical semantics.
+A runtime return can prevent later instances from executing; it does not
+change the structural source sequence. The expansion is not a runtime
+loop or a <code>break</code>/<code>continue</code> target. V1 rejects
+<code>break</code> or <code>continue</code> that would cross the
+expansion boundary; loops and breakable blocks wholly within a fragment
+work normally.</p>
+<p>Nested <code>const for</code> expansions are permitted. Inner sources
+may use bindings of outer expansions, and the inner body is expanded in
+that environment.</p>
+<h3 id="52-constructor-initializer-lists">5.2 Constructor initializer
+lists</h3>
+<p>Inside a struct or variant constructor, an expansion body contains
+initializer entries, not statements. Each instance contributes its
+entries to the enclosing initializer list. Nested expansions in that
+list use the same entry grammar.</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> transform_fields<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(value<span class="op">:</span> <span class="dt">T</span><span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">T</span> {</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">T</span> {</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        <span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">N</span><span class="op">,</span> <span class="dt">A</span><span class="op">&gt;</span> <span class="kw">in</span> <span class="kw">fields</span><span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> {</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>            <span class="dt">A</span><span class="op">:</span> <span class="fu">F</span>(<span class="dt">N</span><span class="op">,</span> value<span class="op">.</span><span class="dt">A</span>)<span class="op">,</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>For <code>struct Point { x: i64, y: i64 }</code>, the resulting
+constructor is equivalent to:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="dt">Point</span> {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    x<span class="op">:</span> <span class="fu">F</span>(<span class="st">&quot;x&quot;</span><span class="op">,</span> value<span class="op">.</span>x)<span class="op">,</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    y<span class="op">:</span> <span class="fu">F</span>(<span class="st">&quot;y&quot;</span><span class="op">,</span> value<span class="op">.</span>y)<span class="op">,</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Callbacks execute at runtime, and each result meets its actual
+field's construction destination. No intermediate tuple, array, or
+temporary struct is introduced. A callback that cannot produce a legal
+initializer for one field gives an error at that field's expansion.</p>
+<p>An initializer expression may itself be an ordinary block expression
+when it needs statements or locals. For non-fixed values, that block
+must obey the existing copying and construction rules; expansion adds no
+implicit copies.</p>
+<p>Explicit entries and expansions may appear together. Entry and list
+separators are commas; a final comma in either list is optional. An
+expansion occupies one syntactic position in its enclosing list, so a
+following explicit entry or expansion is separated from its closing
+brace by a comma. Flattening operates on AST entries, not comma-bearing
+text. Zero entries therefore work without punctuation repair. The
+constructor's optional trailing <code>..</code> remains outside the
+expansions and applies to the complete resulting initializer list.</p>
+<p>After flattening, the ordinary constructor checks apply:</p>
+<ul>
+<li>Named and positional entries must not be mixed.</li>
+<li>Unknown, duplicate, excessive, and missing initializers are
+diagnosed.</li>
+<li>Explicit entries do not override generated entries or vice
+versa.</li>
+<li>Declared defaults, optional-field omission, and trailing
+<code>..</code> keep their normal meanings.</li>
+<li>Construction occurs in declaration order, with the existing checks
+on reordering effectful initializers. Expansion does not introduce
+temporaries to accommodate a different runtime order.</li>
+<li><code>self</code>, relative references, lifetime roots, const
+fields, and restrictions on accessing values under construction are
+checked normally.</li>
+</ul>
+<p>Defaults execute when construction reaches them, not while the
+expansion is generated. Expansion must precede missing-field/default
+processing and the checking of individual initializer destinations.</p>
+<h2 id="6-library-use-and-receiver-semantics">6. Library use and
+receiver semantics</h2>
+<p>A field visitor can be an ordinary user-named function:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> visit_fields<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(value<span class="op">:</span> <span class="dt">T</span><span class="op">&amp;</span>) {</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">N</span><span class="op">,</span> <span class="dt">A</span><span class="op">&gt;</span> <span class="kw">in</span> <span class="kw">fields</span><span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> {</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">F</span>(<span class="dt">N</span><span class="op">,</span> <span class="op">&amp;</span>value<span class="op">.</span><span class="dt">A</span>)<span class="op">;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Point</span> { x<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> y<span class="op">:</span> <span class="dt">i64</span> }</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> point <span class="op">=</span> <span class="dt">Point</span> { <span class="dv">2</span><span class="op">,</span> <span class="dv">3</span> }<span class="op">;</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">visit_fields</span>(point) { name<span class="op">,</span> field <span class="op">=&gt;</span> <span class="bu">print</span>(name<span class="op">,</span> <span class="st">&quot; = &quot;</span><span class="op">,</span> field) }</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The receiver is evaluated and bound by the ordinary function call.
+References forwarded through variables and generic helpers retain normal
+semantics; no special mode depends on whether the caller literally wrote
+an <code>&amp;</code> token. The library author chooses reference or
+value expressions for callbacks.</p>
+<p>Accessing several objects needs no additional expansion-source
+form:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> visit_pairs<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(left<span class="op">:</span> <span class="dt">T</span><span class="op">&amp;,</span> right<span class="op">:</span> <span class="dt">T</span><span class="op">&amp;</span>) {</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">const</span> <span class="kw">for</span> <span class="op">&lt;</span><span class="dt">N</span><span class="op">,</span> <span class="dt">A</span><span class="op">&gt;</span> <span class="kw">in</span> <span class="kw">fields</span><span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> {</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">F</span>(<span class="dt">N</span><span class="op">,</span> <span class="op">&amp;</span>left<span class="op">.</span><span class="dt">A</span><span class="op">,</span> <span class="op">&amp;</span>right<span class="op">.</span><span class="dt">A</span>)<span class="op">;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>There is no blanket once-only evaluation guarantee for arbitrary
+expressions written inside an expansion. A call placed there is
+repeated, just as it would be in handwritten generated code. Ordinary
+function parameters and locals provide explicit control over
+evaluation.</p>
+<p>Constructor expansion is useful for transformations and generated
+building code, but v1 does not claim to supply a universal deserializer.
+Field-type, default, variant, and schema-policy queries remain future
+work. In particular, visiting an existing object's field references
+cannot overwrite variable-size fields or <code>varint</code> fields in
+violation of their construction-only rules.</p>
+<h2 id="7-compiler-integration">7. Compiler integration</h2>
+<p>The compiler already checks generic functions at concrete
+specializations (<a href="../goose_spec.html">specification sections 7.7
+and 10</a>). Expansion belongs at that boundary rather than in a
+source-text preprocessing pass.</p>
+<ol type="1">
+<li>Parse <code>const for</code> into an expansion node with binders, a
+source description, and fragments of the enclosing syntactic category.
+Distinguish <code>const for</code> from ordinary <code>const</code>
+declarations. The contextual source grammar also avoids treating the
+angle brackets in <code>fields&lt;T&gt;</code> as comparison
+operators.</li>
+<li>Preserve scoped references to expansion parameters through name
+resolution, as generic parameter uses are preserved today. Type-list
+binders, constants used in sizes, accessor uses in member positions, and
+initializer labels all need to retain their binding identity until
+specialization.</li>
+<li>Resolve the source in the current specialization. Its types and
+constants must be available without first checking the fragments it will
+generate.</li>
+<li>Clone the appropriate fragments per entry with fresh local
+identities and the corresponding expansion bindings. Substitute types,
+materialize constants, and resolve field selectors; recursively expand
+nested forms.</li>
+<li>Check the generated constructs with the ordinary type, effect, root,
+writability, flow, and construction machinery. A constructor's complete
+entry list must exist before its normal initializer checks begin.</li>
+<li>Pass ordinary checked constructs to optimization and code
+generation.</li>
+</ol>
+<p>The parser need not resolve a member named <code>A</code> or know the
+members of <code>T</code>. However, this is not solely an
+identifier-replacement pass: semantic binding information and the
+distinct fragment categories must survive parsing and resolution. The
+existing <code>FieldInit</code> name representation will need a way to
+distinguish literal labels from bound accessors.</p>
+<p>The compiler need not prove a generic expansion valid for every
+possible type. It checks the instances the program reaches, as for other
+generic code. Empty sources create no fragment instances; their bodies
+must still parse, but have no per-entry semantic checks to perform.</p>
+<p>Structural expansion may be cached where its dependencies permit.
+Checked results must not be reused across incompatible reference roots,
+writability provenances, or other existing specialization inputs. The
+implementation bounds expansion growth and reports the expansion chain
+when the limit is exceeded. The current limit is 100,000 AST nodes
+cloned by expansions per compilation, including nested fragments and
+nested function bodies.</p>
+<p>Ordinary field access is the semantic contract, not a promise that
+repeated accesses are already optimal. For variable-size records, check
+generated code for repeated prefix walks and permit existing or future
+optimizations to reuse a forward cursor when dependencies and mutation
+rules allow it. Do not expose fixed byte offsets as the fundamental
+accessor abstraction.</p>
+<h2 id="8-diagnostics-and-tooling">8. Diagnostics and tooling</h2>
+<p>An expansion error should identify the original source location, the
+function specialization, and the relevant field, type, or constant-list
+entry. An unsupported operation should point to the operation as well as
+the entry that made it invalid. A field must never be silently omitted
+on failure.</p>
+<p>Useful diagnostics include incorrect binding arity, a non-struct
+<code>fields</code> source, an unsupported/nonconstant list entry, an
+accessor used on the wrong owning type, a binding used in the wrong
+syntactic category, and duplicate or missing constructor fields after
+expansion.</p>
+<p>The source dump should preserve and round-trip unexpanded syntax. An
+expanded view would be useful for debugging, but adding a new display
+mode is not a prerequisite for the semantics. Source-to-expansion
+provenance must survive cloning even if no expanded view is implemented
+initially.</p>
+<h2 id="9-validation-targets-for-an-implementation">9. Validation
+targets for an implementation</h2>
+<p>Regression fixtures are <code>test/typing/const_for_*.goose</code>
+and the corresponding <code>test/errors/const_for_*.goose</code> and
+<code>test/errors_tc/const_for_*.goose</code> rejection tests. The test
+runner checks source round trips, expected output at <code>-O0</code>
+and <code>-O2</code> through generated C and TinyCC, and expansion
+diagnostics. Coverage includes:</p>
+<ul>
+<li>Statement visitation of heterogeneous, empty, padded,
+const-qualified, and generic structs; declaration order and no implicit
+recursion.</li>
+<li>Accessor binding despite an actual field with the binder's spelling;
+lexical shadowing, nested expansions, and fresh local identities.</li>
+<li>Normal reference forwarding, rejected writes and references, and
+preserved lifetime roots. Coverage should include variable-size fields,
+<code>varint</code>, relative references, and resizable tails.</li>
+<li>Type lists with qualified and compound types, repeated entries, and
+empty lists. Separate instantiation and no runtime type
+representation.</li>
+<li>Constant lists with heterogeneous entries, typed named constants,
+supported integer expressions, outer bindings, empty lists, and rejected
+runtime expressions. Constant bindings used in array sizes and fill
+counts.</li>
+<li>Runtime conditions remain runtime conditions; callbacks and nonlocal
+returns retain their normal behavior; boundary-crossing
+<code>break</code>/<code>continue</code> errors.</li>
+<li>Named and positional constructor expansion, nested expansion,
+zero-entry expansion, explicit entries and commas, duplicate/missing
+fields, and <code>..</code>. Preserve default evaluation,
+declaration-order effects, and construction directly in each
+destination, including non-fixed fields.</li>
+<li>Parse/dump round trips and errors that identify the failing
+expansion entry.</li>
+<li>Generated-code inspection for absent reflection infrastructure,
+ordinary callback dispatch, unnecessary copies, and repeated dynamic
+offset walks.</li>
+</ul>
+<h2 id="10-future-work-explicitly-outside-v1">10. Future work,
+explicitly outside v1</h2>
+<ul>
+<li><strong>Declared field types.</strong> A possible third binding is
+<code>&lt;N, A, U&gt;</code>. V1 accepts only <code>&lt;N, A&gt;</code>.
+A later design must distinguish storage type from read-value type: a
+<code>varint</code> field is declared <code>varint</code> but reads as
+<code>i64</code>, and not every storage type is legal as an ordinary
+function result.</li>
+<li><strong>Constant integer ranges.</strong> Reuse half-open
+<code>lo..hi</code> syntax with constant bounds if adopted. V1 supports
+explicit constant lists only.</li>
+<li><strong>Variants and payloads.</strong> A possible
+<code>variants&lt;T&gt;</code> source, field queries over concrete
+payload types, and expansion into <code>match</code> arm lists.
+Generated matches must retain exhaustiveness and the restrictions on
+taking payload references. <code>variant_name</code> alone would not
+provide these capabilities.</li>
+<li><strong><code>const if</code> or filtering.</strong> Select
+fragments using a deliberately specified set of compile-time predicates.
+This must not be confused with an ordinary runtime <code>if</code>, and
+must not silently introduce arbitrary compile-time calls.</li>
+<li><strong>Additional fragment positions.</strong> Argument lists and
+array-element lists, followed by other justified grammar positions. The
+shared expansion model permits these additions, but each needs explicit
+parsing, ordering, and type-inference rules. Top-level declarations and
+changes to overload sets require a separate design.</li>
+<li><strong>Defaults and annotations.</strong> Queries supporting
+missing-field construction, serialized names, aliases, omissions, and
+migration policies. Defaults may contain runtime work and must not be
+executed during expansion. Names alone do not constitute stable
+persistence identifiers.</li>
+<li><strong>Other metadata.</strong> Field counts, display type names,
+indices, and carefully scoped type properties. Display names should not
+automatically become stable type IDs or wire-format contracts.</li>
+<li><strong>Richer source composition.</strong> User-defined sequence
+computations, sorting, grouping, general macro helpers, and general
+constant execution. These are not implied by the v1 syntax and would
+need an explicit execution model.</li>
+</ul>
+<p>The library can build richer traversal functions over the v1
+primitives without adding another compiler-provided visitor pattern.
+Future reflection information remains compile-time-only unless a program
+explicitly uses it to generate ordinary runtime data or operations.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/const_for.md"><code>docs/design/const_for.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

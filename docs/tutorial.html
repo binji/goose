@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goose, by example · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#goose-by-example" id="toc-goose-by-example">Goose, by
+example</a>
+<ul>
+<li><a href="#1-the-one-idea" id="toc-1-the-one-idea">1. The one
+idea</a></li>
+<li><a href="#2-running-something" id="toc-2-running-something">2.
+Running something</a></li>
+<li><a href="#3-familiar-syntax" id="toc-3-familiar-syntax">3. Familiar
+syntax</a></li>
+<li><a href="#4-where-values-live" id="toc-4-where-values-live">4. Where
+values live</a>
+<ul>
+<li><a href="#scope-exit-is-the-free"
+id="toc-scope-exit-is-the-free">Scope exit is the free</a></li>
+<li><a href="#nothing-moves-so-references-survive-growth"
+id="toc-nothing-moves-so-references-survive-growth">Nothing moves, so
+references survive growth</a></li>
+<li><a href="#copies-are-visible" id="toc-copies-are-visible">Copies are
+visible</a></li>
+</ul></li>
+<li><a href="#5-the-array-family" id="toc-5-the-array-family">5. The
+array family</a></li>
+<li><a href="#6-strings-are-just-byte-arrays"
+id="toc-6-strings-are-just-byte-arrays">6. Strings are just byte
+arrays</a></li>
+<li><a href="#7-slices-that-cannot-dangle"
+id="toc-7-slices-that-cannot-dangle">7. Slices that cannot
+dangle</a></li>
+<li><a href="#8-nested-data-stays-inline"
+id="toc-8-nested-data-stays-inline">8. Nested data stays inline</a></li>
+<li><a href="#9-enums-in-two-sizes" id="toc-9-enums-in-two-sizes">9.
+Enums, in two sizes</a>
+<ul>
+<li><a href="#match-and-match-written-as-functions"
+id="toc-match-and-match-written-as-functions"><code>match</code>, and
+match written as functions</a></li>
+</ul></li>
+<li><a href="#10-linking-things-without-pointers"
+id="toc-10-linking-things-without-pointers">10. Linking things without
+pointers</a>
+<ul>
+<li><a href="#self-and-sentinels"
+id="toc-self-and-sentinels"><code>self</code>, and sentinels</a></li>
+<li><a href="#an-index-for-variable-size-elements"
+id="toc-an-index-for-variable-size-elements">An index for variable-size
+elements</a></li>
+</ul></li>
+<li><a href="#11-when-lifetimes-really-are-not-nested"
+id="toc-11-when-lifetimes-really-are-not-nested">11. When lifetimes
+really are not nested</a></li>
+<li><a href="#12-errors-and-return--from"
+id="toc-12-errors-and-return--from">12. Errors, and
+<code>return … from</code></a></li>
+<li><a href="#13-generics-and-blocks-that-disappear"
+id="toc-13-generics-and-blocks-that-disappear">13. Generics, and blocks
+that disappear</a>
+<ul>
+<li><a href="#several-tables-one-context"
+id="toc-several-tables-one-context">Several tables, one context</a></li>
+</ul></li>
+<li><a href="#14-threads-that-share-nothing"
+id="toc-14-threads-that-share-nothing">14. Threads that share
+nothing</a></li>
+<li><a href="#15-your-data-is-already-a-file-format"
+id="toc-15-your-data-is-already-a-file-format">15. Your data is already
+a file format</a></li>
+<li><a href="#16-calling-c" id="toc-16-calling-c">16. Calling C</a></li>
+<li><a href="#17-about-the-speed" id="toc-17-about-the-speed">17. About
+the speed</a></li>
+<li><a href="#18-what-it-costs-you" id="toc-18-what-it-costs-you">18.
+What it costs you</a></li>
+<li><a href="#19-calling-goose-from-c"
+id="toc-19-calling-goose-from-c">19. Calling Goose from C</a></li>
+<li><a href="#20-where-to-go-next" id="toc-20-where-to-go-next">20.
+Where to go next</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="goose-by-example">Goose, by example</h1>
+<p>This tutorial introduces Goose through examples. It assumes some
+experience with C, C++, Rust, Go, or a similar language and focuses on
+Goose's differences. Start here, go on to <a href="reference.html">the
+language reference</a> for the whole language topic by topic, consult <a
+href="goose_spec.html">the specification</a> for exact rules, and see <a
+href="../samples/index.html"><code>samples/</code></a> for complete
+programs.</p>
+<p>Much of the syntax is familiar: braces, <code>let</code>,
+<code>fn</code>, <code>struct</code>, and <code>match</code>. The main
+difference is how arrays store and manage data. We start with where
+values live, since that explains many of the language's other
+choices.</p>
+<hr />
+<h2 id="1-the-one-idea">1. The one idea</h2>
+<p>Here is an array of strings.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> words<span class="op">:</span> <span class="dt">u8</span>[][<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i <span class="kw">in</span> <span class="dv">5</span> { words<span class="op">.</span><span class="bu">push</span>(<span class="bu">str</span>(<span class="st">&quot;word&quot;</span><span class="op">,</span> i))<span class="op">;</span> }</span></code></pre></div>
+<p>In C++ that is a <code>vector&lt;string&gt;</code>: one heap
+allocation for the vector, one per string, a pointer and a capacity per
+element, and a walk over all of them when it goes out of scope. In Rust
+it is a <code>Vec&lt;String&gt;</code> with the same shape.</p>
+<p>In Goose it is <strong>one contiguous block of bytes</strong> — a
+length, then five back-to-back <code>(length, characters)</code> runs —
+that came into existence by bumping a pointer, and that disappears when
+the enclosing scope ends by moving that pointer back. No heap allocator
+or per-string deallocation is needed, and the block contains no
+pointers.</p>
+<pre><code>words:  05 00 00 00 | 05 w o r d 0 | 05 w o r d 1 | 05 w o r d 2 | ...</code></pre>
+<p>The memory model has four main properties:</p>
+<ul>
+<li>Memory is a handful of big <strong>data stacks</strong>. Growth is a
+pointer bump.</li>
+<li>Every dynamic value is <strong>owned by a variable</strong>. The
+only deallocation is a scope ending, which resets a pointer.</li>
+<li>Values nest <strong>inline</strong>. A string inside a struct inside
+an array is bytes inside bytes inside bytes.</li>
+<li>You may still take <strong>references into a growing
+container</strong>, and the compiler proves they never dangle — no
+annotations, no <code>'a</code>, no <code>Rc</code>.</li>
+</ul>
+<p>This model has limitations, listed in <a
+href="#18-what-it-costs-you">section 18</a> with the rules that impose
+them and how to work with each, and measurable benefits: over sixteen
+benchmarks Goose runs at about <strong>3.3x the speed of idiomatic
+C++</strong>, roughly level with hand-tuned C++ and with the best safe
+Rust, on <strong>1.9x less memory</strong> than the C++ and 1.2x less
+than the Rust (<a
+href="../bench/summary.html"><code>bench/summary.md</code></a>). Most of
+the gains come from differences in data layout and memory
+management.</p>
+<hr />
+<h2 id="2-running-something">2. Running something</h2>
+<p>Goose compiles the whole program to C and builds that with whatever C
+compiler is around, into an executable beside the source:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> build hello.goose <span class="kw">&amp;&amp;</span> <span class="ex">./hello</span></span></code></pre></div>
+<p>(<code>goose -o hello.c hello.goose</code> writes the C for you to
+build yourself, and <code>goose build --dry-run hello.goose</code>
+prints the commands. <a href="packages.html">packages.md</a> has the
+rest of <code>goose build</code>, and how a program uses libraries from
+other repositories.)</p>
+<p>The bundled TinyCC backend skips the C compiler: with no verb, or
+with <code>goose run</code>, the program is compiled into the compiler's
+own process and run there, which is what you want while you are reading
+this:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> hello.goose</span></code></pre></div>
+<p>Here is a minimal program:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">&quot;hello, goose&quot;</span>)<span class="op">;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>print</code> takes any number of arguments of any type, renders
+each as text and writes the lot as a single line (a single
+<code>write</code>, so two threads never interleave). There is no format
+string and no <code>&lt;&lt;</code>.</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">&quot;answer=&quot;</span><span class="op">,</span> <span class="dv">42</span><span class="op">,</span> <span class="st">&quot; ratio=&quot;</span><span class="op">,</span> <span class="fl">0.75</span><span class="op">,</span> <span class="st">&quot; yes=&quot;</span><span class="op">,</span> <span class="dv">3</span> <span class="op">&gt;</span> <span class="dv">2</span>)<span class="op">;</span></span></code></pre></div>
+<p>Everything renders, not just scalars: arrays print as
+<code>[1, 2, 3]</code>, structs as <code>Point { 1, 2 }</code>, a
+<code>u8</code> array as its bytes. This is why the samples print so
+much — printing is a convenient way to inspect values.</p>
+<hr />
+<h2 id="3-familiar-syntax">3. Familiar syntax</h2>
+<p><code>let</code> creates a binding that cannot be reassigned;
+<code>var</code> allows reassignment. Neither makes the contents
+read-only: use <code>const</code> for that. Types follow the name and
+can usually be inferred:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> answer <span class="op">=</span> <span class="dv">42</span><span class="op">;</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> count<span class="op">:</span> <span class="dt">i32</span> <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> ratio <span class="op">=</span> <span class="fl">0.75</span><span class="op">;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>count <span class="op">+=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>count<span class="op">++;</span>              <span class="co">// a statement, not an expression</span></span></code></pre></div>
+<p>A struct literal names its fields or lists them in order, and may
+leave out those that declare a default. Ending it in <code>..</code>
+leaves out any field: one without a declared default gets its type's own
+(zero, an empty array or string, null). Globals are declared like
+locals, and a <code>var</code> global given only a type starts out the
+same way:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Unit</span> { kind<span class="op">:</span> <span class="dt">i32</span><span class="op">,</span> hp<span class="op">:</span> <span class="dt">i32</span> <span class="op">=</span> <span class="dv">100</span><span class="op">,</span> x<span class="op">:</span> <span class="dt">f32</span><span class="op">,</span> y<span class="op">:</span> <span class="dt">f32</span><span class="op">,</span> name<span class="op">:</span> <span class="dt">u8</span>[] }</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> scout <span class="op">=</span> <span class="dt">Unit</span> { kind<span class="op">:</span> <span class="dv">2</span><span class="op">,</span> x<span class="op">:</span> <span class="fl">1.5</span><span class="op">,</span> <span class="op">..</span> }<span class="op">;</span>   <span class="co">// hp 100, y 0, name &quot;&quot;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> selected<span class="op">:</span> <span class="dt">Unit</span><span class="op">;</span>                         <span class="co">// kind 0, hp 100, x 0, y 0, name &quot;&quot;</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> log<span class="op">:</span> <span class="dt">u8</span>[][<span class="op">&gt;..</span>]<span class="op">;</span>                         <span class="co">// empty</span></span></code></pre></div>
+<p>Functions are free functions. There are no methods and no
+<code>impl</code> blocks, but <code>x.f(a)</code> is <em>exactly</em>
+<code>f(x, a)</code>, so you can write method-call syntax wherever it
+reads better:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">total</span>(xs<span class="op">:</span> <span class="dt">i64</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span> {</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> t <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> x <span class="kw">in</span> xs { t <span class="op">+=</span> x<span class="op">;</span> }</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> t<span class="op">;</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>if</code>, <code>match</code>, <code>block</code> and
+<code>{ }</code> are <strong>expressions</strong> — a block's value is
+its trailing expression — so there is no ternary and no "declare it then
+assign in every branch":</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> kind  <span class="op">=</span> <span class="kw">if</span> hp <span class="op">&gt;</span> <span class="dv">50</span> { <span class="st">&quot;healthy&quot;</span> } <span class="kw">else</span> { <span class="st">&quot;hurt&quot;</span> }<span class="op">;</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> level <span class="op">=</span> <span class="kw">match</span> hp { <span class="dv">0</span> <span class="op">=&gt;</span> <span class="st">&quot;dead&quot;</span><span class="op">,</span> <span class="dv">1</span><span class="op">..</span><span class="dv">50</span> <span class="op">=&gt;</span> <span class="st">&quot;low&quot;</span><span class="op">,</span> _ <span class="op">=&gt;</span> <span class="st">&quot;fine&quot;</span> }<span class="op">;</span></span></code></pre></div>
+<p><code>guard</code> states what the rest of its block depends on:
+<code>guard c;</code> runs the rest of the block only where
+<code>c</code> holds, and <code>guard c else { … }</code> runs the
+<code>else</code> block instead, which is where a <code>return</code>,
+<code>break</code> or <code>continue</code> leaves more than the block.
+<code>block</code> gives <code>break</code> a target without a loop, so
+a chain of checks can bail out with a value:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> verdict <span class="op">=</span> <span class="kw">block</span> {</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">guard</span> p<span class="op">.</span>alive <span class="kw">else</span> { <span class="kw">break</span> <span class="st">&quot;gone&quot;</span><span class="op">;</span> }</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">guard</span> p<span class="op">.</span>hp <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">else</span> { <span class="kw">break</span> <span class="st">&quot;dead&quot;</span><span class="op">;</span> }</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;standing&quot;</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>}<span class="op">;</span></span></code></pre></div>
+<p>Loops are <code>for x in range_or_array</code>, <code>while</code>,
+and <code>loop</code>:</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i <span class="kw">in</span> <span class="dv">3</span> { }              <span class="co">// 0, 1, 2</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i <span class="kw">in</span> <span class="dv">10</span><span class="op">..</span><span class="dv">13</span> { }         <span class="co">// 10, 11, 12</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i<span class="op">:</span> <span class="dt">i32</span> <span class="kw">in</span> <span class="dv">0</span><span class="op">..</span>n { }      <span class="co">// i is an i32; n must widen to one</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i<span class="op">:</span> <span class="dt">u8</span> <span class="kw">in</span> <span class="dv">0</span><span class="op">..</span><span class="dv">256</span> { }     <span class="co">// every u8</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> x <span class="kw">in</span> xs { }             <span class="co">// copies, for fixed-size elements</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> <span class="op">&amp;</span>x <span class="kw">in</span> xs { x <span class="op">*=</span> <span class="dv">2</span><span class="op">;</span> }    <span class="co">// references: the mutation form</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> x<span class="op">,</span> i <span class="kw">in</span> xs { }          <span class="co">// with the index</span></span></code></pre></div>
+<p>Several return values are a calling convention, not a tuple type —
+there is no tuple type — and by custom a trailing <code>bool</code> says
+whether the rest means anything:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">divide</span>(a<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span><span class="op">,</span> <span class="dt">bool</span> {</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> b <span class="op">==</span> <span class="dv">0</span> { <span class="kw">return</span> <span class="dv">0</span><span class="op">,</span> <span class="cn">false</span><span class="op">;</span> }</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> a <span class="op">/</span> b<span class="op">,</span> <span class="cn">true</span><span class="op">;</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> q<span class="op">,</span> ok <span class="op">=</span> <span class="fu">divide</span>(<span class="dv">7</span><span class="op">,</span> <span class="dv">2</span>)<span class="op">;</span></span></code></pre></div>
+<p>Variables (or fields, or elements) that already exist take them with
+<code>=</code>: <code>q, ok = divide(9, 3);</code>.</p>
+<p>Only <code>return</code> and a call's results carry several values,
+so a branch can't end in <code>a, b</code>:
+<code>return if c { 1, 2 } else { 3, 4 };</code> is an error, and each
+branch returns on its own, as <code>divide</code> does.</p>
+<p>Trailing parameters can have defaults, which a call may leave
+out:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">limit</span>(x<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> lo<span class="op">:</span> <span class="dt">i64</span> <span class="op">=</span> <span class="dv">0</span><span class="op">,</span> hi<span class="op">:</span> <span class="dt">i64</span> <span class="op">=</span> <span class="dv">100</span>) <span class="op">-&gt;</span> <span class="dt">i64</span> {</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> x <span class="op">&lt;</span> lo { lo } <span class="kw">else</span> <span class="kw">if</span> x <span class="op">&gt;</span> hi { hi } <span class="kw">else</span> { x }</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="fu">limit</span>(<span class="dv">250</span>)<span class="op">,</span> <span class="st">&quot; &quot;</span><span class="op">,</span> <span class="fu">limit</span>(<span class="op">-</span><span class="dv">5</span><span class="op">,</span> <span class="op">-</span><span class="dv">10</span>))<span class="op">;</span>   <span class="co">// 100 -5</span></span></code></pre></div>
+<p>A default is evaluated at each call that leaves it out. It names what
+a top-level declaration can — globals, constants, functions — and never
+the caller's variables, whatever their names.</p>
+<p>Three arithmetic rules need particular attention:</p>
+<p><strong>Arithmetic happens at the operands' own width.</strong>
+<code>u8 + u8</code> is an 8-bit add. A narrower type widens into a
+wider one implicitly; nothing narrows without <code>as</code>
+(range-checked in debug) or <code>as!</code> (never checked).
+<code>u32 + i32</code> is a compile error asking which one you meant —
+the language will not silently promote both to 64 bits. The declared
+widths determine the operation. Integers become floats implicitly, so
+<code>n * x</code> with <code>x: f32</code> is an <code>f32</code>
+multiply; a float becomes an integer only through <code>as</code>. A
+float literal has no width of its own, and neither does an expression of
+float literals and integers: <code>n * 0.5</code> is computed in
+<code>f32</code> when it is passed to an <code>f32</code> parameter, and
+is an <code>f64</code> in <code>let h = n * 0.5;</code>. An
+<code>if</code> or <code>match</code> whose branches are all literals
+adapts as a literal does, and a literal branch takes the other branches'
+type: <code>if big { x } else { 0.5 }</code> is an <code>f32</code> for
+an <code>x: f32</code>.</p>
+<p>A cast that changes nothing is a warning, so the compiler points out
+the ones these rules make unnecessary: with <code>b: u8</code>,
+<code>let w: i64 = b as i64;</code> says
+<code>redundant `as i64`: a u8 converts to i64 implicitly here</code>. A
+cast that picks a type or an operation's width, as in
+<code>let id = b as i32;</code> or <code>(a as i64) * b</code>, is no
+such cast.</p>
+<p><strong><code>%</code> is Euclidean.</strong> The result is in
+<code>[0, |b|)</code> and never negative, at every integer type. So
+<code>x % n</code> is a valid index into a length-<code>n</code> array
+for <em>any</em> <code>x</code>, and the compiler can drop the bounds
+check instead of demanding a guard you know is redundant.</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="op">-</span><span class="dv">7</span> <span class="op">%</span> <span class="dv">3</span><span class="op">,</span> <span class="st">&quot; &quot;</span><span class="op">,</span> <span class="dv">7</span> <span class="op">%</span> <span class="op">-</span><span class="dv">3</span>)<span class="op">;</span>       <span class="co">// 2 1</span></span></code></pre></div>
+<p><strong>Unsigned arithmetic wraps, in every build</strong>, by
+definition — that is what hashes and PRNGs mean by unsigned math. Signed
+overflow aborts in debug and wraps in release.</p>
+<hr />
+<h2 id="4-where-values-live">4. Where values live</h2>
+<p>A Goose program has the native call stack, some static data, and
+<strong>N data stacks</strong>, where N is a small number the compiler
+works out for your program. A data stack is a multi-gigabyte
+address-space reservation with a bump pointer. That is the entire memory
+system. There is no <code>malloc</code>, no free list, no GC, no
+reference counting, no destructors.</p>
+<p>So every dynamic value is owned by a variable, and the rules that
+make this work are:</p>
+<ol type="1">
+<li>Values are pushed in lifetime order and popped <strong>en
+masse</strong> when the owning scope exits.</li>
+<li>At most one <em>resizable</em> value is live per stack, and it is
+the topmost thing on that stack for its entire lifetime. So growth is a
+pointer bump with no capacity check and <strong>no move,
+ever</strong>.</li>
+</ol>
+<p>The compiler proves all of this statically. There is no runtime
+bookkeeping beyond the bump pointers.</p>
+<p>"One resizable per stack" sounds alarming until you notice the plural
+in "N data stacks": three growable arrays alive at once simply get three
+stacks, and stacks are recycled the moment a scope frees one. N is
+whatever the deepest point of your program needs, computed once at
+compile time. An unused stack needs only reserved address space. You
+never write any of this down — there is no syntax for a stack anywhere
+in the language.</p>
+<h3 id="scope-exit-is-the-free">Scope exit is the free</h3>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> round <span class="kw">in</span> <span class="dv">3</span> {</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> scratch<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> <span class="dv">100000</span> { scratch<span class="op">.</span><span class="bu">push</span>((i <span class="op">%</span> <span class="dv">256</span>) <span class="kw">as</span><span class="op">!</span> <span class="dt">u8</span>)<span class="op">;</span> }</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">&quot;round &quot;</span><span class="op">,</span> round<span class="op">,</span> <span class="st">&quot;: &quot;</span><span class="op">,</span> scratch<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; bytes of scratch&quot;</span>)<span class="op">;</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Each iteration gets a fresh 100 KB buffer, and at the closing brace
+the stack's top goes back to where it was. No destructor runs. No list
+is walked. The cost of "freeing" that buffer is one store.</p>
+<h3 id="nothing-moves-so-references-survive-growth">Nothing moves, so
+references survive growth</h3>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Item</span> { id<span class="op">:</span> <span class="dt">i32</span><span class="op">,</span> weight<span class="op">:</span> <span class="dt">f32</span> }</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> items<span class="op">:</span> <span class="dt">Item</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> first <span class="op">.=</span> items<span class="op">.</span><span class="bu">push</span>(<span class="dt">Item</span> { <span class="dv">1</span><span class="op">,</span> <span class="fl">0.5</span> })<span class="op">;</span>          <span class="co">// a reference to element 0</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i <span class="kw">in</span> <span class="dv">2</span><span class="op">..</span><span class="dv">1000001</span> { items<span class="op">.</span><span class="bu">push</span>(<span class="dt">Item</span> { i <span class="kw">as</span> <span class="dt">i32</span><span class="op">,</span> <span class="fl">0.0</span> })<span class="op">;</span> }</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>first<span class="op">.</span>weight <span class="op">=</span> <span class="fl">99.5</span><span class="op">;</span>                               <span class="co">// still valid, a million pushes later</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(items<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; items, first is &quot;</span><span class="op">,</span> items[<span class="dv">0</span>])<span class="op">;</span></span></code></pre></div>
+<pre><code>1000000 items, first is Item { 1, 99.5 }</code></pre>
+<p>A <code>vector&lt;T&gt;</code> cannot promise that and a
+<code>Vec&lt;T&gt;</code> cannot either: both reallocate, so both
+invalidate. This single property is why so much Goose code holds typed
+references where the equivalent Rust holds <code>u32</code> indices into
+an arena — and it is where a good share of the benchmark wins come
+from.</p>
+<p><code>push</code> returns a reference to the element it just made,
+which is the idiomatic way to link up data you are building.</p>
+<h3 id="copies-are-visible">Copies are visible</h3>
+<p>Fixed-size values (scalars, structs, fixed arrays, references,
+slices) copy silently on assignment, like C. <strong>Non-fixed values
+never copy implicitly</strong>, because that copy is O(size) and you
+should see it:</p>
+<div class="sourceCode" id="cb19"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> a<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..</span>] <span class="op">=</span> [<span class="dv">1</span><span class="op">,</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">3</span>]<span class="op">;</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> b <span class="op">=</span> <span class="bu">copy</span>(a)<span class="op">;</span>      <span class="co">// an explicit, visible O(n) copy</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>b<span class="op">.</span><span class="bu">push</span>(<span class="dv">4</span>)<span class="op">;</span></span></code></pre></div>
+<p>Without the <code>copy</code>, <code>var b = a;</code> binds
+<code>b</code> to <code>a</code> by reference. Same at a call:
+<code>f(xs)</code> hands a growable array to
+<code>fn f(xs: i64[:])</code>, to
+<code>fn f(xs: i64[&gt;..]&amp;)</code> and to an untyped
+<code>fn f(xs)</code> alike, all by reference, without copying the
+elements. A function that needs its own copy uses <code>copy</code>.</p>
+<hr />
+<h2 id="5-the-array-family">5. The array family</h2>
+<p>There is no one "array type". There are several, and they differ in
+exactly one respect: what happens to the size.</p>
+<table>
+<thead>
+<tr>
+<th>Spelling</th>
+<th>What it is</th>
+<th>Metadata</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>T[k]</code></td>
+<td>fixed size, known at compile time</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>T[]</code></td>
+<td>sized at construction, frozen after</td>
+<td>a length</td>
+</tr>
+<tr>
+<td><code>T[varint]</code></td>
+<td>the same, with a variable-length length</td>
+<td>1–2 bytes usually</td>
+</tr>
+<tr>
+<td><code>T[..k]</code></td>
+<td>capacity <code>k</code> inline, grows and shrinks within it</td>
+<td>a small length</td>
+</tr>
+<tr>
+<td><code>T[..]</code></td>
+<td>capacity chosen at construction</td>
+<td>length + capacity</td>
+</tr>
+<tr>
+<td><code>T[&gt;..]</code></td>
+<td><strong>grow-only</strong>: the workhorse</td>
+<td>a length</td>
+</tr>
+<tr>
+<td><code>T[&gt;..&lt;]</code></td>
+<td><strong>grow-shrink</strong>: stacks, queues, heaps</td>
+<td>a length</td>
+</tr>
+</tbody>
+</table>
+<p>In every one of them the representation is
+<code>[metadata][elements...]</code>, inline and packed. There is never
+a pointer to an element block.</p>
+<div class="sourceCode" id="cb20"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> fixed<span class="op">:</span> <span class="dt">i32</span>[<span class="dv">4</span>] <span class="op">=</span> [<span class="dv">1</span><span class="op">,</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">3</span><span class="op">,</span> <span class="dv">4</span>]<span class="op">;</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> zeros<span class="op">:</span> <span class="dt">f64</span>[<span class="dv">8</span>] <span class="op">=</span> [<span class="fl">0.0</span><span class="op">;</span> <span class="dv">8</span>]<span class="op">;</span>      <span class="co">// fill form</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> frozen<span class="op">:</span> <span class="dt">i64</span>[] <span class="op">=</span> [<span class="dv">7</span><span class="op">,</span> <span class="dv">8</span><span class="op">,</span> <span class="dv">9</span>]<span class="op">;</span>     <span class="co">// sized once, never changes</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> grow<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span>           <span class="co">// arenas, builders, pools, tree storage</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i <span class="kw">in</span> <span class="dv">5</span> { grow<span class="op">.</span><span class="bu">push</span>(i <span class="op">*</span> i)<span class="op">;</span> }</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> stack<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..&lt;</span>] <span class="op">=</span> []<span class="op">;</span>         <span class="co">// the one that pops</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>stack<span class="op">.</span><span class="bu">push</span>(<span class="dv">1</span>)<span class="op">;</span> stack<span class="op">.</span><span class="bu">push</span>(<span class="dv">2</span>)<span class="op">;</span> stack<span class="op">.</span><span class="bu">push</span>(<span class="dv">3</span>)<span class="op">;</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> top <span class="op">=</span> stack<span class="op">.</span><span class="bu">pop</span>()<span class="op">;</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>stack<span class="op">.</span><span class="bu">pop_n</span>(<span class="dv">2</span>)<span class="op">;</span>                    <span class="co">// drops the last two at once</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> small<span class="op">:</span> <span class="dt">u8</span>[<span class="op">..</span><span class="dv">8</span>] <span class="op">=</span> []<span class="op">;</span>           <span class="co">// lives inline anywhere a fixed value can</span></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>small<span class="op">.</span><span class="bu">push</span>(<span class="ch">&#39;h&#39;</span>)<span class="op">;</span> small<span class="op">.</span><span class="bu">push</span>(<span class="ch">&#39;i&#39;</span>)<span class="op">;</span></span></code></pre></div>
+<p>Which to reach for:</p>
+<ul>
+<li><strong><code>[&gt;..]</code> is the default.</strong> Arenas,
+pools, string builders, tree storage, scratch that gets refilled between
+phases. "Grow-only" names the <em>guarantee</em> — references into it
+stay valid — not the operation set; it can still <code>pop</code> and
+<code>clear</code> at points where the compiler can see nothing is
+pointing into it.</li>
+<li><strong><code>[&gt;..&lt;]</code></strong> for a stack or priority
+queue. The price is that references into it may live in variables only,
+never in storage, so the compiler can track them when checking a
+shrink.</li>
+<li><strong><code>[..k]</code> / <code>[..]</code></strong> when the
+thing must sit inline inside something else: a 16-byte name inside a
+struct, a small list inside an array element.</li>
+<li><strong><code>[]</code> / <code>[varint]</code></strong> for
+finished data: a string in a record, a node in a pool, anything built
+once and then only read.</li>
+</ul>
+<p>Only <code>[&gt;..]</code> and <code>[&gt;..&lt;]</code> are
+"resizable", and it is those that the one-per-stack rule applies to.
+Everything else can go anywhere.</p>
+<hr />
+<h2 id="6-strings-are-just-byte-arrays">6. Strings are just byte
+arrays</h2>
+<p>There is no string type. A string is any array-family type with
+<code>u8</code> elements, and which one you pick says what you want:</p>
+<ul>
+<li><code>u8[&gt;..]</code> — a builder. Appending is a pointer
+bump.</li>
+<li><code>u8[]</code> / <code>u8[varint]</code> — a finished string,
+stored inline in whatever holds it.</li>
+<li><code>u8[..16]</code> — a small string that lives inside a struct
+with no indirection.</li>
+<li><code>u8[:]</code> — a <em>view</em> of somebody else's bytes. A
+string literal is one of these, specifically a <code>const u8[:]</code>,
+since literals live in read-only static data.</li>
+</ul>
+<div class="sourceCode" id="cb21"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>s<span class="op">.</span><span class="bu">append</span>(<span class="st">&quot;hello&quot;</span>)<span class="op">;</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>s<span class="op">.</span><span class="bu">push</span>(<span class="ch">&#39;,&#39;</span>)<span class="op">;</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="bu">format</span>(s<span class="op">,</span> <span class="st">&quot; world! &quot;</span><span class="op">,</span> <span class="dv">6</span> <span class="op">*</span> <span class="dv">7</span>)<span class="op">;</span>       <span class="co">// format appends the text of anything</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(s<span class="op">,</span> <span class="st">&quot; [&quot;</span><span class="op">,</span> s<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; bytes]&quot;</span>)<span class="op">;</span></span></code></pre></div>
+<pre><code>hello, world! 42 [16 bytes]</code></pre>
+<p>Text that spans lines is a <code>"""</code> string. It is raw, with
+no escapes, and the indentation of its closing <code>"""</code> comes
+off every line, so it sits in the code at the code's own
+indentation:</p>
+<div class="sourceCode" id="cb23"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">&quot;&quot;&quot;</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="st">    usage: wc [-l] file</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="st">      -l   count lines only</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;&quot;&quot;</span>)<span class="op">;</span></span></code></pre></div>
+<pre><code>usage: wc [-l] file
+  -l   count lines only</code></pre>
+<p><code>str(...)</code> formats into a fresh string built <em>directly
+at its destination</em>:</p>
+<div class="sourceCode" id="cb25"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>words<span class="op">.</span><span class="bu">push</span>(<span class="bu">str</span>(<span class="st">&quot;word&quot;</span><span class="op">,</span> i))<span class="op">;</span>         <span class="co">// written straight into the new element</span></span></code></pre></div>
+<p>There is no temporary string that is then copied into the array. The
+copy-free construction guarantee (<a
+href="goose_spec.html#43-the-in-place-construction-guarantee">spec
+§4.3</a>) says a constructed value is always built in its final home,
+propagated top-down through calls, and the compiler is required not to
+need a fallback.</p>
+<p>Slicing text costs nothing, because a slice is a pointer and a count
+into bytes that already exist:</p>
+<div class="sourceCode" id="cb26"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> line <span class="op">=</span> <span class="st">&quot;  key = some value  &quot;</span><span class="op">;</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> body <span class="op">=</span> <span class="fu">trim</span>(line)<span class="op">;</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> eq   <span class="op">=</span> <span class="fu">find</span>(body<span class="op">,</span> <span class="st">&quot;=&quot;</span>)<span class="op">;</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">&quot;&#39;&quot;</span><span class="op">,</span> <span class="fu">trim</span>(body[<span class="op">..</span>eq])<span class="op">,</span> <span class="st">&quot;&#39; -&gt; &#39;&quot;</span><span class="op">,</span> <span class="fu">trim</span>(body[eq <span class="op">+</span> <span class="dv">1</span><span class="op">..</span>])<span class="op">,</span> <span class="st">&quot;&#39;&quot;</span>)<span class="op">;</span></span></code></pre></div>
+<pre><code>&#39;key&#39; -&gt; &#39;some value&#39;</code></pre>
+<p><code>split</code> gives you an <strong>array of slices into the
+input</strong> — a few bytes per part, with no text copied, where most
+languages hand back a list of freshly allocated strings:</p>
+<div class="sourceCode" id="cb28"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> parts <span class="op">=</span> <span class="fu">split</span>(<span class="st">&quot;alice,30,paris&quot;</span><span class="op">,</span> <span class="ch">&#39;,&#39;</span>)<span class="op">;</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(parts<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; parts: &quot;</span><span class="op">,</span> parts)<span class="op">;</span>      <span class="co">// 3 parts: [&quot;alice&quot;, &quot;30&quot;, &quot;paris&quot;]</span></span></code></pre></div>
+<p><code>words</code> splits at runs of whitespace instead, and drops
+the empty parts, as a command line wants:</p>
+<div class="sourceCode" id="cb29"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> cmd <span class="op">=</span> <span class="fu">words</span>(<span class="st">&quot;  go   north &quot;</span>)<span class="op">;</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(cmd<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; words: &quot;</span><span class="op">,</span> cmd)<span class="op">;</span>          <span class="co">// 2 words: [&quot;go&quot;, &quot;north&quot;]</span></span></code></pre></div>
+<p>And a struct can hold its strings inline, so an array of them is one
+block you can sort and copy as plain data:</p>
+<div class="sourceCode" id="cb30"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Person</span> { name<span class="op">:</span> <span class="dt">u8</span>[<span class="op">..</span><span class="dv">16</span>]<span class="op">,</span> age<span class="op">:</span> <span class="dt">i32</span> }</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="co">// A `format` overload makes print/str/format render a Person your way.</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="bu">format</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> p<span class="op">:</span> <span class="dt">Person</span>) { <span class="bu">format</span>(out<span class="op">,</span> p<span class="op">.</span>name<span class="op">,</span> <span class="st">&quot; (&quot;</span><span class="op">,</span> p<span class="op">.</span>age<span class="op">,</span> <span class="st">&quot;)&quot;</span>)<span class="op">;</span> }</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> people<span class="op">:</span> <span class="dt">Person</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>people<span class="op">.</span><span class="bu">push</span>(<span class="dt">Person</span> { name<span class="op">:</span> <span class="st">&quot;ada&quot;</span><span class="op">,</span> age<span class="op">:</span> <span class="dv">36</span> })<span class="op">;</span></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>people<span class="op">.</span><span class="bu">push</span>(<span class="dt">Person</span> { name<span class="op">:</span> <span class="st">&quot;grace&quot;</span><span class="op">,</span> age<span class="op">:</span> <span class="dv">45</span> })<span class="op">;</span></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> p <span class="op">=</span> <span class="dt">Person</span> { name<span class="op">:</span> <span class="st">&quot;&quot;</span><span class="op">,</span> age<span class="op">:</span> <span class="dv">20</span> }<span class="op">;</span></span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a><span class="bu">format</span>(p<span class="op">.</span>name<span class="op">,</span> <span class="st">&quot;linus&quot;</span>)<span class="op">;</span>        <span class="co">// a limited array is a builder too, up to capacity</span></span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>people<span class="op">.</span><span class="bu">push</span>(p)<span class="op">;</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(people)<span class="op">;</span></span></code></pre></div>
+<pre><code>[ada (36), grace (45), linus (20)]</code></pre>
+<p>A value that is one string or another is a view of whichever it is:
+where one branch is a slice, as a literal is, a branch giving such a
+field gives a whole-array slice of it, with nothing copied, and the
+<code>if</code> is a <code>const u8[:]</code>:</p>
+<div class="sourceCode" id="cb32"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> who <span class="op">=</span> <span class="kw">if</span> people<span class="op">.</span><span class="bu">len</span> <span class="op">&gt;</span> <span class="dv">3</span> { <span class="st">&quot;a crowd&quot;</span> } <span class="kw">else</span> { people[<span class="dv">1</span>]<span class="op">.</span>name }<span class="op">;</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(who)<span class="op">;</span>                             <span class="co">// grace</span></span></code></pre></div>
+<hr />
+<h2 id="7-slices-that-cannot-dangle">7. Slices that cannot dangle</h2>
+<p><code>T[:]</code> is a reference plus a count: C++'s
+<code>span</code>/<code>string_view</code>, or Rust's
+<code>&amp;[T]</code>, and lets a function process a range from any
+array kind without copying its elements.</p>
+<div class="sourceCode" id="cb33"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">total</span>(xs<span class="op">:</span> <span class="dt">i64</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span> { <span class="kw">var</span> t <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> <span class="kw">for</span> x <span class="kw">in</span> xs { t <span class="op">+=</span> x<span class="op">;</span> } <span class="kw">return</span> t<span class="op">;</span> }</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="fu">total</span>(fixed)<span class="op">;</span>         <span class="co">// a T[k]</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="fu">total</span>(grow)<span class="op">;</span>          <span class="co">// a T[&gt;..]</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a><span class="fu">total</span>(grow[<span class="dv">1</span><span class="op">..</span><span class="dv">4</span>])<span class="op">;</span>    <span class="co">// a sub-range</span></span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a><span class="fu">total</span>(grow[<span class="op">^</span><span class="dv">2</span><span class="op">..</span>])<span class="op">;</span>    <span class="co">// ^k counts from the end</span></span></code></pre></div>
+<p>Any slice-typed destination takes an array that way, not only a
+parameter: a variable, a field, an element or a return. The slice views
+the array itself, as <code>fixed[..]</code> would, and is
+<code>const</code> where the array is:</p>
+<div class="sourceCode" id="cb34"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> view<span class="op">:</span> <span class="kw">const</span> <span class="dt">i64</span>[<span class="op">:</span>] <span class="op">=</span> fixed<span class="op">;</span>   <span class="co">// fixed itself, not a copy</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>fixed[<span class="dv">0</span>] <span class="op">=</span> <span class="dv">99</span><span class="op">;</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(view[<span class="dv">0</span>])<span class="op">;</span>                   <span class="co">// 99</span></span></code></pre></div>
+<p>The difference from <code>string_view</code> is that this one is
+checked. Every reference and slice carries a static
+<strong>root</strong> — the variable that bounds the lifetime of what it
+points at — and the entire lifetime system is one rule:</p>
+<blockquote>
+<p>A reference must not outlive the variable that owns its target, and
+must never observe its target at a wrong type.</p>
+</blockquote>
+<p>There are <strong>no lifetime annotations anywhere in the
+language</strong>. Roots are inferred, and functions are specialized per
+root, which gets you Rust-lifetime precision through monomorphization
+with zero syntax. There are also no aliasing or exclusivity rules — two
+references to the same thing are fine, because without shared-memory
+concurrency aliasing alone cannot break type safety here. The checker
+tracks lifetimes and valid access; it does not require references to be
+exclusive.</p>
+<p>A lifetime error identifies both the reference's root and its
+destination:</p>
+<div class="sourceCode" id="cb35"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> line<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="co">// ...</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> w <span class="op">=</span> line[<span class="op">..</span><span class="dv">5</span>]<span class="op">;</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(w)<span class="op">;</span></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>line<span class="op">.</span><span class="bu">clear</span>()<span class="op">;</span>        <span class="co">// fine: w&#39;s last use is behind the clear</span></span></code></pre></div>
+<p>A scratch buffer that is refilled per iteration hands out slices of
+itself freely. "Reusable scratch" and "structure I can point into" are
+the same type.</p>
+<p>Because a slice never copies, it is also the natural <em>key</em>.
+The library's dictionary keyed by <code>u8[:]</code> stores no strings
+at all — just addresses and lengths into text you already have:</p>
+<div class="sourceCode" id="cb36"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> text <span class="op">=</span> <span class="st">&quot;the quick brown fox jumps over the lazy dog the fox&quot;</span><span class="op">;</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> counts <span class="op">=</span> dictionary<span class="op">&lt;</span><span class="kw">const</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> <span class="dt">i32</span><span class="op">&gt;</span> {}<span class="op">;</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="fu">each_split</span>(text<span class="op">,</span> <span class="ch">&#39; &#39;</span>) { counts<span class="op">.</span><span class="fu">update</span>(it<span class="op">,</span> <span class="dv">0</span>) { it <span class="op">+=</span> <span class="dv">1</span><span class="op">;</span> }<span class="op">;</span> }<span class="op">;</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(counts<span class="op">.</span>count<span class="op">,</span> <span class="st">&quot; distinct words&quot;</span>)<span class="op">;</span></span></code></pre></div>
+<p>That is the whole of word-frequency counting, with nothing copied:
+the file is read once into one buffer, and every key, every table row
+and every line of the final report points into it (<a
+href="../samples/15_word_freq.goose.html"><code>15_word_freq</code></a>
+does exactly this over a book).</p>
+<p>The <code>const</code> qualifier describes writability. Writability
+is inferred rather than annotated: a string literal is read-only,
+<code>&amp;x</code> of a <code>var</code> is writable, and a
+<em>slot</em> — a field, an element, a global — has to say which kind it
+holds. <code>dictionary&lt;const u8[:], i32&gt;</code> says "these keys
+may be read-only views", which allows literals and other read-only views
+to be keys. Parameters are generic over constness, so you almost never
+write <code>const</code> except on a slot that must accept read-only
+data, and on a parameter you want to document as read-only.</p>
+<hr />
+<h2 id="8-nested-data-stays-inline">8. Nested data stays inline</h2>
+<p>A struct may contain variable-size parts, and they sit
+<strong>inline</strong>, in declaration order. Combine that with
+<code>varint</code> fields — a LEB128 integer that takes as many bytes
+as its value needs — and a record becomes a run of bytes with nothing
+indirect in it at all:</p>
+<div class="sourceCode" id="cb37"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Item</span>  { sku<span class="op">:</span> <span class="dt">u8</span>[<span class="dt">varint</span>]<span class="op">,</span> qty<span class="op">:</span> <span class="dt">varint</span><span class="op">,</span> cents<span class="op">:</span> <span class="dt">varint</span> }</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Order</span> { id<span class="op">:</span> <span class="dt">varint</span><span class="op">,</span> customer<span class="op">:</span> <span class="dt">u8</span>[<span class="dt">varint</span>]<span class="op">,</span> items<span class="op">:</span> <span class="dt">Item</span>[<span class="dt">varint</span>] }</span></code></pre></div>
+<p>In most languages <code>Order</code> is a struct owning a
+<code>String</code> and a <code>Vec&lt;Item&gt;</code>, each
+<code>Item</code> owning another <code>String</code>. Here an order is
+its header followed by its items, laid end to end, and the whole order
+book is one array of those.</p>
+<div class="sourceCode" id="cb38"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co">// &quot;SKU:qty:cents;...&quot; -&gt; items, built straight into the field that gets them</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">parse_items</span>(field<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">Item</span>[<span class="op">&gt;..</span>] {</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> items<span class="op">:</span> <span class="dt">Item</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">each_split</span>(field<span class="op">,</span> <span class="ch">&#39;;&#39;</span>) {</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> p <span class="op">=</span> <span class="fu">split</span>(it<span class="op">,</span> <span class="ch">&#39;:&#39;</span>)<span class="op">;</span></span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> qty<span class="op">,</span> ok1 <span class="op">=</span> <span class="fu">parse_int</span>(p[<span class="dv">1</span>])<span class="op">;</span></span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> cents<span class="op">,</span> ok2 <span class="op">=</span> <span class="fu">parse_int</span>(p[<span class="dv">2</span>])<span class="op">;</span></span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>        <span class="bu">assert</span>(ok1 <span class="op">&amp;&amp;</span> ok2)<span class="op">;</span></span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>        items<span class="op">.</span><span class="bu">push</span>(<span class="dt">Item</span> { sku<span class="op">:</span> p[<span class="dv">0</span>]<span class="op">,</span> qty<span class="op">:</span> qty<span class="op">,</span> cents<span class="op">:</span> cents })<span class="op">;</span></span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>    }<span class="op">;</span></span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> items<span class="op">;</span></span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> book<span class="op">:</span> <span class="dt">Order</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a>book<span class="op">.</span><span class="bu">push</span>(<span class="dt">Order</span> { id<span class="op">:</span> <span class="dv">1001</span><span class="op">,</span> customer<span class="op">:</span> <span class="st">&quot;alice&quot;</span><span class="op">,</span></span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a>                  items<span class="op">:</span> <span class="fu">parse_items</span>(<span class="st">&quot;SKU-441:2:1999;SKU-7:1:500&quot;</span>) })<span class="op">;</span></span>
+<span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> o <span class="kw">in</span> book {</span>
+<span id="cb38-19"><a href="#cb38-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> t <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb38-20"><a href="#cb38-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> it <span class="kw">in</span> o<span class="op">.</span>items { t <span class="op">+=</span> it<span class="op">.</span>qty <span class="op">*</span> it<span class="op">.</span>cents<span class="op">;</span> }</span>
+<span id="cb38-21"><a href="#cb38-21" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(o<span class="op">.</span>customer<span class="op">,</span> <span class="st">&quot; owes &quot;</span><span class="op">,</span> t<span class="op">,</span> <span class="st">&quot; cents over &quot;</span><span class="op">,</span> o<span class="op">.</span>items<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; items&quot;</span>)<span class="op">;</span></span>
+<span id="cb38-22"><a href="#cb38-22" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<pre><code>alice owes 4498 cents over 2 items</code></pre>
+<p>It is worth counting the bytes, because this is the sort of record a
+real program has millions of. That order — id 1001, customer
+<code>alice</code>, two items with 5 and 7-character SKUs — is:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">bytes</th>
+<th style="text-align: right;">allocations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Goose, as declared above</td>
+<td style="text-align: right;"><strong>29</strong></td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+<tr>
+<td>C++ <code>std::string</code> +
+<code>std::vector&lt;Item&gt;</code></td>
+<td style="text-align: right;">160</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>Rust <code>String</code> + <code>Vec&lt;Item&gt;</code></td>
+<td style="text-align: right;">153</td>
+<td style="text-align: right;">4</td>
+</tr>
+</tbody>
+</table>
+<p>The C++ and Rust figures are <code>sizeof</code> plus the blocks
+actually allocated, measured with MSVC and rustc; they do not include
+the allocator's own per-block header and rounding, which would add more.
+C++ gets off lightly here only because all three strings are short
+enough for the small-string optimization — one character more in a SKU
+and it is four allocations too.</p>
+<p>The smaller layout reduces cache traffic when traversing the order
+book. And <code>id</code>, <code>qty</code> and <code>cents</code> cost
+one byte each rather than eight, because a <code>varint</code> is as
+wide as its value needs.</p>
+<p>Note also <code>parse_items</code> returning a growable array by
+value and that costing nothing: the callee is compiled knowing its
+destination and writes the items directly into the order's field, inside
+the book. Returning a built-up value and out-parameter style are the
+same cost in Goose, which is why the out-parameter style mostly does not
+appear.</p>
+<p>The price of variable-size elements is that the array becomes
+<strong>sequential</strong>: offsets are data-dependent, so you can
+iterate it but not index it.</p>
+<div class="sourceCode" id="cb40"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> o <span class="kw">in</span> book { <span class="bu">print</span>(o)<span class="op">;</span> }     <span class="co">// fine</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(book[<span class="dv">0</span>])<span class="op">;</span>                 <span class="co">// error: arrays of variable-size elements</span></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>                                <span class="co">// cannot be indexed, only iterated</span></span></code></pre></div>
+<p>That is a real restriction, and it is why the array family has both
+kinds. Use variable elements for things you walk (records, parsed nodes,
+log lines); use fixed elements, with a <code>u8[..k]</code> for the
+string part, for things you index and sort. When you need both, keep an
+index beside the compact array: a second array of references to its
+elements can be indexed and sorted while the elements stay packed where
+they are. Section 10 ends with one.</p>
+<hr />
+<h2 id="9-enums-in-two-sizes">9. Enums, in two sizes</h2>
+<p>Algebraic data types are the only dynamic polymorphism in the
+language. No inheritance, no traits, no vtables.</p>
+<div class="sourceCode" id="cb41"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="kw">enum</span> <span class="dt">Shape</span> { <span class="dt">Circle</span> { r<span class="op">:</span> <span class="dt">f64</span> }<span class="op">,</span> <span class="dt">Rect</span> { w<span class="op">:</span> <span class="dt">f64</span><span class="op">,</span> h<span class="op">:</span> <span class="dt">f64</span> }<span class="op">,</span> <span class="dt">Dot</span> }</span></code></pre></div>
+<p>What is unusual is that every ADT type can be stored <strong>two
+ways</strong>, chosen at the point of use:</p>
+<p><strong>Fixed mode</strong> (<code>Shape</code>) is what Rust's
+<code>enum</code> and C++'s <code>variant</code> do: a tag plus room for
+the largest payload, here 1 + 16 = 17 bytes for every value,
+<code>Dot</code> included. In exchange it is indexable and you may
+overwrite an element with a different variant.</p>
+<div class="sourceCode" id="cb42"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> shapes<span class="op">:</span> <span class="dt">Shape</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>shapes<span class="op">.</span><span class="bu">push</span>(<span class="dt">Shape</span><span class="op">.</span><span class="dt">Circle</span> { r<span class="op">:</span> <span class="fl">1.0</span> })<span class="op">;</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>shapes<span class="op">.</span><span class="bu">push</span>(<span class="dt">Shape</span><span class="op">.</span><span class="dt">Rect</span> { w<span class="op">:</span> <span class="fl">2.0</span><span class="op">,</span> h<span class="op">:</span> <span class="fl">3.0</span> })<span class="op">;</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>shapes<span class="op">.</span><span class="bu">push</span>(<span class="dt">Shape</span><span class="op">.</span><span class="dt">Dot</span>)<span class="op">;</span></span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>shapes[<span class="dv">2</span>] <span class="op">=</span> <span class="dt">Shape</span><span class="op">.</span><span class="dt">Rect</span> { w<span class="op">:</span> <span class="fl">1.0</span><span class="op">,</span> h<span class="op">:</span> <span class="fl">1.0</span> }<span class="op">;</span>      <span class="co">// a different variant, in place</span></span></code></pre></div>
+<p><strong>Variable mode</strong> (<code>Shape..</code> — note the
+trailing dots) gives each value exactly its own variant's size: a
+<code>Dot</code> is 1 byte, a <code>Circle</code> 9, a <code>Rect</code>
+17. The price is that the elements are packed against each other, so the
+array is sequential (short of an index you keep beside it, <a
+href="#an-index-for-variable-size-elements">section 10</a>) and a value
+can never change variant. In exchange you may take references
+<em>into</em> a payload:</p>
+<div class="sourceCode" id="cb43"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> packed<span class="op">:</span> <span class="dt">Shape</span><span class="op">..</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>packed<span class="op">.</span><span class="bu">push</span>(<span class="dt">Shape</span><span class="op">.</span><span class="dt">Circle</span> { r<span class="op">:</span> <span class="fl">1.0</span> })<span class="op">;</span></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>packed<span class="op">.</span><span class="bu">push</span>(<span class="dt">Shape</span><span class="op">.</span><span class="dt">Dot</span>)<span class="op">;</span></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>packed<span class="op">.</span><span class="bu">push</span>(<span class="dt">Shape</span><span class="op">.</span><span class="dt">Rect</span> { w<span class="op">:</span> <span class="fl">2.0</span><span class="op">,</span> h<span class="op">:</span> <span class="fl">3.0</span> })<span class="op">;</span></span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> s <span class="kw">in</span> packed {</span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">match</span> s {</span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>        <span class="dt">Rect</span> <span class="op">&amp;</span>r <span class="op">=&gt;</span> { r<span class="op">.</span>w <span class="op">+=</span> <span class="fl">1.0</span><span class="op">;</span> }<span class="op">,</span>     <span class="co">// edits the payload in place, inside the array</span></span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a>        _ <span class="op">=&gt;</span> {}<span class="op">,</span></span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The two modes offer different guarantees: fixed-mode values can
+change variant; variable-mode values allow references into their
+payloads. A fixed-mode value can be overwritten with another variant, so
+nothing may point inside it; a variable-mode value can be pointed into,
+so it can never be overwritten. That is what keeps it sound, and it is
+why <code>&amp;</code>-binders in a <code>match</code> are legal only on
+variable-mode payloads.</p>
+<p>For a tree of mostly-small nodes the memory difference is large. It
+is the single biggest source of the memory column in the benchmarks: the
+<code>records</code> benchmark uses 4.0x less memory than a Rust
+<code>enum</code> whose every element is sized for its
+<code>String</code> arm, and runs 2.0–2.3x faster for the same reason —
+the cache does less work.</p>
+<h3 id="match-and-match-written-as-functions"><code>match</code>, and
+match written as functions</h3>
+<p>The inline form is what you expect:</p>
+<div class="sourceCode" id="cb44"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">name</span>(s<span class="op">:</span> <span class="dt">Shape</span>) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>] {</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">match</span> s {</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>        <span class="dt">Circle</span> c <span class="op">=&gt;</span> <span class="st">&quot;circle&quot;</span><span class="op">,</span></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>        <span class="dt">Rect</span> r <span class="op">=&gt;</span> <span class="kw">if</span> r<span class="op">.</span>w <span class="op">==</span> r<span class="op">.</span>h { <span class="st">&quot;square&quot;</span> } <span class="kw">else</span> { <span class="st">&quot;rectangle&quot;</span> }<span class="op">,</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>        _ <span class="op">=&gt;</span> <span class="st">&quot;other&quot;</span><span class="op">,</span></span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>An arm may list several variants, as in
+<code>Circle, Dot =&gt; "round"</code>, and then binds no payload: each
+variant's payload is a type of its own.</p>
+<p>A match on an integer takes literals, half-open ranges and named
+constants (<code>let</code> globals, <code>ns::NAME</code> from another
+namespace), so a program's own codes read as names there too; one arm
+may list several of them. Whether a bare name is a variant or a constant
+is up to the scrutinee's type:</p>
+<div class="sourceCode" id="cb45"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> <span class="dt">GROUND</span> <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> <span class="dt">SHALLOW</span> <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> <span class="dt">DEEP</span> <span class="op">=</span> <span class="dv">4</span><span class="op">;</span></span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> <span class="dt">LAVA</span> <span class="op">=</span> <span class="dv">7</span><span class="op">;</span></span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">terrain</span>(t<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>] {</span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">match</span> t {</span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>        <span class="dt">GROUND</span> <span class="op">=&gt;</span> <span class="st">&quot;ground&quot;</span><span class="op">,</span></span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>        <span class="dt">SHALLOW</span><span class="op">..</span><span class="dt">DEEP</span> <span class="op">=&gt;</span> <span class="st">&quot;water&quot;</span><span class="op">,</span></span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>        <span class="dt">LAVA</span><span class="op">,</span> <span class="dv">10</span><span class="op">..</span><span class="dv">12</span> <span class="op">=&gt;</span> <span class="st">&quot;hot&quot;</span><span class="op">,</span></span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a>        _ <span class="op">=&gt;</span> <span class="st">&quot;rock&quot;</span><span class="op">,</span></span>
+<span id="cb45-12"><a href="#cb45-12" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb45-13"><a href="#cb45-13" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The other form is <strong>case functions</strong>: one overload per
+variant, called with the enum. This is the virtual-call idiom, without
+the vtable:</p>
+<div class="sourceCode" id="cb46"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">area</span>(s<span class="op">:</span> <span class="dt">Shape</span><span class="op">.</span><span class="dt">Circle</span>) <span class="op">-&gt;</span> <span class="dt">f64</span> { <span class="fl">3.14159</span> <span class="op">*</span> s<span class="op">.</span>r <span class="op">*</span> s<span class="op">.</span>r }</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">area</span>(s<span class="op">:</span> <span class="dt">Shape</span><span class="op">.</span><span class="dt">Rect</span>) <span class="op">-&gt;</span> <span class="dt">f64</span>   { s<span class="op">.</span>w <span class="op">*</span> s<span class="op">.</span>h }</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">area</span>(s<span class="op">:</span> <span class="dt">Shape</span><span class="op">.</span><span class="dt">Dot</span>) <span class="op">-&gt;</span> <span class="dt">f64</span>    { <span class="fl">0.0</span> }</span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> s <span class="kw">in</span> shapes { <span class="bu">print</span>(s<span class="op">,</span> <span class="st">&quot; area &quot;</span><span class="op">,</span> <span class="fu">area</span>(s))<span class="op">;</span> }</span></code></pre></div>
+<p>The call dispatches on the tag through a jump table, and
+exhaustiveness is checked exactly as for a <code>match</code> — add a
+variant and this stops compiling until it gets its case. Variant types
+(<code>Shape.Circle</code>) are ordinary types you can name and pass
+around.</p>
+<hr />
+<h2 id="10-linking-things-without-pointers">10. Linking things without
+pointers</h2>
+<p>A <code>T&amp;</code> is a machine address: eight bytes, no
+arithmetic, no casts, never dangling. For a data structure with a lot of
+links, eight bytes per link is often more than you want, and an address
+is not something you can save to a file.</p>
+<p>So Goose also has <strong>relative references</strong>, which are a
+link stored as a narrow offset:</p>
+<ul>
+<li><code>T&amp;&lt;u32&gt;</code> — <em>self-relative</em>: an offset
+from the field itself to the target, which must live in the same
+enclosing array. Position-independent, so a structure built from them
+can be relocated as a whole. Section 15 explains how this supports
+serialization.</li>
+<li><code>T&amp;&lt;u32 in pool&gt;</code> — <em>pool-relative</em>: an
+offset from a named global pool's base. A store is a subtraction from a
+base already in a register, and — the thing self-relative cannot do —
+other arrays can hold links <em>into</em> the pool.</li>
+</ul>
+<p>Widths are <code>u8</code>, <code>u16</code>, <code>u32</code>,
+<code>u64</code> or <code>varint</code>. Loading either form gives you
+an ordinary <code>T&amp;</code>; storing one re-encodes.
+<code>T&amp;&lt;u32&gt;?</code> uses offset 0 as null, so a link costs
+four bytes including its null.</p>
+<p>Here is a binary search tree living in one grow-only array, with
+4-byte self-relative children:</p>
+<div class="sourceCode" id="cb47"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Node</span> { key<span class="op">:</span> <span class="dt">i32</span><span class="op">,</span> count<span class="op">:</span> <span class="dt">i32</span> <span class="op">=</span> <span class="dv">1</span><span class="op">,</span> left<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;&lt;</span><span class="dt">u32</span><span class="op">&gt;?,</span> right<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;&lt;</span><span class="dt">u32</span><span class="op">&gt;?</span> }</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">insert</span>(pool<span class="op">:</span> <span class="dt">Node</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> key<span class="op">:</span> <span class="dt">i32</span>) {</span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> pool<span class="op">.</span><span class="bu">len</span> <span class="op">==</span> <span class="dv">0</span> { pool<span class="op">.</span><span class="bu">push</span>(<span class="dt">Node</span> { key<span class="op">:</span> key })<span class="op">;</span> <span class="kw">return</span><span class="op">;</span> }</span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> cur <span class="op">.=</span> pool[<span class="dv">0</span>]<span class="op">;</span>                  <span class="co">// .= binds the element; = would copy it</span></span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">loop</span> {</span>
+<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> key <span class="op">==</span> cur<span class="op">.</span>key { cur<span class="op">.</span>count <span class="op">+=</span> <span class="dv">1</span><span class="op">;</span> <span class="kw">return</span><span class="op">;</span> }</span>
+<span id="cb47-8"><a href="#cb47-8" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> key <span class="op">&lt;</span> cur<span class="op">.</span>key {</span>
+<span id="cb47-9"><a href="#cb47-9" aria-hidden="true" tabindex="-1"></a>            <span class="kw">let</span> l <span class="op">=</span> cur<span class="op">.</span>left<span class="op">;</span></span>
+<span id="cb47-10"><a href="#cb47-10" aria-hidden="true" tabindex="-1"></a>            <span class="kw">if</span> l { cur <span class="op">.=</span> l<span class="op">;</span> <span class="kw">continue</span><span class="op">;</span> }             <span class="co">// narrowed by `if`: l is a Node&amp;</span></span>
+<span id="cb47-11"><a href="#cb47-11" aria-hidden="true" tabindex="-1"></a>            cur<span class="op">.</span>left <span class="op">.=</span> pool<span class="op">.</span><span class="bu">push</span>(<span class="dt">Node</span> { key<span class="op">:</span> key })<span class="op">;</span>   <span class="co">// the push cannot move cur</span></span>
+<span id="cb47-12"><a href="#cb47-12" aria-hidden="true" tabindex="-1"></a>            <span class="kw">return</span><span class="op">;</span></span>
+<span id="cb47-13"><a href="#cb47-13" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb47-14"><a href="#cb47-14" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> r <span class="op">=</span> cur<span class="op">.</span>right<span class="op">;</span></span>
+<span id="cb47-15"><a href="#cb47-15" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> r { cur <span class="op">.=</span> r<span class="op">;</span> <span class="kw">continue</span><span class="op">;</span> }</span>
+<span id="cb47-16"><a href="#cb47-16" aria-hidden="true" tabindex="-1"></a>        cur<span class="op">.</span>right <span class="op">.=</span> pool<span class="op">.</span><span class="bu">push</span>(<span class="dt">Node</span> { key<span class="op">:</span> key })<span class="op">;</span></span>
+<span id="cb47-17"><a href="#cb47-17" aria-hidden="true" tabindex="-1"></a>        <span class="kw">return</span><span class="op">;</span></span>
+<span id="cb47-18"><a href="#cb47-18" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb47-19"><a href="#cb47-19" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The example uses three reference features:</p>
+<p><strong><code>.=</code> binds and rebinds a reference.</strong> Since
+references are <em>transparent</em> — an expression that denotes a
+reference behaves as its target everywhere, with no <code>*</code> and
+no <code>-&gt;</code> — there has to be some way to say "I mean the
+reference itself", and <code>.=</code> is it.
+<code>var cur .= pool[0];</code> names the element;
+<code>cur .= l;</code> retargets. (<code>.==</code> is the matching
+identity test: <code>==</code> compares the two nodes, <code>.==</code>
+asks whether they are the same node.)</p>
+<p><strong>Optionals are references that can be null, narrowed by
+flow.</strong> <code>Node?</code> is a nullable <code>Node&amp;</code> —
+address 0, no space cost. You cannot touch it until an <code>if</code>,
+<code>while</code>, <code>guard</code> or <code>assert</code> has
+narrowed it, and inside that region it simply <em>is</em> a
+<code>Node&amp;</code>.</p>
+<p><strong>The insert is one store.</strong>
+<code>cur.left .= pool.push(...)</code> pushes the node and writes the
+offset, and the push cannot invalidate <code>cur</code> because nothing
+moves. In safe Rust this is where you switch to
+<code>Vec&lt;Node&gt;</code> plus <code>u32</code> indices.</p>
+<p>The node is 16 bytes: two <code>i32</code>s and two 4-byte links,
+where a tree of <code>Box&lt;Node&gt;</code> or
+<code>unique_ptr&lt;Node&gt;</code> would be 24 bytes of node plus an
+allocation header per node. A thousand random inserts:</p>
+<pre><code>442 nodes, 7072 bytes of tree, no allocator involved</code></pre>
+<h3 id="self-and-sentinels"><code>self</code>, and sentinels</h3>
+<p>A non-optional relative reference has no null, so a structure whose
+links point back at itself could never be constructed — there is nothing
+yet to point at. <code>self</code>, legal only as the whole initializer
+of such a field, means "the value this literal is constructing":</p>
+<div class="sourceCode" id="cb49"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Node</span> { val<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> prev<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;&lt;</span><span class="dt">u32</span> <span class="kw">in</span> pool<span class="op">&gt;,</span> next<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;&lt;</span><span class="dt">u32</span> <span class="kw">in</span> pool<span class="op">&gt;</span> }</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a><span class="kw">reusable</span> <span class="kw">var</span> pool<span class="op">:</span> <span class="dt">Node</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> head <span class="op">=</span> pool<span class="op">.</span><span class="bu">alloc_index</span>(<span class="dt">Node</span> { val<span class="op">:</span> <span class="dv">0</span><span class="op">,</span> prev<span class="op">:</span> <span class="cn">self</span><span class="op">,</span> next<span class="op">:</span> <span class="cn">self</span> })<span class="op">;</span></span></code></pre></div>
+<p>That is a circular doubly-linked list's sentinel, allocated before
+<code>main</code> runs. Because the sentinel exists, no link in the
+whole list is ever null, every insert and remove is the same four stores
+with no special cases, and every link load is a plain add rather than an
+add plus a null test.</p>
+<div class="sourceCode" id="cb50"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">insert_after</span>(p<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;,</span> v<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">Node</span><span class="op">&amp;</span> {</span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> n <span class="op">.=</span> pool<span class="op">.</span><span class="bu">alloc_ref</span>(<span class="dt">Node</span> { val<span class="op">:</span> v<span class="op">,</span> prev<span class="op">:</span> p<span class="op">,</span> next<span class="op">:</span> p<span class="op">.</span>next })<span class="op">;</span></span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>    n<span class="op">.</span>next<span class="op">.</span>prev <span class="op">.=</span> n<span class="op">;</span></span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>    p<span class="op">.</span>next <span class="op">.=</span> n<span class="op">;</span></span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> n<span class="op">;</span></span>
+<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">remove</span>(n<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;</span>) {</span>
+<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a>    n<span class="op">.</span>prev<span class="op">.</span>next <span class="op">.=</span> n<span class="op">.</span>next<span class="op">;</span></span>
+<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a>    n<span class="op">.</span>next<span class="op">.</span>prev <span class="op">.=</span> n<span class="op">.</span>prev<span class="op">;</span></span>
+<span id="cb50-11"><a href="#cb50-11" aria-hidden="true" tabindex="-1"></a>    pool<span class="op">.</span><span class="bu">free</span>(pool<span class="op">.</span><span class="bu">index_of</span>(n))<span class="op">;</span></span>
+<span id="cb50-12"><a href="#cb50-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb50-13"><a href="#cb50-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-14"><a href="#cb50-14" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">is_end</span>(n<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">bool</span> { n <span class="op">.==</span> pool[head] }</span></code></pre></div>
+<p>A node is 8 + 4 + 4 = 16 bytes, against a <code>std::list</code> node
+plus a map node in the C++ version of the same thing — which is most of
+why the <code>lru</code> benchmark uses 3.2x less memory.</p>
+<h3 id="an-index-for-variable-size-elements">An index for variable-size
+elements</h3>
+<p>Section 8 said an array of variable-size elements can be walked but
+not indexed: where an element starts depends on every element before it.
+Since other arrays can hold links into a pool, you can keep the index
+yourself — a second array with one 4-byte link per element, pushed
+alongside it:</p>
+<div class="sourceCode" id="cb51"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="kw">enum</span> <span class="dt">Mark</span> {</span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">Circle</span> { r<span class="op">:</span> <span class="dt">f64</span> }<span class="op">,</span></span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">Rect</span> { w<span class="op">:</span> <span class="dt">f64</span><span class="op">,</span> h<span class="op">:</span> <span class="dt">f64</span> }<span class="op">,</span></span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">Label</span> { text<span class="op">:</span> <span class="dt">u8</span>[<span class="dt">varint</span>] }<span class="op">,</span></span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">Dot</span><span class="op">,</span></span>
+<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-8"><a href="#cb51-8" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> marks<span class="op">:</span> <span class="dt">Mark</span><span class="op">..</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb51-9"><a href="#cb51-9" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> mark_at<span class="op">:</span> (<span class="dt">Mark</span><span class="op">..&amp;&lt;</span><span class="dt">u32</span> <span class="kw">in</span> marks<span class="op">&gt;</span>)[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb51-10"><a href="#cb51-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-11"><a href="#cb51-11" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb51-12"><a href="#cb51-12" aria-hidden="true" tabindex="-1"></a>    mark_at<span class="op">.</span><span class="bu">push</span>(marks<span class="op">.</span><span class="bu">push</span>(<span class="dt">Mark</span><span class="op">.</span><span class="dt">Label</span> { text<span class="op">:</span> <span class="st">&quot;hello, goose&quot;</span> }))<span class="op">;</span></span>
+<span id="cb51-13"><a href="#cb51-13" aria-hidden="true" tabindex="-1"></a>    mark_at<span class="op">.</span><span class="bu">push</span>(marks<span class="op">.</span><span class="bu">push</span>(<span class="dt">Mark</span><span class="op">.</span><span class="dt">Circle</span> { r<span class="op">:</span> <span class="fl">1.5</span> }))<span class="op">;</span></span>
+<span id="cb51-14"><a href="#cb51-14" aria-hidden="true" tabindex="-1"></a>    mark_at<span class="op">.</span><span class="bu">push</span>(marks<span class="op">.</span><span class="bu">push</span>(<span class="dt">Mark</span><span class="op">.</span><span class="dt">Dot</span>))<span class="op">;</span></span>
+<span id="cb51-15"><a href="#cb51-15" aria-hidden="true" tabindex="-1"></a>    mark_at<span class="op">.</span><span class="bu">push</span>(marks<span class="op">.</span><span class="bu">push</span>(<span class="dt">Mark</span><span class="op">.</span><span class="dt">Rect</span> { w<span class="op">:</span> <span class="fl">2.0</span><span class="op">,</span> h<span class="op">:</span> <span class="fl">3.0</span> }))<span class="op">;</span></span>
+<span id="cb51-16"><a href="#cb51-16" aria-hidden="true" tabindex="-1"></a>    mark_at<span class="op">.</span><span class="bu">push</span>(marks<span class="op">.</span><span class="bu">push</span>(<span class="dt">Mark</span><span class="op">.</span><span class="dt">Label</span> { text<span class="op">:</span> <span class="st">&quot;x&quot;</span> }))<span class="op">;</span></span>
+<span id="cb51-17"><a href="#cb51-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> [<span class="dv">3</span><span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">4</span><span class="op">,</span> <span class="dv">1</span><span class="op">,</span> <span class="dv">2</span>] {</span>
+<span id="cb51-18"><a href="#cb51-18" aria-hidden="true" tabindex="-1"></a>        <span class="kw">match</span> mark_at[i] {</span>
+<span id="cb51-19"><a href="#cb51-19" aria-hidden="true" tabindex="-1"></a>            <span class="dt">Circle</span> c <span class="op">=&gt;</span> <span class="bu">print</span>(i<span class="op">,</span> <span class="st">&quot;: circle &quot;</span><span class="op">,</span> c<span class="op">.</span>r)<span class="op">,</span></span>
+<span id="cb51-20"><a href="#cb51-20" aria-hidden="true" tabindex="-1"></a>            <span class="dt">Rect</span> r <span class="op">=&gt;</span> <span class="bu">print</span>(i<span class="op">,</span> <span class="st">&quot;: rect &quot;</span><span class="op">,</span> r<span class="op">.</span>w<span class="op">,</span> <span class="st">&quot; by &quot;</span><span class="op">,</span> r<span class="op">.</span>h)<span class="op">,</span></span>
+<span id="cb51-21"><a href="#cb51-21" aria-hidden="true" tabindex="-1"></a>            <span class="dt">Label</span> l <span class="op">=&gt;</span> <span class="bu">print</span>(i<span class="op">,</span> <span class="st">&quot;: label </span><span class="sc">\&quot;</span><span class="st">&quot;</span><span class="op">,</span> l<span class="op">.</span>text<span class="op">,</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">&quot;</span>)<span class="op">,</span></span>
+<span id="cb51-22"><a href="#cb51-22" aria-hidden="true" tabindex="-1"></a>            <span class="dt">Dot</span> <span class="op">=&gt;</span> <span class="bu">print</span>(i<span class="op">,</span> <span class="st">&quot;: dot&quot;</span>)<span class="op">,</span></span>
+<span id="cb51-23"><a href="#cb51-23" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb51-24"><a href="#cb51-24" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb51-25"><a href="#cb51-25" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<pre><code>3: rect 2 by 3
+0: label &quot;hello, goose&quot;
+4: label &quot;x&quot;
+1: circle 1.5
+2: dot</code></pre>
+<p><code>push</code> builds each mark in place at the end of
+<code>marks</code> and returns a reference to it; stored in
+<code>mark_at</code>, that reference becomes the mark's offset from the
+base of <code>marks</code>. <code>mark_at[i]</code> is then a load and
+an add, in any order.</p>
+<p>Look at what <code>marks</code> holds. A <code>Label</code> is its
+tag, a one-byte length and its text, all inside the element:
+<code>hello, goose</code> makes it 14 bytes, and the next mark starts
+where the text ends. The five marks, strings included, are 44 bytes in
+one block, with no pointer and no allocation anywhere. An enum in Rust
+or C++ has one fixed size, so a string variant holds a fixed-size string
+object that keeps whatever text does not fit in it somewhere else, and
+every element is as large as the largest variant. Here each value is
+exactly as long as its contents, and the index still reaches any of them
+for 4 bytes an element.</p>
+<p>The array an <code>in</code> offset is measured from has to be a
+global. An array local to a function is indexed the same way with plain
+references, <code>(Mark..&amp;)[&gt;..]</code>, at 8 bytes an entry. <a
+href="../samples/05_shapes.goose.html"><code>05_shapes</code></a> ends
+with this example.</p>
+<hr />
+<h2 id="11-when-lifetimes-really-are-not-nested">11. When lifetimes
+really are not nested</h2>
+<p>Some data has lifetimes that do not nest: cache entries, mutable
+graph nodes, or files deleted in arbitrary order. Goose supports these
+uses with a <code>reusable</code> pool: a grow-only array the compiler
+pairs with a hidden freelist.</p>
+<div class="sourceCode" id="cb53"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="kw">reusable</span> <span class="kw">var</span> pool<span class="op">:</span> <span class="dt">Item</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> s0 <span class="op">=</span> pool<span class="op">.</span><span class="bu">alloc_index</span>(<span class="dt">Item</span> { <span class="dv">10</span><span class="op">,</span> <span class="fl">1.0</span> })<span class="op">;</span></span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> s1 <span class="op">=</span> pool<span class="op">.</span><span class="bu">alloc_index</span>(<span class="dt">Item</span> { <span class="dv">11</span><span class="op">,</span> <span class="fl">1.0</span> })<span class="op">;</span></span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>pool<span class="op">.</span><span class="bu">free</span>(s0)<span class="op">;</span></span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> s2 <span class="op">=</span> pool<span class="op">.</span><span class="bu">alloc_index</span>(<span class="dt">Item</span> { <span class="dv">12</span><span class="op">,</span> <span class="fl">2.0</span> })<span class="op">;</span>   <span class="co">// takes slot s0 back</span></span></code></pre></div>
+<p><code>alloc_index</code> / <code>alloc_ref</code> take a free slot if
+there is one and push otherwise; <code>free(i)</code> records a slot for
+reuse. That looks like an allocator, so it is worth being precise about
+what <code>free</code> does and does not do:</p>
+<blockquote>
+<p><strong>All elements remain valid at all times.</strong>
+<code>free</code> does not release any memory and does not end any
+lifetime — it adds an index to a freelist. The slot is still a live,
+well-typed <code>Item</code> afterwards, and it still belongs to the
+pool, which still belongs to its owning scope.</p>
+</blockquote>
+<p>Reuse preserves memory and type safety. A reference to a
+freed-and-reused slot reads a <em>different <code>Item</code></em> — a
+perfectly good one, just not the one you were thinking of. That is the
+same class of mistake as keeping an index into an array you have since
+overwritten: a logic bug, and one you can reason about locally. Memory
+is never accessed at a type it was not written with, and nothing goes
+out of bounds, because nothing was freed.</p>
+<p>Within a pool, the program manages slot reuse independently of scope.
+After returning a slot, stop using references to its old contents: they
+remain memory safe but may read a replacement value.</p>
+<p>Running the linked list above through it:</p>
+<pre><code>built: 10 20 30 40 50   (6 slots)
+evens removed: 10 30 50   (6 slots)
+two more, both from the freelist: 10 30 50 7 8   (6 slots)</code></pre>
+<p>There is a second flavour, <code>reusable[]</code>, that hands out
+<em>runs</em> of elements rather than single slots —
+<code>alloc_slice(n)</code>, <code>realloc_slice(s, n)</code>,
+<code>free_slice(s)</code> — with a freelist of spans that merges
+neighbours. That is what you use for the child lists of an n-ary tree,
+where each node's entries want to be one contiguous run you can walk as
+a plain slice (<a
+href="../samples/26_file_tree.goose.html"><code>26_file_tree</code></a>
+builds a whole <code>mkdir</code>/<code>mv</code>/ <code>rm -r</code>
+file tree out of the two pools together).</p>
+<hr />
+<h2 id="12-errors-and-return--from">12. Errors, and
+<code>return … from</code></h2>
+<p>There is no exception mechanism and no <code>Result</code> type, and
+no specified error convention either — it is the application's choice.
+For a call with two outcomes the trailing <code>bool</code> you have
+already seen is enough (<code>let age, ok = parse_age(s);</code>), and
+for "found or not" it is a <code>T?</code>, which costs nothing because
+it is a reference into the input. Both are ordinary return values.</p>
+<p>The one that is not obvious is
+<strong><code>return E from f</code></strong>: it returns <code>E</code>
+as the result of the innermost active call of <code>f</code>, unwinding
+every frame in between. It is the language's lightweight exception, and
+it exists because the two idioms above scale badly — a failure eight
+frames deep inside a parser would otherwise mean eight signatures
+carrying an error they have nothing to do with.</p>
+<div class="sourceCode" id="cb55"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">load</span>(text<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">User</span>[<span class="op">&gt;..</span>]<span class="op">,</span> <span class="dt">u8</span>[] {</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> users<span class="op">:</span> <span class="dt">User</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> lineno <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">each_split</span>(text<span class="op">,</span> <span class="ch">&#39;</span><span class="sc">\n</span><span class="ch">&#39;</span>) {</span>
+<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a>        lineno<span class="op">++;</span></span>
+<span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> it<span class="op">.</span><span class="bu">len</span> <span class="op">&gt;</span> <span class="dv">0</span> { users<span class="op">.</span><span class="bu">push</span>(<span class="fu">parse_record</span>(it<span class="op">,</span> lineno))<span class="op">;</span> }</span>
+<span id="cb55-7"><a href="#cb55-7" aria-hidden="true" tabindex="-1"></a>    }<span class="op">;</span></span>
+<span id="cb55-8"><a href="#cb55-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> users<span class="op">,</span> <span class="st">&quot;&quot;</span><span class="op">;</span></span>
+<span id="cb55-9"><a href="#cb55-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb55-10"><a href="#cb55-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-11"><a href="#cb55-11" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">parse_record</span>(line<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> lineno<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">User</span> {</span>
+<span id="cb55-12"><a href="#cb55-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> comma <span class="op">=</span> <span class="fu">find</span>(line<span class="op">,</span> <span class="st">&quot;,&quot;</span>)<span class="op">;</span></span>
+<span id="cb55-13"><a href="#cb55-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">guard</span> comma <span class="op">&gt;=</span> <span class="dv">0</span> <span class="kw">else</span> { <span class="kw">return</span> []<span class="op">,</span> <span class="bu">str</span>(<span class="st">&quot;line &quot;</span><span class="op">,</span> lineno<span class="op">,</span> <span class="st">&quot;: expected name,age&quot;</span>) <span class="kw">from</span> load<span class="op">;</span> }</span>
+<span id="cb55-14"><a href="#cb55-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> age<span class="op">,</span> ok <span class="op">=</span> <span class="fu">parse_age</span>(line[comma <span class="op">+</span> <span class="dv">1</span><span class="op">..</span>])<span class="op">;</span></span>
+<span id="cb55-15"><a href="#cb55-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">guard</span> ok <span class="kw">else</span> { <span class="kw">return</span> []<span class="op">,</span> <span class="bu">str</span>(<span class="st">&quot;line &quot;</span><span class="op">,</span> lineno<span class="op">,</span> <span class="st">&quot;: bad age&quot;</span>) <span class="kw">from</span> load<span class="op">;</span> }</span>
+<span id="cb55-16"><a href="#cb55-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> <span class="dt">User</span> { name<span class="op">:</span> <span class="fu">trim</span>(line[<span class="op">..</span>comma])<span class="op">,</span> age<span class="op">:</span> age }<span class="op">;</span></span>
+<span id="cb55-17"><a href="#cb55-17" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<pre><code>loaded 2 users
+error: line 2: expected name,age
+error: line 1: bad age</code></pre>
+<p>Look at what <code>parse_record</code> does <em>not</em> have. Its
+return type is <code>User</code> — not
+<code>Result&lt;User, E&gt;</code>, not <code>(User, bool)</code>. It
+has no error parameter, no <code>?</code> on the calls it makes, and
+nothing to propagate. The same is true of every function between it and
+<code>load</code>, however many there are. All the error handling in the
+program is the two <code>guard</code>s that produce a message and the
+one <code>if err.len &gt; 0</code> that reports it.</p>
+<p>Three properties keep the cost low:</p>
+<ul>
+<li><strong>It is checked statically.</strong> Validity is a
+compile-time property: every call site of a function containing
+<code>return … from load</code> must lie inside the dynamic extent of a
+<code>load</code> call, and the whole-program compiler verifies that in
+call-graph order. There is no "uncaught" case at runtime.</li>
+<li><strong>The implementation is a hidden discriminant</strong>, not an
+unwinder. Each frame on the path gains a "this result is mine" versus
+"propagate to <code>load</code>" flag; a caller checks it and returns
+immediately in the second case. Normal epilogues run, so every
+data-stack watermark restores by itself. No tables, no
+<code>setjmp</code>, no destructors — there are none to run.</li>
+<li><strong>The result lands where <code>load</code>'s caller wanted
+it.</strong> <code>str("line ", …)</code> builds its message directly at
+<code>load</code>'s return destination, straight past the frames being
+unwound.</li>
+</ul>
+<p>So the happy path pays for a flag check per frame on the way out and
+nothing else, which is why the parsers in the samples use this for
+<em>every</em> syntax error rather than reserving it for catastrophes
+(<a href="../samples/17_calc.goose.html"><code>17_calc</code></a>, <a
+href="../samples/18_json.goose.html"><code>18_json</code></a> — a bad
+token, a missing bracket and a bad escape are all one line each).</p>
+<p>The <a href="stdlib.html#exception"><code>exception</code> module</a>
+packages this mechanism as
+<code>exception::try&lt;E&gt;(body) { error =&gt; ... }</code> and
+<code>exception::throw(value)</code>. It can catch owned text or
+application-defined error values without naming the application's outer
+function at each throw site. See its reference for the ownership and
+recursion restrictions; it does not provide <code>finally</code>.</p>
+<p>The same machinery is what lets a block <code>return</code> from its
+enclosing function rather than from the HOF calling it (<a
+href="#13-generics-and-blocks-that-disappear">section 13</a>), which is
+the other place you will meet it.</p>
+<p>And the ones that stop the program rather than reporting:
+<code>assert(c)</code> for invariants, <code>abort(msg)</code> with a
+message, <code>exit(code)</code>. The checker knows the last two never
+return, so a branch ending in either gives no value. That knowledge also
+propagates through ordinary calls, including wrappers around
+<code>exception::throw</code>: a value-returning function can end by
+calling one, without a dummy result afterward. Statements and a trailing
+expression after a proven exit are not typechecked. Unknown recursive
+calls are conservatively assumed to return.</p>
+<hr />
+<h2 id="13-generics-and-blocks-that-disappear">13. Generics, and blocks
+that disappear</h2>
+<p>An untyped parameter is generic:</p>
+<div class="sourceCode" id="cb57"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">twice</span>(x) { x <span class="op">+</span> x }</span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> span<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">T</span> { <span class="kw">if</span> a <span class="op">&gt;</span> b { a <span class="op">-</span> b } <span class="kw">else</span> { b <span class="op">-</span> a } }</span></code></pre></div>
+<p><code>&lt;T&gt;</code> says that two parameters must agree, or names
+a type no parameter carries. Type arguments are normally inferred from
+the arguments, as in <code>foo(1)</code>. An explicit list such as
+<code>foo&lt;i64&gt;(1)</code> can supply leading type arguments; it is
+required for a type variable that no argument determines:</p>
+<div class="sourceCode" id="cb58"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> zero<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>() <span class="op">-&gt;</span> <span class="dt">T</span> { <span class="bu">default</span><span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>() }   <span class="co">// T&#39;s default value</span></span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> half <span class="op">=</span> zero<span class="op">&lt;</span><span class="dt">f64</span><span class="op">&gt;</span>() <span class="op">+</span> <span class="fl">0.5</span><span class="op">;</span></span></code></pre></div>
+<p>Everything is monomorphized, so there is nothing abstract to
+typecheck: a generic body is only ever checked at an instantiation where
+every type is concrete, and errors come with the compile-time call chain
+that produced them.</p>
+<p>Overloads resolve on argument types, and a slice parameter takes any
+array kind:</p>
+<div class="sourceCode" id="cb59"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">describe</span>(x<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]     { <span class="bu">str</span>(<span class="st">&quot;int &quot;</span><span class="op">,</span> x) }</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">describe</span>(x<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]     { <span class="bu">str</span>(<span class="st">&quot;float &quot;</span><span class="op">,</span> x) }</span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">describe</span>(xs<span class="op">:</span> <span class="dt">i64</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] { <span class="bu">str</span>(xs<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; ints, first &quot;</span><span class="op">,</span> xs[<span class="dv">0</span>]) }</span>
+<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="fu">describe</span>(<span class="dv">7</span>)<span class="op">,</span> <span class="st">&quot;; &quot;</span><span class="op">,</span> <span class="fl">2.5</span><span class="op">.</span><span class="fu">describe</span>()<span class="op">,</span> <span class="st">&quot;; &quot;</span><span class="op">,</span> xs<span class="op">.</span><span class="fu">describe</span>()<span class="op">,</span> <span class="st">&quot;; &quot;</span><span class="op">,</span> <span class="fu">describe</span>(xs[<span class="dv">2</span><span class="op">..</span>]))<span class="op">;</span></span></code></pre></div>
+<p>Function values are <strong>compile-time entities</strong>. They are
+passed as generic parameters, every call is direct and inlinable, and
+they cannot escape — storing one, returning one or putting one in data
+is a compile error. There are no closures-as-objects and no runtime
+function pointers. A higher-order function can therefore compile to a
+direct loop:</p>
+<div class="sourceCode" id="cb60"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_pair<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) {</span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> <span class="dv">0</span><span class="op">..</span>xs<span class="op">.</span><span class="bu">len</span> <span class="op">-</span> <span class="dv">1</span> { <span class="fu">F</span>(xs[i]<span class="op">,</span> xs[i <span class="op">+</span> <span class="dv">1</span>])<span class="op">;</span> }</span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> gaps<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a><span class="fu">each_pair</span>(xs) { a<span class="op">,</span> b <span class="op">=&gt;</span> gaps<span class="op">.</span><span class="bu">push</span>(b <span class="op">-</span> a)<span class="op">;</span> }<span class="op">;</span>     <span class="co">// writes an enclosing local</span></span></code></pre></div>
+<p><code>{ ... }</code> after a call is the trailing-block sugar, with
+<code>it</code> as the implicit parameter or <code>a, b =&gt;</code> for
+named ones. The standard library is written this way throughout, and
+<code>filter</code>/<code>map</code> build their results straight into
+the variable receiving them — no intermediate array, no allocation:</p>
+<div class="sourceCode" id="cb61"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> evens   <span class="op">=</span> xs<span class="op">.</span><span class="fu">filter</span>() { it <span class="op">%</span> <span class="dv">2</span> <span class="op">==</span> <span class="dv">0</span> }<span class="op">;</span></span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> squares <span class="op">=</span> xs<span class="op">.</span><span class="fu">map</span>()    { it <span class="op">*</span> it }<span class="op">;</span></span>
+<span id="cb61-3"><a href="#cb61-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> total   <span class="op">=</span> <span class="fu">fold</span>(xs<span class="op">,</span> <span class="dv">0</span>) { acc<span class="op">,</span> x <span class="op">=&gt;</span> acc <span class="op">+</span> x }<span class="op">;</span></span>
+<span id="cb61-4"><a href="#cb61-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sort</span>(xs) { a<span class="op">,</span> b <span class="op">=&gt;</span> a <span class="op">&gt;</span> b }<span class="op">;</span></span></code></pre></div>
+<p>A block may also <code>return</code> from the <strong>lexically
+enclosing function</strong>, not from the HOF calling it — implemented
+with the same <code>return from</code> machinery — so a hand-written
+iterator has the same structuring power as a <code>for</code> loop:</p>
+<div class="sourceCode" id="cb62"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_step<span class="op">&lt;</span><span class="dt">F</span><span class="op">&gt;</span>(lo<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> hi<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> step<span class="op">:</span> <span class="dt">i64</span>) {</span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> i <span class="op">=</span> lo<span class="op">;</span></span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">while</span> i <span class="op">&lt;</span> hi { <span class="fu">F</span>(i)<span class="op">;</span> i <span class="op">+=</span> step<span class="op">;</span> }</span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-6"><a href="#cb62-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">first_multiple_of_7</span>(lo<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> hi<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span> {</span>
+<span id="cb62-7"><a href="#cb62-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">each_step</span>(lo<span class="op">,</span> hi<span class="op">,</span> <span class="dv">3</span>) { <span class="kw">if</span> it <span class="op">%</span> <span class="dv">7</span> <span class="op">==</span> <span class="dv">0</span> { <span class="kw">return</span> it<span class="op">;</span> } }<span class="op">;</span>   <span class="co">// returns from first_multiple_of_7,</span></span>
+<span id="cb62-8"><a href="#cb62-8" aria-hidden="true" tabindex="-1"></a>                                                              <span class="co">// not from each_step</span></span>
+<span id="cb62-9"><a href="#cb62-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb62-10"><a href="#cb62-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Nested functions see the enclosing function's locals, which is how
+the parsers in the samples are written: <code>parse</code>'s input,
+cursor and pools are its locals, and the recursive descent functions
+nested inside it use them as free variables instead of passing a state
+struct around (<a
+href="../samples/17_calc.goose.html"><code>17_calc</code></a>, <a
+href="../samples/18_json.goose.html"><code>18_json</code></a>).</p>
+<p>One thing to know about recursion: it is opt-in and annotated. The
+entry of a recursive cycle is a <code>recursive fn</code>, every
+function in the cycle needs an explicit signature, and <strong>no
+function in a cycle may hold growable data across a call back into the
+cycle</strong> — every activation would need a data stack of its own. So
+a recursive builder takes the pool it grows as a parameter:</p>
+<div class="sourceCode" id="cb63"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="kw">recursive</span> <span class="kw">fn</span> <span class="fu">in_order</span>(n<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;,</span> out<span class="op">:</span> <span class="dt">i32</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>) {</span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> l <span class="op">=</span> n<span class="op">.</span>left<span class="op">;</span></span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> l { <span class="fu">in_order</span>(l<span class="op">,</span> out)<span class="op">;</span> }</span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a>    out<span class="op">.</span><span class="bu">push</span>(n<span class="op">.</span>key)<span class="op">;</span></span>
+<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> r <span class="op">=</span> n<span class="op">.</span>right<span class="op">;</span></span>
+<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> r { <span class="fu">in_order</span>(r<span class="op">,</span> out)<span class="op">;</span> }</span>
+<span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>A function in a cycle may still own scratch it is done with before it
+recurses, as long as the scratch's scope ends before the call. Here each
+line is built and printed in a block, so its stack is free again when
+the recursive calls start:</p>
+<div class="sourceCode" id="cb64"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="kw">recursive</span> <span class="kw">fn</span> <span class="fu">show</span>(n<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;,</span> depth<span class="op">:</span> <span class="dt">i64</span>) {</span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>        <span class="kw">var</span> line<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a>        <span class="kw">for</span> i <span class="kw">in</span> depth { line<span class="op">.</span><span class="bu">append</span>(<span class="st">&quot;  &quot;</span>)<span class="op">;</span> }</span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>        line<span class="op">.</span><span class="bu">append</span>(<span class="bu">str</span>(n<span class="op">.</span>key))<span class="op">;</span></span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(line)<span class="op">;</span></span>
+<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> l <span class="op">=</span> n<span class="op">.</span>left<span class="op">;</span></span>
+<span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> l { <span class="fu">show</span>(l<span class="op">,</span> depth <span class="op">+</span> <span class="dv">1</span>)<span class="op">;</span> }</span>
+<span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> r <span class="op">=</span> n<span class="op">.</span>right<span class="op">;</span></span>
+<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> r { <span class="fu">show</span>(r<span class="op">,</span> depth <span class="op">+</span> <span class="dv">1</span>)<span class="op">;</span> }</span>
+<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>That is a real constraint on how you write recursive code, and it is
+also most of why recursion depth costs nothing but native stack.</p>
+<h3 id="several-tables-one-context">Several tables, one context</h3>
+<p>A compiler or a simulation keeps its state in several growable tables
+(nodes, symbols, output) and wants to hand them around as one thing. A
+struct cannot own them, since it holds at most one resizable array, as
+its last field, and a recursive function cannot keep them across its
+recursive calls. What works is to make each table a local of a driver
+function, and to pass the code that works on them one struct of
+references:</p>
+<div class="sourceCode" id="cb65"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Node</span> { at<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> first<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> next<span class="op">:</span> <span class="dt">i64</span> }   <span class="co">// a source offset, first child, next sibling</span></span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Ctx</span> {                 <span class="co">// a slice and three references: fixed-size, cheap to pass</span></span>
+<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a>    source<span class="op">:</span> <span class="kw">const</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span></span>
+<span id="cb65-5"><a href="#cb65-5" aria-hidden="true" tabindex="-1"></a>    nodes<span class="op">:</span> <span class="dt">Node</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span></span>
+<span id="cb65-6"><a href="#cb65-6" aria-hidden="true" tabindex="-1"></a>    text<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span></span>
+<span id="cb65-7"><a href="#cb65-7" aria-hidden="true" tabindex="-1"></a>    scratch<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..&lt;</span>]<span class="op">&amp;,</span>     <span class="co">// the recursion&#39;s working stack</span></span>
+<span id="cb65-8"><a href="#cb65-8" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb65-9"><a href="#cb65-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb65-10"><a href="#cb65-10" aria-hidden="true" tabindex="-1"></a><span class="kw">recursive</span> <span class="kw">fn</span> <span class="fu">walk</span>(c<span class="op">:</span> <span class="dt">Ctx</span><span class="op">&amp;,</span> n<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> depth<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span> {</span>
+<span id="cb65-11"><a href="#cb65-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> mark <span class="op">=</span> c<span class="op">.</span>scratch<span class="op">.</span><span class="bu">len</span><span class="op">;</span></span>
+<span id="cb65-12"><a href="#cb65-12" aria-hidden="true" tabindex="-1"></a>    c<span class="op">.</span>scratch<span class="op">.</span><span class="bu">push</span>(depth)<span class="op">;</span>                 <span class="co">// this activation&#39;s entries, above its callers&#39;</span></span>
+<span id="cb65-13"><a href="#cb65-13" aria-hidden="true" tabindex="-1"></a>    c<span class="op">.</span>text<span class="op">.</span><span class="bu">push</span>(c<span class="op">.</span>source[c<span class="op">.</span>nodes[n]<span class="op">.</span>at])<span class="op">;</span></span>
+<span id="cb65-14"><a href="#cb65-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> total <span class="op">=</span> c<span class="op">.</span>scratch[mark]<span class="op">;</span></span>
+<span id="cb65-15"><a href="#cb65-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> e <span class="op">=</span> c<span class="op">.</span>nodes[n]<span class="op">.</span>first<span class="op">;</span></span>
+<span id="cb65-16"><a href="#cb65-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">while</span> e <span class="op">&gt;=</span> <span class="dv">0</span> {</span>
+<span id="cb65-17"><a href="#cb65-17" aria-hidden="true" tabindex="-1"></a>        total <span class="op">+=</span> <span class="fu">walk</span>(c<span class="op">,</span> e<span class="op">,</span> depth <span class="op">+</span> <span class="dv">1</span>)<span class="op">;</span></span>
+<span id="cb65-18"><a href="#cb65-18" aria-hidden="true" tabindex="-1"></a>        e <span class="op">=</span> c<span class="op">.</span>nodes[e]<span class="op">.</span>next<span class="op">;</span></span>
+<span id="cb65-19"><a href="#cb65-19" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb65-20"><a href="#cb65-20" aria-hidden="true" tabindex="-1"></a>    c<span class="op">.</span>scratch<span class="op">.</span><span class="bu">resize</span>(mark)<span class="op">;</span>                <span class="co">// gone again before it returns</span></span>
+<span id="cb65-21"><a href="#cb65-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> total<span class="op">;</span></span>
+<span id="cb65-22"><a href="#cb65-22" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb65-23"><a href="#cb65-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb65-24"><a href="#cb65-24" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">compile</span>(source<span class="op">:</span> <span class="kw">const</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span> {</span>
+<span id="cb65-25"><a href="#cb65-25" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> nodes<span class="op">:</span> <span class="dt">Node</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb65-26"><a href="#cb65-26" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> text<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb65-27"><a href="#cb65-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> scratch<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..&lt;</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb65-28"><a href="#cb65-28" aria-hidden="true" tabindex="-1"></a>    nodes<span class="op">.</span><span class="bu">push</span>(<span class="dt">Node</span> { at<span class="op">:</span> <span class="dv">0</span><span class="op">,</span> first<span class="op">:</span> <span class="dv">1</span><span class="op">,</span> next<span class="op">:</span> <span class="op">-</span><span class="dv">1</span> })<span class="op">;</span>   <span class="co">// a root with two children</span></span>
+<span id="cb65-29"><a href="#cb65-29" aria-hidden="true" tabindex="-1"></a>    nodes<span class="op">.</span><span class="bu">push</span>(<span class="dt">Node</span> { at<span class="op">:</span> <span class="dv">1</span><span class="op">,</span> first<span class="op">:</span> <span class="op">-</span><span class="dv">1</span><span class="op">,</span> next<span class="op">:</span> <span class="dv">2</span> })<span class="op">;</span></span>
+<span id="cb65-30"><a href="#cb65-30" aria-hidden="true" tabindex="-1"></a>    nodes<span class="op">.</span><span class="bu">push</span>(<span class="dt">Node</span> { at<span class="op">:</span> <span class="dv">2</span><span class="op">,</span> first<span class="op">:</span> <span class="op">-</span><span class="dv">1</span><span class="op">,</span> next<span class="op">:</span> <span class="op">-</span><span class="dv">1</span> })<span class="op">;</span></span>
+<span id="cb65-31"><a href="#cb65-31" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> c <span class="op">=</span> <span class="dt">Ctx</span> { source<span class="op">:</span> source<span class="op">,</span> nodes<span class="op">:</span> nodes<span class="op">,</span> text<span class="op">:</span> text<span class="op">,</span> scratch<span class="op">:</span> scratch }<span class="op">;</span></span>
+<span id="cb65-32"><a href="#cb65-32" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> r <span class="op">=</span> <span class="fu">walk</span>(c<span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">1</span>)<span class="op">;</span></span>
+<span id="cb65-33"><a href="#cb65-33" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(text<span class="op">,</span> <span class="st">&quot; &quot;</span><span class="op">,</span> scratch<span class="op">.</span><span class="bu">len</span>)<span class="op">;</span></span>
+<span id="cb65-34"><a href="#cb65-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> r<span class="op">;</span></span>
+<span id="cb65-35"><a href="#cb65-35" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>compile("abc")</code> prints <code>abc 0</code> and returns 5.
+<code>walk</code> pushes into, indexes and shrinks the tables through
+<code>c</code> as it would through separate reference parameters, and
+they are <code>compile</code>'s locals, owned outside the cycle and
+outliving every activation of <code>walk</code>. The grow-shrink
+<code>scratch</code> is a stack the whole recursion shares: each
+activation pushes above its callers' entries and truncates back to its
+mark before it returns.</p>
+<p>The context lives for one call of <code>compile</code>. A second
+call, for another file in the same process, starts from fresh tables,
+and each call's scope exit frees its tables at once, so there is no
+global state to reset. Where the code that works on the tables is small
+enough to live inside the driver, nested functions reach them as free
+variables with no struct at all, as the samples' parsers do; the struct
+is for code spread over many functions or files.</p>
+<hr />
+<h2 id="14-threads-that-share-nothing">14. Threads that share
+nothing</h2>
+<p>There is no shared mutable memory, at all. A worker is declared
+<code>thread_fn</code>, and the compiler compiles it and everything it
+calls as a <strong>separate program</strong> with its own data stacks
+and its own copies of the globals it uses.</p>
+<p>Values cross between them through typed queues — one queue per type,
+selected by the type — and the values that may cross must be
+<strong>flat</strong>: no references, no slices, at any depth. Which is
+cheap, because a flat Goose value is contiguous, so "copy it into the
+queue" is a memcpy.</p>
+<div class="sourceCode" id="cb66"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Job</span>    { n<span class="op">:</span> <span class="dt">i32</span> }</span>
+<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Result</span> { n<span class="op">:</span> <span class="dt">i32</span><span class="op">,</span> digits<span class="op">:</span> <span class="dt">i32</span> }</span>
+<span id="cb66-3"><a href="#cb66-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb66-4"><a href="#cb66-4" aria-hidden="true" tabindex="-1"></a><span class="kw">thread_fn</span> <span class="fu">worker</span>() {</span>
+<span id="cb66-5"><a href="#cb66-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">loop</span> {</span>
+<span id="cb66-6"><a href="#cb66-6" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> job <span class="op">=</span> <span class="bu">qget</span><span class="op">&lt;</span><span class="dt">Job</span><span class="op">&gt;</span>()<span class="op">;</span>           <span class="co">// blocks</span></span>
+<span id="cb66-7"><a href="#cb66-7" aria-hidden="true" tabindex="-1"></a>        <span class="kw">guard</span> job<span class="op">.</span>n <span class="op">&gt;=</span> <span class="dv">0</span> <span class="kw">else</span> { <span class="kw">break</span><span class="op">;</span> } <span class="co">// -1 means stop</span></span>
+<span id="cb66-8"><a href="#cb66-8" aria-hidden="true" tabindex="-1"></a>        <span class="bu">qput</span>(<span class="dt">Result</span> { n<span class="op">:</span> job<span class="op">.</span>n<span class="op">,</span> digits<span class="op">:</span> <span class="fu">count_digits</span>(job<span class="op">.</span>n) })<span class="op">;</span></span>
+<span id="cb66-9"><a href="#cb66-9" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb66-10"><a href="#cb66-10" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb66-11"><a href="#cb66-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb66-12"><a href="#cb66-12" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb66-13"><a href="#cb66-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> n <span class="op">=</span> <span class="fu">max</span>(<span class="dv">1</span><span class="op">,</span> <span class="bu">hardware_threads</span>())<span class="op">;</span></span>
+<span id="cb66-14"><a href="#cb66-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> <span class="dv">8</span> { <span class="bu">qput</span>(<span class="dt">Job</span> { n<span class="op">:</span> (<span class="dv">1</span> <span class="op">&lt;&lt;</span> (i <span class="op">*</span> <span class="dv">3</span>)) <span class="kw">as</span> <span class="dt">i32</span> })<span class="op">;</span> }</span>
+<span id="cb66-15"><a href="#cb66-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> n { <span class="bu">qput</span>(<span class="dt">Job</span> { n<span class="op">:</span> <span class="op">-</span><span class="dv">1</span> })<span class="op">;</span> }              <span class="co">// one quit job per worker</span></span>
+<span id="cb66-16"><a href="#cb66-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> ids<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb66-17"><a href="#cb66-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> n { ids<span class="op">.</span><span class="bu">push</span>(<span class="bu">thread_spawn</span>(worker))<span class="op">;</span> }</span>
+<span id="cb66-18"><a href="#cb66-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> total <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb66-19"><a href="#cb66-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> i <span class="kw">in</span> <span class="dv">8</span> { <span class="kw">let</span> r <span class="op">=</span> <span class="bu">qget</span><span class="op">&lt;</span><span class="dt">Result</span><span class="op">&gt;</span>()<span class="op">;</span> total <span class="op">+=</span> r<span class="op">.</span>digits<span class="op">;</span> }</span>
+<span id="cb66-20"><a href="#cb66-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> id <span class="kw">in</span> ids { <span class="bu">thread_wait</span>(id)<span class="op">;</span> }</span>
+<span id="cb66-21"><a href="#cb66-21" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(n<span class="op">,</span> <span class="st">&quot; workers, &quot;</span><span class="op">,</span> total<span class="op">,</span> <span class="st">&quot; digits in total&quot;</span>)<span class="op">;</span></span>
+<span id="cb66-22"><a href="#cb66-22" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Because a "flat value" includes variable-size parts, a job or a
+result can carry real data rather than a handle to it — a
+<code>struct Row { y: i32, cells: u8[] }</code> crosses the queue as one
+copy, pixels included, which is exactly what <a
+href="../samples/23_mandelbrot_threads.goose.html"><code>23_mandelbrot_threads</code></a>
+does.</p>
+<p>A worker that increments a global increments <em>its own copy</em>;
+<code>main</code>'s is untouched. If that sounds restrictive, notice
+what it removes: there are no data races to have, and no locks, atomics
+or memory ordering anywhere in the language.</p>
+<p>(Threads need a real C compiler — the TinyCC in-process backend
+cannot place thread-local storage, so compile with <code>-o</code> for
+these.)</p>
+<hr />
+<h2 id="15-your-data-is-already-a-file-format">15. Your data is already
+a file format</h2>
+<p>If a structure's links are self-relative offsets, it means the same
+thing wherever it sits in memory. So saving it is a write of its bytes,
+and loading it is a read. No serializer, no schema, no pointer fixups,
+no allocation per node.</p>
+<div class="sourceCode" id="cb67"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Node</span> { word<span class="op">:</span> <span class="dt">u8</span>[<span class="op">..</span><span class="dv">24</span>]<span class="op">,</span> count<span class="op">:</span> <span class="dt">i32</span><span class="op">,</span> left<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;&lt;</span><span class="dt">u32</span><span class="op">&gt;?,</span> right<span class="op">:</span> <span class="dt">Node</span><span class="op">&amp;&lt;</span><span class="dt">u32</span><span class="op">&gt;?</span> }</span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> index<span class="op">:</span> <span class="dt">Node</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">;</span></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a><span class="co">// ... build the tree ...</span></span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> image<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>] <span class="op">=</span> index<span class="op">.</span><span class="bu">to_bytes</span>()<span class="op">;</span>      <span class="co">// a framed image of the array</span></span>
+<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> loaded<span class="op">,</span> ok <span class="op">=</span> <span class="bu">from_bytes</span><span class="op">&lt;</span><span class="dt">Node</span>[<span class="op">&gt;..</span>]<span class="op">&gt;</span>(image)<span class="op">;</span></span>
+<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">&quot;loaded &quot;</span><span class="op">,</span> ok<span class="op">,</span> <span class="st">&quot;, &quot;</span><span class="op">,</span> loaded<span class="op">.</span><span class="bu">len</span><span class="op">,</span> <span class="st">&quot; nodes, &#39;fox&#39; = &quot;</span><span class="op">,</span> <span class="fu">lookup</span>(loaded<span class="op">,</span> <span class="st">&quot;fox&quot;</span>))<span class="op">;</span></span></code></pre></div>
+<p><code>bytes_of(a)</code> is the same thing without the copy — a
+read-only <em>view</em> of the element region, which you can hand
+straight to <code>write_file</code>.</p>
+<p>The interesting half is <code>from_bytes</code>. Bytes arriving from
+outside the program are the one place a reference could enter without
+the compiler having proved it, so <code>from_bytes</code>
+<strong>verifies before the bytes become a value</strong>: the framing,
+every tag, every length, and every link landing on an element start of
+that same image. A corrupt or hostile file is a <code>false</code> and
+an empty array, never a wild reference.</p>
+<div class="sourceCode" id="cb68"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a>image[image<span class="op">.</span><span class="bu">len</span> <span class="op">-</span> <span class="dv">3</span>] <span class="op">=</span> <span class="dv">200</span><span class="op">;</span>                  <span class="co">// tamper with a link</span></span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> bad<span class="op">,</span> bok <span class="op">=</span> <span class="bu">from_bytes</span><span class="op">&lt;</span><span class="dt">Node</span>[<span class="op">&gt;..</span>]<span class="op">&gt;</span>(image)<span class="op">;</span></span>
+<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">&quot;accepted: &quot;</span><span class="op">,</span> bok<span class="op">,</span> <span class="st">&quot;, nodes &quot;</span><span class="op">,</span> bad<span class="op">.</span><span class="bu">len</span>)<span class="op">;</span></span></code></pre></div>
+<pre><code>loaded true, 9 nodes, &#39;fox&#39; = 4
+accepted: false, nodes 0</code></pre>
+<p>What it verifies is <em>safety</em>, not integrity — an image whose
+data bytes were edited still describes a well-formed structure, and it
+is a checksum, not the verifier, that tells you the file is the one you
+wrote. What comes back is an ordinary array: it indexes, it grows,
+references into it are ordinary references, and the lifetime system
+needs no new rule for it.</p>
+<hr />
+<h2 id="16-calling-c">16. Calling C</h2>
+<p>An <code>extern fn</code> binds a Goose signature to a C symbol. The
+<code>math</code> and <code>os</code> modules use this foreign-function
+interface.</p>
+<div class="sourceCode" id="cb70"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="st">&quot;cbrt&quot;</span> <span class="kw">fn</span> <span class="fu">cube_root</span>(x<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">f64</span><span class="op">;</span></span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">hypot</span>(x<span class="op">:</span> <span class="dt">f64</span><span class="op">,</span> y<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">f64</span><span class="op">;</span></span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">crc32_bytes</span>(s<span class="op">:</span> <span class="kw">const</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u32</span><span class="op">;</span>   <span class="co">// a slice in, a scalar out</span></span>
+<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">stats_of</span>(xs<span class="op">:</span> <span class="dt">i32</span>[<span class="op">:</span>]<span class="op">,</span> out<span class="op">:</span> <span class="dt">Stats</span><span class="op">&amp;</span>)<span class="op">;</span>    <span class="co">// a struct filled through a reference</span></span>
+<span id="cb70-6"><a href="#cb70-6" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">c_version</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>)<span class="op">;</span>             <span class="co">// a builder C appends to</span></span></code></pre></div>
+<p>What may cross is exactly what has a plain C shape: the scalars and
+<code>bool</code>, flat fixed-size structs and arrays (by value, or
+through a reference as a pointer), slices of those (as a
+<code>{ data, len }</code> struct), and a <code>u8[&gt;..]&amp;</code>
+builder. Anything else is rejected at the declaration rather than
+mis-marshalled at the call. A call compiles to a direct C call with no
+calling-convention extras. Your own C arrives with
+<code>--include header.h</code>.</p>
+<hr />
+<h2 id="17-about-the-speed">17. About the speed</h2>
+<p>Goose's performance depends on both its memory model and compiler
+optimization. The distinction helps when choosing data layouts and
+tuning loops.</p>
+<p><strong>Benefits of the memory model.</strong> No allocator on any
+path. No teardown — a scope exit is a pointer store, not a walk.
+Contiguous data, so the cache does less work: an array of records is
+<em>one</em> block, not one block per record. Narrow links: 2 and 4-byte
+offsets where a pointer would be 8. And variable-mode enums, where a
+tree of mostly-small nodes stops paying for its largest variant
+everywhere.</p>
+<p><strong>Where it does need the optimizer</strong>, and where you can
+help it. Every index is bounds-checked, and the compiler proves most of
+them away — but "most" is not "all", and what it fails to prove stays in
+the program. The idiom that works is to give the analysis a length it
+can use. Here is a blur kernel over row slices:</p>
+<div class="sourceCode" id="cb71"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> <span class="dt">W</span> <span class="op">=</span> <span class="dv">512</span><span class="op">;</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a><span class="co">// Each row of the image is a slice; the caller passes three source rows and</span></span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a><span class="co">// one destination row per output row.</span></span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">blur_row</span>(above<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> here<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> below<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) {</span>
+<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">assert</span>(above<span class="op">.</span><span class="bu">len</span> <span class="op">==</span> <span class="dt">W</span> <span class="op">&amp;&amp;</span> here<span class="op">.</span><span class="bu">len</span> <span class="op">==</span> <span class="dt">W</span> <span class="op">&amp;&amp;</span> below<span class="op">.</span><span class="bu">len</span> <span class="op">==</span> <span class="dt">W</span> <span class="op">&amp;&amp;</span> out<span class="op">.</span><span class="bu">len</span> <span class="op">==</span> <span class="dt">W</span>)<span class="op">;</span></span>
+<span id="cb71-7"><a href="#cb71-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> x <span class="kw">in</span> <span class="dv">1</span><span class="op">..</span><span class="dt">W</span> <span class="op">-</span> <span class="dv">1</span> {</span>
+<span id="cb71-8"><a href="#cb71-8" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> sum <span class="op">=</span> above[x <span class="op">-</span> <span class="dv">1</span>] <span class="kw">as</span> <span class="dt">i64</span> <span class="op">+</span> above[x] <span class="op">+</span> above[x <span class="op">+</span> <span class="dv">1</span>] <span class="op">+</span></span>
+<span id="cb71-9"><a href="#cb71-9" aria-hidden="true" tabindex="-1"></a>                  here[x <span class="op">-</span> <span class="dv">1</span>]  <span class="op">+</span> here[x]  <span class="op">+</span> here[x <span class="op">+</span> <span class="dv">1</span>] <span class="op">+</span></span>
+<span id="cb71-10"><a href="#cb71-10" aria-hidden="true" tabindex="-1"></a>                  below[x <span class="op">-</span> <span class="dv">1</span>] <span class="op">+</span> below[x] <span class="op">+</span> below[x <span class="op">+</span> <span class="dv">1</span>]<span class="op">;</span></span>
+<span id="cb71-11"><a href="#cb71-11" aria-hidden="true" tabindex="-1"></a>        out[x] <span class="op">=</span> (sum <span class="op">/</span> <span class="dv">9</span>) <span class="kw">as</span><span class="op">!</span> <span class="dt">u8</span><span class="op">;</span></span>
+<span id="cb71-12"><a href="#cb71-12" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb71-13"><a href="#cb71-13" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<pre><code>bce: elided 11/11 index and 0/4 slice checks</code></pre>
+<p>One <code>assert</code> per row, and every index inside the pixel
+loop is a loop counter plus a constant against a known length, so all
+eleven checks go and the C backend sees the loop it would have seen from
+C. Without it, none of them do, and the loop does not vectorize.
+<code>--bce-lines</code> will tell you, per line, exactly which checks
+survived — use it when a kernel is slower than you expect.</p>
+<p>Two language rules also help the analysis: a grow-only array can only
+shrink at a
+<code>pop</code>/<code>pop_n</code>/<code>resize</code>/<code>clear</code>
+the compiler can see, so a bound established before a <code>push</code>
+still holds after it; and <code>%</code> being Euclidean means a
+reduction is in range by construction.</p>
+<p><strong>What the numbers actually say</strong> (<a
+href="../bench/summary.html"><code>bench/summary.md</code></a>, <a
+href="../bench/results.html"><code>bench/results.md</code></a>): 3.3x
+the speed of idiomatic C++, 1.16x hand-optimized C++, 1.05–1.11x the
+best safe Rust, on 1.9x/1.3x/1.2x less memory, over sixteen benchmarks.
+Read the losses too — they are in there, with explanations.
+<code>particles</code> is a flat float kernel where the design never
+predicted an advantage and there is none. <code>calc</code>, at 0.82x
+against Rust, is the one loss the summary attributes to Goose's own
+design rather than to a backend, and it says exactly which three things
+cost it. Every measurement is whole-process wall clock including
+teardown, which is a real cost the other languages pay and Goose does
+not.</p>
+<hr />
+<h2 id="18-what-it-costs-you">18. What it costs you</h2>
+<p>You will meet all of these. Each one links to the section above that
+shows how to work with it, where there is one, and to the specification
+rule that imposes it.</p>
+<ul>
+<li><strong>You have to think about where data lives.</strong> Not
+constantly, but the question "who owns this, and how long does its scope
+last" is one you now answer explicitly. Most of the time the answer is
+"the function that builds it", and that is free. When it is not, it is a
+<code>reusable</code> pool (<a
+href="#11-when-lifetimes-really-are-not-nested">section 11</a>; <a
+href="goose_spec.html#12-memory-model">spec §1.2</a>, <a
+href="goose_spec.html#54-reusable-arrays-safe-allocation-escape-hatch">§5.4</a>).</li>
+<li><strong>Recursive functions cannot keep growable data across a
+recursive call.</strong> Scratch in a block that ends before the call is
+fine; anything that lives longer is passed in. This changes how a
+recursive-descent parser is structured — the state becomes locals of the
+non-recursive entry function, or a struct of references to them, which
+is arguably nicer, but it is a change (<a
+href="#several-tables-one-context">Several tables, one context</a>; <a
+href="goose_spec.html#78-recursion">spec §7.8</a>).</li>
+<li><strong>Arrays of variable-size elements cannot be indexed.</strong>
+You pick, per container, between "compact and walkable" and "indexable",
+or pay for an index of references beside a compact one (<a
+href="#an-index-for-variable-size-elements">section 10</a>; <a
+href="goose_spec.html#33-the-array-family">spec §3.3</a>).</li>
+<li><strong>A fixed-mode enum cannot be pointed into; a variable-mode
+one cannot be overwritten.</strong> You pick, per use site (<a
+href="#9-enums-in-two-sizes">section 9</a>; <a
+href="goose_spec.html#35-algebraic-data-types">spec §3.5</a>, <a
+href="goose_spec.html#81-match">§8.1</a>).</li>
+<li><strong>No closures that escape, no function pointers, no dynamic
+dispatch beyond ADT tags.</strong> The closed-world compiler is what
+makes roots and destinations static; it is also what stops you writing a
+plugin system (<a href="#13-generics-and-blocks-that-disappear">section
+13</a>; <a href="goose_spec.html#76-static-function-values">spec
+§7.6</a>, <a
+href="goose_spec.html#82-case-functions-match-as-an-overload-set">§8.2</a>).</li>
+<li><strong>Whole-program compilation.</strong> No separate compilation,
+no shared libraries of Goose code (<a
+href="goose_spec.html#101-whole-program-call-graph-order">spec
+§10.1</a>).</li>
+<li><strong>A <code>reusable</code> pool manages its elements
+loosely.</strong> Nothing is freed and nothing is unsafe, but a slot you
+handed back and then still name reads whatever its next owner put there
+— the array equivalent of a stale index, and yours to avoid (<a
+href="#11-when-lifetimes-really-are-not-nested">section 11</a>; <a
+href="goose_spec.html#94-type-safe-reuse-and-stale-references">spec
+§9.4</a>).</li>
+<li><strong>v1 omissions</strong> you will notice: no move for
+resizables, one resizable per struct, no labeled break, no namespace
+privacy (<a
+href="goose_spec.html#12-builtins-the-standard-library-and-what-v1-leaves-out">spec
+§12</a>), no subprocesses or networking in the library yet (<a
+href="stdlib.html#os"><code>os</code></a>).</li>
+</ul>
+<hr />
+<h2 id="19-calling-goose-from-c">19. Calling Goose from C</h2>
+<p><code>extern fn</code> goes the other way: <code>export fn</code>
+makes a Goose function callable from C, so a Goose module can be linked
+into a C or C++ program as a library.</p>
+<div class="sourceCode" id="cb73"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> calls<span class="op">:</span> <span class="dt">i32</span> <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a><span class="kw">export</span> <span class="kw">fn</span> <span class="fu">hello_world</span>() <span class="op">-&gt;</span> <span class="kw">const</span> <span class="dt">u8</span>[<span class="op">:</span>] {</span>
+<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a>    calls <span class="op">+=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> <span class="st">&quot;Hello, world!&quot;</span></span>
+<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb73-7"><a href="#cb73-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-8"><a href="#cb73-8" aria-hidden="true" tabindex="-1"></a><span class="kw">export</span> <span class="st">&quot;c_add&quot;</span> <span class="kw">fn</span> <span class="fu">add</span>(a<span class="op">:</span> <span class="dt">i32</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">i32</span>) <span class="op">-&gt;</span> <span class="dt">i32</span> { a <span class="op">+</span> b }</span>
+<span id="cb73-9"><a href="#cb73-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-10"><a href="#cb73-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb73-11"><a href="#cb73-11" aria-hidden="true" tabindex="-1"></a>    calls <span class="op">=</span> <span class="dv">100</span><span class="op">;</span>    <span class="co">// runs once, inside goose_init</span></span>
+<span id="cb73-12"><a href="#cb73-12" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>An <code>export fn</code> is an ordinary Goose function; the compiler
+adds a C wrapper for it. The optional string picks the C symbol, and
+otherwise the Goose name is used. Ask for a header and the compiler
+builds the C for a C host, with no <code>main</code> of its own:</p>
+<div class="sourceCode" id="cb74"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="ex">goose</span> <span class="at">--standalone</span> <span class="at">--header</span> hello.h <span class="at">-o</span> hello.c hello.goose</span>
+<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cc</span> hello.c app.c <span class="at">-o</span> app</span></code></pre></div>
+<div class="sourceCode" id="cb75"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&quot;hello.h&quot;</span></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">int</span> argc<span class="op">,</span> <span class="dt">char</span> <span class="op">**</span>argv<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb75-5"><a href="#cb75-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int64_t</span> length<span class="op">;</span></span>
+<span id="cb75-6"><a href="#cb75-6" aria-hidden="true" tabindex="-1"></a>    goose_init<span class="op">(</span>argc<span class="op">,</span> argv<span class="op">);</span></span>
+<span id="cb75-7"><a href="#cb75-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">const</span> <span class="dt">uint8_t</span> <span class="op">*</span>message <span class="op">=</span> hello_world<span class="op">(&amp;</span>length<span class="op">);</span></span>
+<span id="cb75-8"><a href="#cb75-8" aria-hidden="true" tabindex="-1"></a>    fwrite<span class="op">(</span>message<span class="op">,</span> <span class="dv">1</span><span class="op">,</span> <span class="op">(</span><span class="dt">size_t</span><span class="op">)</span>length<span class="op">,</span> stdout<span class="op">);</span>   <span class="co">// not NUL-terminated</span></span>
+<span id="cb75-9"><a href="#cb75-9" aria-hidden="true" tabindex="-1"></a>    putchar<span class="op">(</span><span class="ch">&#39;</span><span class="sc">\n</span><span class="ch">&#39;</span><span class="op">);</span></span>
+<span id="cb75-10"><a href="#cb75-10" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">&quot;</span><span class="sc">%d\n</span><span class="st">&quot;</span><span class="op">,</span> c_add<span class="op">(</span><span class="dv">20</span><span class="op">,</span> <span class="dv">22</span><span class="op">));</span></span>
+<span id="cb75-11"><a href="#cb75-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb75-12"><a href="#cb75-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>The host calls <code>goose_init</code> once before anything else. It
+sets up the runtime and the globals and then runs your Goose
+<code>fn main()</code>, so <code>main</code> is the place for a
+library's own start-up code. A library with nothing to start up may
+leave <code>main</code> out. A <code>const u8[:]</code> result comes
+back as a pointer plus an extra <code>int64_t *</code> parameter that
+receives its length; scalars and flat fixed-size values are returned by
+value. The generated functions are not thread-safe: call them from the
+thread that called <code>goose_init</code>. The signatures that may
+cross are the ones from <a href="#16-calling-c">section 16</a>, with a
+few more limits; see <a
+href="goose_spec.html#711-exporting-goose-functions-to-c">spec
+§7.11</a>.</p>
+<hr />
+<h2 id="20-where-to-go-next">20. Where to go next</h2>
+<ul>
+<li><strong><a
+href="reference.html"><code>docs/reference.md</code></a></strong> — the
+whole language, topic by topic, with a compiling example for every rule:
+where to go after this tutorial, and where to look things up.</li>
+<li><strong><a
+href="../samples/index.html"><code>samples/</code></a></strong> —
+thirty-one complete programs in reading order, each one commented for
+what it demonstrates. Start with <code>01_tour</code> and
+<code>02_memory</code>, then jump to whatever looks like your problem.
+<code>13_linked_list</code>, <code>14_bst</code> and
+<code>18_json</code> are the ones that show the data structures in
+detail; <code>26_file_tree</code> uses both pool kinds together.</li>
+<li><strong><a
+href="stdlib.html"><code>docs/stdlib.md</code></a></strong> — the
+library reference. Fourteen modules: <code>std</code>,
+<code>dictionary</code>, <code>vec</code>, <code>math</code>,
+<code>os</code>, <code>binary</code>, <code>base64</code>,
+<code>csv</code>, <code>json</code>, <code>regex</code>,
+<code>audio</code>, <code>gfx</code>, <code>physics</code>, and
+<code>ui</code>, with Goose interfaces under <code>stdlib/</code>.</li>
+<li><strong><a
+href="goose_spec.html"><code>docs/goose_spec.md</code></a></strong> —
+the actual rules, when you want to know why something did not compile.
+It is precise rather than friendly, and it is where every "spec §" in
+this document points.</li>
+<li><strong><a
+href="../bench/summary.html"><code>bench/</code></a></strong> — the
+numbers and the design notes behind them.</li>
+<li><strong><a
+href="implementation.html"><code>docs/implementation.md</code></a></strong>
+— how the compiler works, if you want to hack on it.</li>
+</ul>
+<p>One last piece of advice: when the checker rejects something, read
+the whole error. It names both ends — the reference <em>and</em> where
+it was bound, the holder <em>and</em> the line that stored into it, the
+instantiation <em>and</em> the call chain that produced it. Use those
+locations to decide which binding, store, or scope needs to change.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/tutorial.md"><code>docs/tutorial.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

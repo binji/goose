@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Goose Standard Library — Design · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#the-goose-standard-library--design"
+id="toc-the-goose-standard-library--design">The Goose Standard Library —
+Design</a>
+<ul>
+<li><a href="#0-summary" id="toc-0-summary">0. Summary</a></li>
+<li><a href="#1-principles" id="toc-1-principles">1. Principles</a></li>
+<li><a href="#2-conventions" id="toc-2-conventions">2. Conventions</a>
+<ul>
+<li><a href="#21-how-containers-are-passed"
+id="toc-21-how-containers-are-passed">2.1 How containers are
+passed</a></li>
+<li><a href="#22-results" id="toc-22-results">2.2 Results</a></li>
+<li><a href="#23-function-value-parameters"
+id="toc-23-function-value-parameters">2.3 Function-value
+parameters</a></li>
+<li><a href="#24-trait-like-overload-sets"
+id="toc-24-trait-like-overload-sets">2.4 Trait-like overload
+sets</a></li>
+<li><a href="#25-ufcs" id="toc-25-ufcs">2.5 UFCS</a></li>
+<li><a href="#26-naming" id="toc-26-naming">2.6 Naming</a></li>
+<li><a href="#27-strings" id="toc-27-strings">2.7 Strings</a></li>
+</ul></li>
+<li><a href="#3-module-map" id="toc-3-module-map">3. Module map</a></li>
+<li><a href="#4-std" id="toc-4-std">4. <code>std</code></a>
+<ul>
+<li><a href="#41-scalars-and-bits" id="toc-41-scalars-and-bits">4.1
+Scalars and bits</a></li>
+<li><a href="#42-hashing" id="toc-42-hashing">4.2 Hashing</a></li>
+<li><a href="#43-random-numbers" id="toc-43-random-numbers">4.3 Random
+numbers</a></li>
+<li><a href="#44-arrays-reading-and-searching"
+id="toc-44-arrays-reading-and-searching">4.4 Arrays: reading and
+searching</a></li>
+<li><a href="#45-arrays-transforming"
+id="toc-45-arrays-transforming">4.5 Arrays: transforming</a></li>
+<li><a href="#46-arrays-in-place" id="toc-46-arrays-in-place">4.6
+Arrays: in place</a></li>
+<li><a href="#47-arrays-changing-the-length"
+id="toc-47-arrays-changing-the-length">4.7 Arrays: changing the
+length</a></li>
+<li><a href="#48-strings" id="toc-48-strings">4.8 Strings</a></li>
+</ul></li>
+<li><a href="#5-dictionary" id="toc-5-dictionary">5.
+<code>dictionary</code></a>
+<ul>
+<li><a href="#51-representation" id="toc-51-representation">5.1
+Representation</a></li>
+<li><a href="#52-api" id="toc-52-api">5.2 API</a></li>
+<li><a href="#53-sets-and-other-idioms"
+id="toc-53-sets-and-other-idioms">5.3 Sets and other idioms</a></li>
+</ul></li>
+<li><a href="#6-vec" id="toc-6-vec">6. <code>vec</code></a></li>
+<li><a href="#7-math-and-os-extern-backed"
+id="toc-7-math-and-os-extern-backed">7. <code>math</code> and
+<code>os</code> (extern-backed)</a></li>
+<li><a href="#8-builtins-and-language-rules-the-library-needed"
+id="toc-8-builtins-and-language-rules-the-library-needed">8. Builtins
+and language rules the library needed</a>
+<ul>
+<li><a href="#81-the-print--str--format-family"
+id="toc-81-the-print--str--format-family">8.1 The <code>print</code> /
+<code>str</code> / <code>format</code> family</a></li>
+<li><a href="#82-defaultt" id="toc-82-defaultt">8.2
+<code>default&lt;T&gt;()</code></a></li>
+<li><a href="#83-abortmsg-u8-and-exitcode-i64"
+id="toc-83-abortmsg-u8-and-exitcode-i64">8.3
+<code>abort(msg: u8[:])</code> and <code>exit(code: i64)</code></a></li>
+<li><a href="#84-extern-fn-spec-710" id="toc-84-extern-fn-spec-710">8.4
+<code>extern fn</code> (spec §7.10)</a></li>
+<li><a href="#85-map-and-the-empty-array-declaration-spec-42"
+id="toc-85-map-and-the-empty-array-declaration-spec-42">8.5
+<code>map</code> and the empty-array declaration (spec §4.2)</a></li>
+<li><a href="#86-where-import-std-looks-spec-111"
+id="toc-86-where-import-std-looks-spec-111">8.6 Where
+<code>import std;</code> looks (spec §11.1)</a></li>
+<li><a href="#87-checker-and-language-rules"
+id="toc-87-checker-and-language-rules">8.7 Checker and language
+rules</a></li>
+</ul></li>
+<li><a href="#9-deliberately-not-included"
+id="toc-9-deliberately-not-included">9. Deliberately not
+included</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="the-goose-standard-library--design">The Goose Standard Library —
+Design</h1>
+<p>This document records the original standard library design: its
+scope, conventions, and the builtins and language rules it required
+(§8). It preserves the reasoning at the time. Later changes include
+<code>const</code> types, namespaces, generic aliases, serialization,
+graphics, physics, user interfaces, directories and atomic replacement
+in <code>os</code>, and the <code>base64</code>, <code>csv</code>,
+<code>json</code> and <code>regex</code> modules; some rules and
+limitations below have therefore been superseded. See
+<code>../stdlib.md</code> for the current API and
+<code>../goose_spec.md</code> for current language rules. References of
+the form §N refer to that specification.</p>
+<hr />
+<h2 id="0-summary">0. Summary</h2>
+<p>The original standard library comprised five Goose source files
+(<code>std</code>, <code>math</code>, <code>dictionary</code>,
+<code>vec</code>, <code>os</code>) with about 120 functions in total. It
+introduced three families of named types:
+<code>dictionary&lt;K, V&gt;</code> (the one facility the language has
+no building block for), <code>rng</code> (one word of PRNG state), and
+the <code>vec2/3/4&lt;T&gt;</code> math vectors that §6.1 already
+promises. Everything else is a function over the user's own arrays,
+structs and pools.</p>
+<p>Everything is written in Goose except:</p>
+<ul>
+<li>the builtins of the
+<code>print</code>/<code>str</code>/<code>format</code> family,
+<code>default&lt;T&gt;()</code>, <code>abort(msg)</code>,
+<code>exit(code)</code>, and <code>copy(x)</code> from the passing rule
+of §8.7; and</li>
+<li>the <code>extern fn</code> declaration form (spec §7.10), through
+which the <code>math</code> and <code>os</code> modules reach libm and a
+thin C runtime layer without a builtin per function.</li>
+</ul>
+<p>The Goose library code uses no heap allocator: every temporary is a
+local resizable or a limited array, every result is constructed in its
+destination (§4.3), and every higher-order function compiles to a loop
+(§7.6).</p>
+<hr />
+<h2 id="1-principles">1. Principles</h2>
+<p><strong>Functions over types.</strong> Goose's strength is the array
+family: eight kinds of array, pools, relative references, variable-mode
+ADTs, all named and laid out by the user. The library should operate on
+these user-defined containers rather than require wrappers of its own.
+Concretely: a library function takes a slice (<code>T[:]</code>) or a
+reference to whatever array the caller has, never a library-defined
+wrapper, and returns either a scalar, a reference into the input, or a
+fresh array built at the caller's destination. New nominal types are
+introduced only where the language has no representation to build on (a
+hash table) or the spec already asks for them (vectors).</p>
+<p><strong>Small.</strong> One well-chosen function per job, chosen so
+that the obvious call covers the common cases; no
+<code>_if</code>/<code>_by_key</code>/<code>_reverse</code>/<code>_indices</code>
+families. The test applied to every candidate: is the idiomatic
+hand-written loop more than three lines, <em>or</em> is it easy to get
+subtly wrong (sorting, hashing, UTF-8, float printing, binary search)?
+If neither, it is not in the library. §9 lists what was left out and the
+one-line loop that replaces it.</p>
+<p><strong>Goose first, builtins by exception.</strong> A builtin is
+justified only when it provides an operation the language cannot
+express: custom typechecking (<code>print</code> of any type,
+<code>default&lt;T&gt;()</code>), a diverging call the checker must know
+about (<code>abort</code>), or a way out to the OS. Speed alone is not a
+reason yet — the library's Goose code is expected to compile to the same
+loops a C programmer would write — but where measurement later shows a
+library function would gain from custom codegen (a word-at-a-time string
+hash, <code>memchr</code> for byte search), that function moves into the
+builtin table without changing its signature. The <code>extern fn</code>
+mechanism (§8.4) keeps that door open without growing the
+typechecker.</p>
+<p><strong>Make costs explicit.</strong> No hidden allocation, no hidden
+copies. The conventions in §2 are chosen so that the cheap call is the
+natural one to write and the expensive one cannot be written by
+accident.</p>
+<p><strong>Lobster's shape, Goose's cost model.</strong> From Lobster's
+<code>std.lobster</code> we take the function-heavy surface, the
+<code>it</code> blocks,
+<code>find</code>/<code>filter</code>/<code>fold</code>/<code>map</code>,
+<code>insert_ordered</code>-style pragmatism; we do not take the
+allocate-a-new-vector-per-call semantics (results are built in place) or
+the do-everything builtins (<code>tokenize</code>,
+<code>concat_string</code>), which become small composable pieces. From
+C++ and Rust we take the <em>coverage list</em> — sort/stable
+sort/binary search/heap/dedup/retain/hash map/string search — and reject
+the iterator protocols, trait bounds and wrapper types that carry it
+there; Goose has <code>T?</code> references, multiple returns and
+<code>return from</code> instead of <code>Option</code>,
+<code>Result</code> and exceptions.</p>
+<hr />
+<h2 id="2-conventions">2. Conventions</h2>
+<p>Call-site spellings follow the passing rule of spec §4.1, whose
+design §8.7 records: no <code>&amp;</code> at a reference-typed
+destination.</p>
+<h3 id="21-how-containers-are-passed">2.1 How containers are passed</h3>
+<table>
+<thead>
+<tr>
+<th>The function…</th>
+<th>Parameter</th>
+<th>Call sites</th>
+<th>Works on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>reads, or mutates elements in place without changing the length
+(<code>sort</code>, <code>reverse</code>, <code>fill</code>,
+<code>find</code>, <code>sum</code>, …)</td>
+<td><code>xs: T[:]</code></td>
+<td><code>f(arr)</code>, <code>f(arr[1..])</code>,
+<code>f(slice)</code></td>
+<td>every array kind and slices</td>
+</tr>
+<tr>
+<td>changes the length (<code>push_n</code>, <code>insert_at</code>,
+<code>remove_at</code>, <code>retain</code>, <code>heap_push</code>,
+…)</td>
+<td><code>xs: A&amp;</code> — <code>A</code> a generic bound to the
+whole array type</td>
+<td><code>f(arr)</code></td>
+<td>every array kind that has the operations used</td>
+</tr>
+<tr>
+<td>takes a library type (<code>dictionary</code>,
+<code>rng</code>)</td>
+<td><code>d: dictionary&lt;K, V&gt;&amp;</code></td>
+<td><code>d.insert(k, v)</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Rationale, and what was ruled out:</p>
+<ul>
+<li>Arrays coerce to slice parameters copy-free (§3.10), so
+<code>sort(arr)</code> costs nothing and reads naturally; writes through
+the slice are legal when the array is writable (§9.5), so in-place
+algorithms need no second form. A <code>let</code> array passed to
+<code>sort</code> is a compile error carrying the call chain, which is
+the intended behaviour.</li>
+<li>A generic reference parameter <code>xs: A&amp;</code> binds
+<code>A</code> to the whole array type and instantiates per kind: one
+<code>push_n&lt;A, T&gt;(xs: A&amp;, v: T, n: i64)</code> body serves a
+<code>[&gt;..&lt;]</code>, a <code>[&gt;..]</code>, a <code>[..k]</code>
+field. It cannot accept a slice, so it is reserved for length-changing
+operations, where a slice would be meaningless anyway.</li>
+<li>An untyped parameter (<code>fn f(xs)</code>) binds the argument's
+exact type, which includes a reference type for
+<code>f(&amp;arr)</code>. By §8.7's rule a non-fixed lvalue argument
+reaches an untyped parameter by reference and a fixed one by value, so
+<code>fn total(xs)</code> serves every kind; the library still prefers
+<code>T[:]</code> for read-only functions because it names the element
+type (<code>find -&gt; T?</code>, <code>contains(xs, v: T)</code>) and
+accepts sub-ranges.</li>
+<li>Grow-shrink arrays <code>[&gt;..&lt;]</code> reach the first row
+like any other array now that they can be sliced (§8.7); a shrink while
+such a slice is in scope is the checker's error, not the library's
+concern.</li>
+<li>Nothing non-fixed is ever taken by value: the language enforces it
+(spec §4.1), so a library function that wants its own copy says
+<code>copy(x)</code>.</li>
+</ul>
+<h3 id="22-results">2.2 Results</h3>
+<ul>
+<li><strong>A fresh array</strong> (<code>filter</code>,
+<code>map</code>, <code>split</code>, <code>concat</code>,
+<code>str</code>) is returned as <code>T[&gt;..]</code>: a resizable
+local built by NRVO straight into the caller's destination (§7.3), so
+<code>let ys = xs.filter() { it &gt; 0 }</code>,
+<code>var ys = xs.filter() { … }</code> (and keep pushing),
+<code>out.append(xs.map() { … })</code> and
+<code>words.push(str("w", i))</code> all cost the elements and nothing
+more. <code>T[&gt;..]</code> rather than <code>T[]</code> because it has
+no length-field limit and the caller most often wants to keep growing or
+sorting it; the "fresh stack" it needs is a stack index for the value's
+lifetime, not a runtime cost. A <code>T[]</code> destination
+converts.</li>
+<li><strong>"Maybe an element"</strong> (<code>find</code>,
+<code>get</code>, <code>last</code>) is a <code>T?</code> — an optional
+reference into the input, rooted where the input is rooted, null for
+"none". The caller narrows with <code>if</code>/<code>guard</code>
+(§3.8) and can write through it. There is no
+<code>Option&lt;T&gt;</code> value type and the library does not invent
+one.</li>
+<li><strong>A position</strong> (<code>find_index</code>,
+<code>index_of</code>, <code>min_by</code>, <code>lower_bound</code>) is
+an <code>i64</code>, with <code>-1</code> for "none" where that can
+happen.</li>
+<li><strong>Two-outcome scalars</strong> (<code>parse_int</code>,
+<code>binary_search</code>, <code>read_line</code>) use the spec's
+convention of a trailing <code>bool</code> in a multiple return:
+<code>let v, ok = parse_int(s);</code>. There is no error type;
+programming errors <code>abort</code>.</li>
+<li><strong>Text output</strong> goes into a builder passed in
+(<code>format(out, …)</code>, <code>read_file(path, out)</code>): the
+result appends transparently to whatever the caller is assembling. The
+one exception is <code>str(…)</code>, whose whole point is to
+<em>be</em> the fresh string.</li>
+</ul>
+<h3 id="23-function-value-parameters">2.3 Function-value parameters</h3>
+<ul>
+<li>Function values are trailing blocks (§7.6):
+<code>xs.find() { it.key == k }</code>,
+<code>xs.sort() { a, b =&gt; a.age &lt; b.age }</code>, or a named
+function.</li>
+<li>A comparator is always a strict "a goes before b" predicate
+<code>lt(a, b)</code>. Sorting, heap and extremum functions come in two
+arities: with a block, and without one meaning <code>a &lt; b</code> (so
+<code>sort(xs)</code> works for numbers and
+<code>sort(xs) { a, b =&gt; compare(a, b) &lt; 0 }</code> for strings).
+Overload resolution separates the two by whether a function value is
+supplied, which was verified.</li>
+<li>A <em>key</em> function returns a value
+(<code>min_by(xs) { it.score }</code>).</li>
+<li>A block parameter binds a <strong>reference</strong> when the
+library passes it <code>&amp;x</code>, so blocks can mutate:
+<code>d.each() { k, v =&gt; v += 1; }</code> works because
+<code>each</code> calls <code>F(s.key, &amp;s.val)</code>. Functions
+document which arguments they pass by reference.</li>
+<li>Inside a block, <code>return</code> returns from the <em>enclosing
+named function</em> (§7.6), so early exits are available to callers of
+<code>each_*</code> functions for free.</li>
+</ul>
+<h3 id="24-trait-like-overload-sets">2.4 Trait-like overload sets</h3>
+<p>Goose's overloading-by-type is its trait mechanism. The library
+defines a few names that user code is expected to extend by adding
+overloads for its own types:</p>
+<table>
+<thead>
+<tr>
+<th>Set</th>
+<th>Provided for</th>
+<th>Users add</th>
+<th>Consumed by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hash(x) -&gt; u64</code></td>
+<td>every scalar type, <code>bool</code>, <code>u8[:]</code></td>
+<td><code>fn hash(k: mykey) -&gt; u64</code></td>
+<td><code>dictionary</code></td>
+</tr>
+<tr>
+<td><code>compare(a, b) -&gt; i64</code></td>
+<td><code>u8[:]</code></td>
+<td><code>fn compare(a: ver, b: ver) -&gt; i64</code></td>
+<td>sorting strings</td>
+</tr>
+<tr>
+<td><code>format(out: u8[&gt;..]&amp;, x)</code></td>
+<td>every type, structurally, by the builtin (§8.1)</td>
+<td><code>fn format(out: u8[&gt;..]&amp;, p: point)</code></td>
+<td><code>print</code>/<code>str</code>/<code>format</code>, which use a
+user overload for its type wherever that type occurs</td>
+</tr>
+</tbody>
+</table>
+<p>Two resolution facts (§7.1) shape how these are written:</p>
+<ul>
+<li>A concrete overload beats a generic one (<code>hash(k: mykey)</code>
+wins over <code>hash&lt;T&gt;(x: T)</code>), so user overloads take
+precedence automatically.</li>
+<li>Every integer width needs its <strong>own</strong> overload: a
+<code>u8</code> argument widens equally well into <code>i64</code> and
+<code>u64</code>, and two coercion-tier matches are an ambiguity error.
+So <code>hash</code> is ten one-line functions, not one generic.</li>
+</ul>
+<h3 id="25-ufcs">2.5 UFCS</h3>
+<p><code>x.f(args)</code> is <code>f(x, args)</code> (§7.1). By the
+passing rule (§8.7) <code>x.f()</code> binds <code>x</code> by reference
+exactly when <code>f</code>'s first parameter is a reference type, for
+the same reason a free call <code>f(x)</code> does, so
+<code>d.insert(k, v)</code>, <code>q.heap_push(v)</code> and
+<code>r.rand_int(6)</code> all bind their receivers as their signatures
+specify. An earlier idea, a per-function marker for by-reference
+receivers, was withdrawn because it would have taught callers to drop
+<code>&amp;</code> everywhere, which brings back the accidental copy the
+moment someone forgets to declare the marker, and because it made the
+call form depend on knowing how each function was declared.</p>
+<p>A reference-returning call is not an assignable location
+(<code>get_or_insert(d, k, 0) += 1</code> is rejected); binding it needs
+the annotated form <code>let c: i64&amp; = d.get_or_insert(k, 0);</code>
+(§3.8). The <code>dictionary</code> API sidesteps this with the
+block-taking <code>update</code> (§5.2).</p>
+<h3 id="26-naming">2.6 Naming</h3>
+<ul>
+<li>Library types are lowercase, like the builtin types:
+<code>dictionary&lt;K, V&gt;</code>, <code>rng</code>,
+<code>vec3&lt;T&gt;</code>, <code>float3</code>. Heavy types get long
+names.</li>
+<li><code>each_*</code>: iteration higher-order functions
+(<code>each_rev</code>, <code>each_split</code>, <code>each_utf8</code>,
+<code>each_chunk</code>).</li>
+<li><code>*_by</code>: the key-function variant of a value function
+(<code>min</code>/<code>min_by</code>).</li>
+<li><code>*_at</code>: index-addressed array mutation
+(<code>insert_at</code>, <code>remove_at</code>), keeping the bare verbs
+(<code>insert</code>, <code>remove</code>) for <code>dictionary</code>.
+Two generic functions of the same name and arity whose first parameters
+are <code>A&amp;</code> and <code>dictionary&lt;K, V&gt;&amp;</code>
+would be ambiguous (both bind at the generic tier), so the array and
+dictionary vocabularies are kept disjoint by construction.</li>
+<li><code>format_*</code>: append a textual form to a
+<code>u8[&gt;..]</code> builder with formatting control;
+<code>parse_*</code>: the inverse; <code>to_*</code>: in-place case
+conversion; <code>write_*</code>: I/O, and only I/O.</li>
+<li>No <code>is_</code> prefix (<code>any</code>, <code>all</code>,
+<code>contains</code>, <code>starts_with</code>).</li>
+<li>There is no namespacing in v1 (§11.1), so every library name is
+global. Names were chosen to be the ones a user would also pick, on the
+theory that a user who defines their own <code>find</code> with a
+concrete signature gets theirs (exact match beats generic), and a user
+who defines a generic one gets a clear duplicate or ambiguity error
+rather than silent shadowing.</li>
+</ul>
+<h3 id="27-strings">2.7 Strings</h3>
+<p>There is no string type (§3.7); the library's string functions are
+functions on <code>u8</code> arrays with these roles:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>input</td>
+<td><code>u8[:]</code></td>
+<td>literals, any <code>u8</code> array and any slice coerce</td>
+</tr>
+<tr>
+<td>output being built</td>
+<td><code>u8[&gt;..]&amp;</code></td>
+<td>the "builder";
+<code>push</code>/<code>append</code>/<code>format</code> are the
+primitives</td>
+</tr>
+<tr>
+<td>owned, stored</td>
+<td><code>u8[]</code>, <code>u8[varint]</code>,
+<code>u8[..k]</code></td>
+<td>fields and elements; a <code>u8[&gt;..]</code> result lands in
+them</td>
+</tr>
+</tbody>
+</table>
+<p>All functions are byte-oriented and ASCII by default
+(<code>to_lower</code>, <code>trim</code>);
+<code>each_utf8</code>/<code>push_utf8</code> are the only
+encoding-aware pieces. Comparison is <code>==</code> (structural, §4.5)
+and <code>compare</code>. A character literal is an integer constant
+(§2): <code>format(out, 'x')</code> appends <code>120</code>, and a byte
+goes in with <code>out.push('x')</code> or
+<code>format(out, "x")</code>.</p>
+<hr />
+<h2 id="3-module-map">3. Module map</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Imports</th>
+<th>Contents</th>
+<th>Leans on (§8)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>stdlib/std.goose</code></td>
+<td>—</td>
+<td>scalars, bits, hashing, <code>rng</code>; array HOFs, searching,
+sorting, heaps, resizing; strings, formatting control, parsing,
+UTF-8</td>
+<td><code>default&lt;T&gt;()</code> for <code>sum</code>;
+<code>abort</code></td>
+</tr>
+<tr>
+<td><code>stdlib/math.goose</code></td>
+<td>—</td>
+<td>libm as <code>extern fn</code>, <code>PI</code>/<code>TAU</code>,
+<code>radians</code>/<code>degrees</code>,
+<code>is_nan</code>/<code>is_inf</code></td>
+<td><code>extern fn</code></td>
+</tr>
+<tr>
+<td><code>stdlib/dictionary.goose</code></td>
+<td><code>std</code></td>
+<td><code>dictionary&lt;K, V&gt;</code> and its functions</td>
+<td><code>default&lt;T&gt;()</code></td>
+</tr>
+<tr>
+<td><code>stdlib/vec.goose</code></td>
+<td><code>std</code>, <code>math</code></td>
+<td><code>vec2/3/4&lt;T&gt;</code>, <code>float*</code>,
+<code>double*</code>, <code>int*</code>, vector functions</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>stdlib/os.goose</code></td>
+<td><code>std</code></td>
+<td>files, stdio, arguments, environment, time, sleep, entropy</td>
+<td><code>extern fn</code>, runtime C in
+<code>src/runtime/runtime_os.h</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>import std;</code> is explicit; nothing is auto-imported. The
+compiler resolves <code>import std;</code> by looking, in order, in the
+importing file's package root (spec §11.1: the main file's directory for
+the program's own files, the library's directory for a library module),
+in <code>--stdlib &lt;dir&gt;</code> or <code>GOOSE_STDLIB</code> if
+given, and then by walking up from its own executable's directory
+looking for <code>stdlib/std.goose</code> (three levels), so
+<code>build/Debug/goose.exe</code>, <code>build/goose</code>,
+<code>bin/goose.exe</code> and an installed
+<code>&lt;prefix&gt;/bin/goose</code> beside
+<code>&lt;prefix&gt;/stdlib</code> all find it without requiring a
+single installation path. Unused library functions cost parse time only:
+functions are typechecked in call-graph order from <code>main</code>, so
+an unreferenced generic never instantiates.</p>
+<hr />
+<h2 id="4-std">4. <code>std</code></h2>
+<p>Signatures are written in documentation form. Where a function's
+return type is the element type of an <code>A&amp;</code> parameter, the
+source omits the annotation (it is inferred from the body, §7.1) and the
+documentation writes <code>-&gt; T</code> with "T = the element type".
+<code>xs: T[:]</code> accepts every sliceable array (§2.1).</p>
+<h3 id="41-scalars-and-bits">4.1 Scalars and bits</h3>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> min<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">T</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> max<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">T</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> clamp<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(x<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> lo<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> hi<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">T</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> abs<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(x<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">T</span>            <span class="co">// integers; plus abs(f32) and abs(f64) overloads</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> sign<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(x<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">T</span>           <span class="co">// -1, 0, 1 at x&#39;s type; f32/f64 overloads</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">lerp</span>(a<span class="op">:</span> <span class="dt">f64</span><span class="op">,</span> b<span class="op">:</span> <span class="dt">f64</span><span class="op">,</span> t<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">f64</span>      <span class="co">// and an f32 overload</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">next_pow2</span>(x<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span>     <span class="co">// smallest power of two &gt;= max(x, 1)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">popcount</span>(x<span class="op">:</span> <span class="dt">u64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">clz</span>(x<span class="op">:</span> <span class="dt">u64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span>           <span class="co">// 64 for x == 0</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">ctz</span>(x<span class="op">:</span> <span class="dt">u64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span>           <span class="co">// 64 for x == 0</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> swap<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> <span class="dt">T</span><span class="op">&amp;,</span> b<span class="op">:</span> <span class="dt">T</span><span class="op">&amp;</span>)</span></code></pre></div>
+<p>Generic numeric bodies cannot use literals for floats
+(<code>x &lt; 0</code> does not typecheck at <code>T = f64</code>, since
+an integer constant never becomes a float, §6.3), hence the explicit
+float overloads. <code>popcount</code>/<code>clz</code>/<code>ctz</code>
+are pure Goose bit tricks; <code>extern</code> intrinsics (§8.4) can
+replace them if measurements justify the change.</p>
+<h3 id="42-hashing">4.2 Hashing</h3>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">hash</span>(x<span class="op">:</span> <span class="dt">i8</span>) <span class="op">-&gt;</span> <span class="dt">u64</span>        <span class="co">// … one overload per integer type, i8 … u64</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">hash</span>(x<span class="op">:</span> <span class="dt">bool</span>) <span class="op">-&gt;</span> <span class="dt">u64</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">hash</span>(x<span class="op">:</span> <span class="dt">f32</span>) <span class="op">-&gt;</span> <span class="dt">u64</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">hash</span>(x<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">u64</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">hash</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u64</span>     <span class="co">// 8 bytes per multiply; any u8 array coerces</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">hash_combine</span>(seed<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span> h<span class="op">:</span> <span class="dt">u64</span>) <span class="op">-&gt;</span> <span class="dt">u64</span>   <span class="co">// for composite keys</span></span></code></pre></div>
+<p>The integer hashes are a multiply-xorshift mix (Fibonacci hashing),
+so the low bits are well distributed and <code>dictionary</code> can
+mask rather than divide. The byte hash reads 8 bytes at a time: a
+multiply and a rotate per word, the last word being the final 8 bytes
+(or, below 8 bytes, the bytes gathered into one word) with the length as
+the seed, then two multiply-xorshift rounds, so that every input bit
+reaches the low 32 bits that <code>dictionary</code> masks and keeps as
+slot tags. Keys that differ only in their last characters
+(<code>item_17</code>, <code>item_18</code>) would otherwise share their
+low bits. Each word's round waits for the previous one's multiply, so
+above 24 bytes the words before the last 24 bytes or fewer go to two
+lanes, the even and the odd words of each 16 bytes, whose rounds a
+processor overlaps; the second lane is folded into the first, rotated,
+before the remaining words. That form is a function of its own
+(<code>hash_lanes</code>), called from an early return, which the
+optimizer keeps out of line, so that the short keys' code stays small
+enough for the C compiler to inline into a dictionary's lookups. A user
+key type gets
+<code>fn hash(k: key) -&gt; u64 { hash_combine(hash(k.a), hash(k.b)) }</code>.
+Fixed-capacity inline strings (<code>u8[..16]</code>) hash through the
+slice overload, which is what makes them usable as
+<code>dictionary</code> keys.</p>
+<h3 id="43-random-numbers">4.3 Random numbers</h3>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> rng { s<span class="op">:</span> <span class="dt">u64</span> }                    <span class="co">// splitmix64 state; the seed is the state</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">rand_u64</span>(r<span class="op">:</span> rng<span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">u64</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">rand_int</span>(r<span class="op">:</span> rng<span class="op">&amp;,</span> n<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span>      <span class="co">// uniform in [0, n)</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">rand_flt</span>(r<span class="op">:</span> rng<span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">f64</span>              <span class="co">// uniform in [0, 1)</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> shuffle<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> r<span class="op">:</span> rng<span class="op">&amp;</span>)         <span class="co">// Fisher-Yates</span></span></code></pre></div>
+<p><code>var r = rng { 12345 };</code> then <code>r.rand_int(6)</code>.
+splitmix64 is one word of state, 64-bit arithmetic only, and passes the
+usual batteries; the benchmarks' xorshift stays where it is. Seeding
+from the OS is <code>os</code>'s <code>random_seed()</code>.</p>
+<h3 id="44-arrays-reading-and-searching">4.4 Arrays: reading and
+searching</h3>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_rev<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>])                    <span class="co">// F(x), last to first</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_chunk<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> n<span class="op">:</span> <span class="dt">i64</span>)          <span class="co">// F(chunk: T[:], i); the last chunk may be short</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> find<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span><span class="op">?</span>                  <span class="co">// first x with F(x), as a reference; null if none</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> find_index<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span>           <span class="co">// …or its index, -1 if none</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> position<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> v<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">i64</span>          <span class="co">// first i with xs[i] == v, -1 if none</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> contains<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> v<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> any<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> all<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> count<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span>                <span class="co">// number of x with F(x)</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> min<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span>                       <span class="co">// asserts xs.len &gt; 0; F(a, b) forms too</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> max<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> min_by<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span>               <span class="co">// index of the smallest F(x); -1 if empty</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> max_by<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> last<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span><span class="op">&amp;</span>                     <span class="co">// asserts xs.len &gt; 0</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> lower_bound<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span>          <span class="co">// first i with !F(xs[i]); F must be true on a prefix</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> binary_search<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> v<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> <span class="dt">i64</span><span class="op">,</span> <span class="dt">bool</span>   <span class="co">// sorted by &lt;; position (or insertion point), found</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> find<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> sub<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span>         <span class="co">// first occurrence of a subsequence, -1 if none</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> rfind<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> sub<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> starts_with<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> p<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> ends_with<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> p<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span></code></pre></div>
+<p><code>each_chunk</code> exists because row slices are the documented
+way to get bounds checks out of 2-D kernels
+(<code>bench/goose/blur_rows.goose</code>);
+<code>for y in h { each_chunk(img, w) … }</code> is that idiom with the
+arithmetic done once.
+<code>find</code>/<code>rfind</code>/<code>starts_with</code>/<code>ends_with</code>
+are generic over the element type, so they are the string functions too
+(<code>find(line, "://")</code>), and they coexist with the predicate
+<code>find</code> because a function-value argument and a slice argument
+never match the same overload.</p>
+<h3 id="45-arrays-transforming">4.5 Arrays: transforming</h3>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> map<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">U</span>[<span class="op">&gt;..</span>]                 <span class="co">// U = F&#39;s result type (§8.5)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> filter<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span>[<span class="op">&gt;..</span>]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> fold<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">A</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> acc<span class="op">:</span> <span class="dt">A</span>) <span class="op">-&gt;</span> <span class="dt">A</span>          <span class="co">// acc = F(acc, x) for each x</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> sum<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span>                         <span class="co">// fold from default&lt;T&gt;()</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> concat<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> b<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">T</span>[<span class="op">&gt;..</span>]</span></code></pre></div>
+<p><code>map</code>'s body is
+<code>var out = []; for x in xs { out.push(F(x)); } return out;</code>,
+the empty-array declaration of §8.5. <code>sum</code> needs
+<code>default&lt;T&gt;()</code>;
+<code>fold(xs, 0.0) { a, x =&gt; a + x }</code> is the form that needs
+nothing.</p>
+<h3 id="46-arrays-in-place">4.6 Arrays: in place</h3>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> fill<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> v<span class="op">:</span> <span class="dt">T</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> copy_into<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(dst<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> src<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>])            <span class="co">// asserts equal lengths; memmove semantics</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> reverse<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>])</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> sort<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>])                             <span class="co">// by &lt;</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> sort<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>])                          <span class="co">// by F(a, b); unstable, in place, no allocation</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> stable_sort<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>])</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> stable_sort<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>])                   <span class="co">// natural merge sort; one temporary of xs.len elements</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">to_lower</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])                            <span class="co">// ASCII, in place</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">to_upper</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])</span></code></pre></div>
+<p><code>sort</code> is a pattern-defeating quicksort after pdqsort and
+Rust's ipnsort. A first pass stops at the end of the run the input
+starts with, and the sort is done if that is all of it. Otherwise each
+round takes a median pivot (of three elements, or of three medians of
+three from 128 on), partitions with a branchless Lomuto loop (every
+element is swapped, and the boundary advances by the comparison's
+outcome), pushes the larger side on an <code>i64[..144]</code> stack of
+(lo, hi, budget) ranges and goes on with the smaller, so it recurses
+nowhere, allocates nothing, and holds at most log₂(2⁴⁸) ranges.
+Everything left of a range goes before or with everything in it, so when
+the pivot does not go after the element just before the range, the
+elements equal to it are moved to the front in one pass and dropped, as
+pdqsort does: many equal keys cost linear passes. Each range carries a
+budget of 2·log₂(n) rounds, after which heapsort finishes it, bounding
+the worst case at O(n log n); <code>test/stdlib/stdlib_sort.goose</code>
+builds an input against the pivot choice with McIlroy's adversary to
+check that. Ten elements or fewer are insertion sorted: below that, the
+branchy insertion sort measured faster than more partitioning. One shape
+is slower than with the Hoare partition <code>sort</code> had before:
+input in order but for a few misplaced elements. The branchless
+partition swaps every element, which rotates each side of a sorted range
+by one, so nothing below the first run check sees order to exploit, and
+such input costs about two thirds of random input, where the old
+quicksort's well-predicted scans took half the new time (200k elements:
+1.6 ms against 0.8 ms; random input 2.5 ms against 8.3 ms).</p>
+<p><code>stable_sort</code> is a natural merge sort. One pass splits the
+input into runs in order, reversing strictly descending ones and
+extending those shorter than 16 by insertion sort; an input that is one
+run is done there. The runs' ends go in a <code>i64[&gt;..]</code>, and
+passes merge neighboring pairs between <code>xs</code> and a
+<code>T[&gt;..]</code> temporary on a fresh data stack (a stack index,
+not an allocation), alternating direction so that no pass copies back. A
+merge copies runs already in order. Its step either branches on the
+comparison or selects the element and the side with conditional moves;
+it branches while the previous merge switched between its runs on fewer
+than one step in four, since a branch on random input mispredicts about
+every other step, while on structured input a predicted branch lets the
+comparisons overlap, which matters most for a comparator that loads what
+it compares (BWT's rank pairs: 3.7x between the two forms on its
+unsorted rounds, against 1.5x the other way on random integers).</p>
+<p>Both leave a permutation of the input whatever the comparator
+returns: every index stays in range however the comparisons come out, so
+a comparator that is no strict weak ordering only leaves an unspecified
+order.</p>
+<h3 id="47-arrays-changing-the-length">4.7 Arrays: changing the
+length</h3>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> push_n<span class="op">&lt;</span><span class="dt">A</span><span class="op">,</span> <span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;,</span> v<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> n<span class="op">:</span> <span class="dt">i64</span>)            <span class="co">// n pushes; grow-only arrays&#39; answer to resize</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> insert_at<span class="op">&lt;</span><span class="dt">A</span><span class="op">,</span> <span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;,</span> i<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> v<span class="op">:</span> <span class="dt">T</span>)         <span class="co">// shifts [i..) up; needs push</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> remove_at<span class="op">&lt;</span><span class="dt">A</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;,</span> i<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">T</span>             <span class="co">// shifts down; needs pop; returns the element</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> swap_remove<span class="op">&lt;</span><span class="dt">A</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;,</span> i<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">T</span>           <span class="co">// O(1), reorders</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> retain<span class="op">&lt;</span><span class="dt">A</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;</span>)                          <span class="co">// keeps x with F(x), stable; needs resize</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> dedup<span class="op">&lt;</span><span class="dt">A</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;</span>)                              <span class="co">// drops adjacent duplicates (sort first for all)</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> heap_push<span class="op">&lt;</span><span class="dt">A</span><span class="op">,</span> <span class="dt">T</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;,</span> v<span class="op">:</span> <span class="dt">T</span>)                 <span class="co">// min-heap by &lt;; F(a, b) forms of all three exist</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> heap_pop<span class="op">&lt;</span><span class="dt">A</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">T</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> make_heap<span class="op">&lt;</span><span class="dt">A</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">A</span><span class="op">&amp;</span>)                          <span class="co">// O(n) heapify</span></span></code></pre></div>
+<p>Each instantiates only for array kinds that have the operations it
+uses (a grow-only array pops through the reference wherever nothing in
+the caller points into it, spec §5.1). A <code>[&gt;..&lt;]</code> is
+the expected heap and queue container; a limited <code>[..k]</code>
+inside a struct works too.</p>
+<h3 id="48-strings">4.8 Strings</h3>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">format_int</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> v<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> base<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> width<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> <span class="kw">pad</span><span class="op">:</span> <span class="dt">u8</span>)   <span class="co">// base 2..36, right-aligned</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">format_uint</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> v<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span> base<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> width<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span> <span class="kw">pad</span><span class="op">:</span> <span class="dt">u8</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">format_flt</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> v<span class="op">:</span> <span class="dt">f64</span><span class="op">,</span> decimals<span class="op">:</span> <span class="dt">i64</span>)   <span class="co">// fixed decimals</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">parse_int</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span><span class="op">,</span> <span class="dt">bool</span>              <span class="co">// optional sign, base 10, whole string</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">parse_int</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> base<span class="op">:</span> <span class="dt">i64</span>) <span class="op">-&gt;</span> <span class="dt">i64</span><span class="op">,</span> <span class="dt">bool</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">parse_flt</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">f64</span><span class="op">,</span> <span class="dt">bool</span>              <span class="co">// sign, fraction, exponent</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">compare</span>(a<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> b<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">i64</span>            <span class="co">// bytewise lexicographic: -1, 0, 1</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">trim</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>]                       <span class="co">// ASCII whitespace; a sub-slice, no copy</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">trim_start</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>]</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">trim_end</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>]</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">split</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> sep<span class="op">:</span> <span class="dt">u8</span>) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>][<span class="op">&gt;..</span>]        <span class="co">// slices into s; empty parts kept</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">split</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> sep<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>][<span class="op">&gt;..</span>]     <span class="co">// a separator of several bytes</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_split<span class="op">&lt;</span><span class="dt">F</span><span class="op">&gt;</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> sep<span class="op">:</span> <span class="dt">u8</span>)              <span class="co">// F(part: u8[:]); no array built</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_split<span class="op">&lt;</span><span class="dt">F</span><span class="op">&gt;</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> sep<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">words</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>][<span class="op">&gt;..</span>]                 <span class="co">// the runs between whitespace; none empty</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_word<span class="op">&lt;</span><span class="dt">F</span><span class="op">&gt;</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])                        <span class="co">// F(word: u8[:])</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> join<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> parts<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]<span class="op">,</span> sep<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])   <span class="co">// T any u8 array/slice type</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">format_replaced</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> old<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> with<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])   <span class="co">// `from` is a keyword</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each_utf8<span class="op">&lt;</span><span class="dt">F</span><span class="op">&gt;</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])                        <span class="co">// F(cp: i64); malformed bytes yield 0xFFFD</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">push_utf8</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;,</span> cp<span class="op">:</span> <span class="dt">i64</span>)             <span class="co">// the UTF-8 bytes of a code point</span></span></code></pre></div>
+<p>Plain rendering of scalars and strings is the builtin
+<code>format</code> (§8.1); the functions here add formatting control
+and parsing. <code>split</code> returning slices into its input (no
+copies, elements rooted at the caller's text) is the Goose replacement
+for Lobster's <code>tokenize</code>; the <code>each_split</code> form
+does not even build the array. <code>words</code> is the whitespace
+tokenizer a command line wants, which <code>split</code> at
+<code>' '</code> is not: it drops the empty parts repeated spaces and
+tabs would leave.</p>
+<hr />
+<h2 id="5-dictionary">5. <code>dictionary</code></h2>
+<h3 id="51-representation">5.1 Representation</h3>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> dictionary_slot<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span> { key<span class="op">:</span> <span class="dt">K</span><span class="op">,</span> val<span class="op">:</span> <span class="dt">V</span><span class="op">,</span> tag<span class="op">:</span> <span class="dt">u32</span> }</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span> { count<span class="op">:</span> <span class="dt">i64</span> <span class="op">=</span> <span class="dv">0</span><span class="op">,</span> slots<span class="op">:</span> dictionary_slot<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>[<span class="op">&gt;..&lt;</span>] <span class="op">=</span> [] }</span></code></pre></div>
+<ul>
+<li>Open addressing, linear probing, power-of-two capacity,
+<code>hash(key) &amp; mask</code>. <code>K</code> and <code>V</code>
+must be fixed-size (the slot array is indexed randomly, §3.3); strings
+are keyed as <code>u8[:]</code> slices into text the caller owns, or as
+inline <code>u8[..k]</code>. Deletion is backward-shift (the technique
+<code>bench/goose/lru.goose</code> uses), so there are no tombstones and
+no periodic cleaning.</li>
+<li>A <code>dictionary</code> is resizable-class (its tail is a
+<code>[&gt;..&lt;]</code>), so it lives where resizables live: a local,
+a global, a by-reference parameter, the tail of a struct. It is spec
+A.3, generalized.</li>
+<li>Each slot keeps a tag: 0 when it is unused, else the low 31 bits of
+the key's hash with bit 31 set. A probe compares keys only where the
+tags agree (a slice key's length and bytes, an inline key's bytes), and
+for a table of up to 2^31 slots the tag holds the home slot, so growth
+and removal never hash a key again; a larger table hashes the keys it
+moves. The tag costs 3 bytes per slot over a <code>used</code> byte (12
+bytes for a <code>u32 → i32</code> table where 9 would do): n-gram
+counting with <code>u32</code> keys, which compare as cheaply as tags,
+measured between 3% slower and even, while string-keyed tables (word
+counts, an LRU cache, an interpreter's variables, a template engine's)
+gained 18-57% from the dictionary changes alone.</li>
+<li>Growth doubles at ⅔ load, in place: the slot array tops its stack,
+so <code>resize</code> extends it with unused slots, and the entries are
+re-placed by one walk over the old slots in cyclic order, starting just
+after an unused one. Every entry then lands within a run of slots the
+walk has already passed (its new home is its old home or that plus a
+multiple of the old size), so no entry still to be moved lies on a moved
+entry's probe path. No second table is built and nothing is copied back.
+The slot array is grow-shrink so that it can be resized through a
+reference (§5.2). A maximum load of ½ measured 16% faster on a small LRU
+table and 9% on n-gram counting, but 8% slower on growth-heavy word
+counting and up to 1.8 times slower on 150K-entry tables, which at twice
+the size leave the cache; ¾ was within noise of ⅔ but for the word
+count, 8% slower.</li>
+<li><code>insert</code>, <code>update</code> and
+<code>get_or_insert</code> check for growth first and then walk the
+probe sequence once, to the key or to the unused slot where it
+goes.</li>
+<li>Fresh slots are filled with
+<code>default&lt;K&gt;()</code>/<code>default&lt;V&gt;()</code> (§8.2),
+so a reference value is an optional one (<code>Cell?</code>, or
+<code>in pool</code>). An update stores a whole slot, since
+<code>=</code> into a reference <code>V</code> would write its pointee
+(spec §3.8).</li>
+</ul>
+<h3 id="52-api">5.2 API</h3>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> get<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;,</span> key<span class="op">:</span> <span class="dt">K</span>) <span class="op">-&gt;</span> <span class="dt">V</span><span class="op">?</span>              <span class="co">// reference to the value, or null</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> contains<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;,</span> key<span class="op">:</span> <span class="dt">K</span>) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> insert<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;,</span> key<span class="op">:</span> <span class="dt">K</span><span class="op">,</span> val<span class="op">:</span> <span class="dt">V</span>) <span class="op">-&gt;</span> <span class="dt">bool</span>  <span class="co">// overwrites; true if the key was new</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> get_or_insert<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;,</span> key<span class="op">:</span> <span class="dt">K</span><span class="op">,</span> v0<span class="op">:</span> <span class="dt">V</span>) <span class="op">-&gt;</span> <span class="dt">V</span><span class="op">&amp;</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> update<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;,</span> key<span class="op">:</span> <span class="dt">K</span><span class="op">,</span> v0<span class="op">:</span> <span class="dt">V</span>)        <span class="co">// F(val&amp;): inserts v0 if absent, then calls F</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> remove<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;,</span> key<span class="op">:</span> <span class="dt">K</span>) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="bu">clear</span><span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;</span>)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> reserve<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;,</span> n<span class="op">:</span> <span class="dt">i64</span>)                 <span class="co">// capacity for n entries without rehash</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> each<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(d<span class="op">:</span> dictionary<span class="op">&lt;</span><span class="dt">K</span><span class="op">,</span> <span class="dt">V</span><span class="op">&gt;&amp;</span>)                         <span class="co">// F(key, val&amp;); order unspecified</span></span></code></pre></div>
+<p>Word counting, the canonical use (prototyped end to end):</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> counts <span class="op">=</span> dictionary<span class="op">&lt;</span><span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> <span class="dt">i32</span><span class="op">&gt;</span> {}<span class="op">;</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">each_split</span>(text<span class="op">,</span> <span class="ch">&#39; &#39;</span>) { counts<span class="op">.</span><span class="fu">update</span>(it<span class="op">,</span> <span class="dv">0</span>) { it <span class="op">+=</span> <span class="dv">1</span><span class="op">;</span> } }<span class="op">;</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>counts<span class="op">.</span><span class="fu">each</span>() { w<span class="op">,</span> n <span class="op">=&gt;</span> <span class="kw">if</span> n <span class="op">&gt;</span> <span class="dv">100</span> { <span class="bu">print</span>(w<span class="op">,</span> <span class="st">&quot; &quot;</span><span class="op">,</span> n)<span class="op">;</span> } }<span class="op">;</span></span></code></pre></div>
+<p><code>update</code> exists because the natural spelling,
+<code>get_or_insert(d, k, 0) += 1</code>, is not an assignable location
+and the annotated binding needs the value type spelled out (§2.5). A
+block gets the reference without either problem.</p>
+<p>A reference returned by <code>get</code> or
+<code>get_or_insert</code>, or an <code>each</code> binder, may not be
+in scope at the next <code>insert</code>, <code>update</code>,
+<code>remove</code> or <code>clear</code>: the slot array is
+grow-shrink, so the checker reports it (spec §5.2) rather than letting a
+rehash or a backward shift leave the reference on a different,
+well-typed slot. Bind such references in their own block, or use
+<code>update</code>.</p>
+<h3 id="53-sets-and-other-idioms">5.3 Sets and other idioms</h3>
+<ul>
+<li>A set is <code>dictionary&lt;K, bool&gt;</code>:
+<code>s.insert(k, true)</code>, <code>s.contains(k)</code>. A dedicated
+<code>set&lt;K&gt;</code> needs generic type aliases (§8.7) and a
+zero-size value type, neither of which exists yet; the byte per slot is
+not worth a second implementation.</li>
+<li>Owned string keys: keep a <code>u8[&gt;..]</code> text pool next to
+the <code>dictionary&lt;u8[:], V&gt;</code> (two locals of one scope, or
+a global pool); keys are slices into the pool. A struct cannot hold both
+(one resizable per struct, §3.4), which is spec TODO 8. An interner
+built on this idiom is a candidate for a later module.</li>
+<li>Insertion order: <code>dictionary</code> does not keep it. Where
+order matters, store values in the user's own <code>[&gt;..]</code> and
+keep indices in the dictionary, which is what <code>lru.goose</code>
+does.</li>
+</ul>
+<hr />
+<h2 id="6-vec">6. <code>vec</code></h2>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> vec2<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> { x<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> y<span class="op">:</span> <span class="dt">T</span> }</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> { x<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> y<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> z<span class="op">:</span> <span class="dt">T</span> }</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> vec4<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> { x<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> y<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> z<span class="op">:</span> <span class="dt">T</span><span class="op">,</span> w<span class="op">:</span> <span class="dt">T</span> }</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> float2 <span class="op">=</span> vec2<span class="op">&lt;</span><span class="dt">f32</span><span class="op">&gt;;</span>   <span class="kw">type</span> float3 <span class="op">=</span> vec3<span class="op">&lt;</span><span class="dt">f32</span><span class="op">&gt;;</span>   <span class="kw">type</span> float4 <span class="op">=</span> vec4<span class="op">&lt;</span><span class="dt">f32</span><span class="op">&gt;;</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> double2 <span class="op">=</span> vec2<span class="op">&lt;</span><span class="dt">f64</span><span class="op">&gt;;</span>  <span class="kw">type</span> double3 <span class="op">=</span> vec3<span class="op">&lt;</span><span class="dt">f64</span><span class="op">&gt;;</span>  <span class="kw">type</span> double4 <span class="op">=</span> vec4<span class="op">&lt;</span><span class="dt">f64</span><span class="op">&gt;;</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> int2 <span class="op">=</span> vec2<span class="op">&lt;</span><span class="dt">i32</span><span class="op">&gt;;</span>     <span class="kw">type</span> int3 <span class="op">=</span> vec3<span class="op">&lt;</span><span class="dt">i32</span><span class="op">&gt;;</span>     <span class="kw">type</span> int4 <span class="op">=</span> vec4<span class="op">&lt;</span><span class="dt">i32</span><span class="op">&gt;;</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> dot<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> vec2<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;,</span> b<span class="op">:</span> vec2<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="dt">T</span>            <span class="co">// and vec3, vec4</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> cross<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;,</span> b<span class="op">:</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> length_sq<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(v<span class="op">:</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="dt">T</span>                  <span class="co">// all three sizes</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">length</span>(v<span class="op">:</span> float3) <span class="op">-&gt;</span> <span class="dt">f32</span>                       <span class="co">// f32 and f64 instances, all sizes</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">normalize</span>(v<span class="op">:</span> float3) <span class="op">-&gt;</span> float3</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">distance</span>(a<span class="op">:</span> float3<span class="op">,</span> b<span class="op">:</span> float3) <span class="op">-&gt;</span> <span class="dt">f32</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> lerp<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(a<span class="op">:</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;,</span> b<span class="op">:</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;,</span> t<span class="op">:</span> <span class="dt">T</span>) <span class="op">-&gt;</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> xy<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>(v<span class="op">:</span> vec3<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> vec2<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span>                   <span class="co">// also xy(vec4), xyz(vec4)</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> float3_<span class="dv">0</span> <span class="op">=</span> float3 { <span class="fl">0.0</span><span class="op">,</span> <span class="fl">0.0</span><span class="op">,</span> <span class="fl">0.0</span> }<span class="op">;</span>          <span class="co">// _0 and _1 for all nine aliases</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> float3_<span class="dv">1</span> <span class="op">=</span> float3 { <span class="fl">1.0</span><span class="op">,</span> <span class="fl">1.0</span><span class="op">,</span> <span class="fl">1.0</span> }<span class="op">;</span></span></code></pre></div>
+<p>Elementwise <code>+ - * /</code> are the language's (§6.1); the
+prototype confirmed a <code>type float3 = vec3&lt;f32&gt;</code> alias
+constructs positionally, adds memberwise and instantiates generic
+<code>dot</code> for <code>f32</code> and <code>i64</code>.
+<code>int*</code> are <code>i32</code> because vectors are data (§3.1)
+and an <code>i32</code> component widens into an <code>i64</code> index
+implicitly. Elementwise
+<code>min</code>/<code>max</code>/<code>abs</code> are deliberately
+absent: a <code>min&lt;T&gt;(a: vec3&lt;T&gt;, b: vec3&lt;T&gt;)</code>
+overload is ambiguous with the scalar
+<code>min&lt;T&gt;(a: T, b: T)</code> (both generic tier), and
+<code>min(a.x, b.x)</code> per component is what a user writes anyway.
+The lengthening constructors (<code>vec3(v, z)</code>) were dropped:
+<code>vec3 { v.x, v.y, z }</code> is as short and avoids a function
+named like a type.</p>
+<hr />
+<h2 id="7-math-and-os-extern-backed">7. <code>math</code> and
+<code>os</code> (extern-backed)</h2>
+<p><code>math</code> is libm, declared once per function and float
+width:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">sqrt</span>(x<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">f64</span><span class="op">;</span>        <span class="kw">extern</span> <span class="st">&quot;sqrtf&quot;</span> <span class="kw">fn</span> <span class="fu">sqrt</span>(x<span class="op">:</span> <span class="dt">f32</span>) <span class="op">-&gt;</span> <span class="dt">f32</span><span class="op">;</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="co">// sin cos tan asin acos atan atan2 exp log log2 log10 pow floor ceil round trunc, likewise</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> <span class="dt">PI</span> <span class="op">=</span> <span class="fl">3.141592653589793</span><span class="op">;</span>  <span class="kw">let</span> <span class="dt">TAU</span> <span class="op">=</span> <span class="fl">6.283185307179586</span><span class="op">;</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">radians</span>(deg<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">f64</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">degrees</span>(rad<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">f64</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">is_nan</span>(x<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">bool</span>             <span class="co">// x != x</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">is_inf</span>(x<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">bool</span></span></code></pre></div>
+<p><code>floor</code>/<code>ceil</code>/<code>round</code>/<code>trunc</code>
+return floats, as in C; <code>as i64</code> converts. Float
+<code>%</code> is already <code>fmod</code> (§6.1).</p>
+<p><code>os</code> is a thin, deliberately incomplete layer — enough to
+write tools and benchmarks — over C functions in
+<code>src/runtime/runtime_os.h</code>:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">read_file</span>(path<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">bool</span>     <span class="co">// appends the whole file</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">write_file</span>(path<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> data<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">append_file</span>(path<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> data<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">file_exists</span>(path<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">delete_file</span>(path<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">read_line</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">bool</span>                  <span class="co">// stdin; strips the newline; false at EOF</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">read_stdin</span>(out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>)                         <span class="co">// everything until EOF</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">write_stdout</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">write_stderr</span>(s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>])</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">flush_stdout</span>()</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">args</span>() <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>][<span class="op">&gt;..</span>]                              <span class="co">// slices of a global buffer, over extern arg_count()/arg(i, out)</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">env</span>(name<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">bool</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">time</span>() <span class="op">-&gt;</span> <span class="dt">f64</span>                                     <span class="co">// seconds since the epoch</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">clock</span>() <span class="op">-&gt;</span> <span class="dt">f64</span>                                    <span class="co">// monotonic, high resolution</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">time_ns</span>() <span class="op">-&gt;</span> <span class="dt">i64</span>      <span class="kw">fn</span> <span class="fu">clock_ns</span>() <span class="op">-&gt;</span> <span class="dt">i64</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">sleep</span>(seconds<span class="op">:</span> <span class="dt">f64</span>)   <span class="kw">fn</span> <span class="fu">sleep_ms</span>(ms<span class="op">:</span> <span class="dt">i64</span>)</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">random_seed</span>() <span class="op">-&gt;</span> <span class="dt">u64</span>                              <span class="co">// OS entropy, for rng</span></span></code></pre></div>
+<p>Directory listing, subprocesses, sockets and date formatting are not
+in v1. <code>exit(code)</code> is a builtin rather than an extern
+because the checker must know it diverges (§8.3).</p>
+<hr />
+<h2 id="8-builtins-and-language-rules-the-library-needed">8. Builtins
+and language rules the library needed</h2>
+<p>All in the spec now; ordered by how much of the library depends on
+them.</p>
+<h3 id="81-the-print--str--format-family">8.1 The <code>print</code> /
+<code>str</code> / <code>format</code> family</h3>
+<p>One rendering engine behind three builtins, each taking any number of
+arguments of any type, rendered in sequence with no separator:</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(a<span class="op">,</span> b<span class="op">,</span> …)                 <span class="co">// stdout, newline at the end</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="bu">str</span>(a<span class="op">,</span> b<span class="op">,</span> …) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]        <span class="co">// a fresh string, constructed at the destination</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="bu">format</span>(out<span class="op">,</span> a<span class="op">,</span> b<span class="op">,</span> …)           <span class="co">// append to any growable u8 array; out.format(a, b, …) via UFCS</span></span></code></pre></div>
+<p><code>str</code> is the answer to "quickly concatenate a few things
+into a new string", which Goose does in place and should encourage:
+<code>words.push(str( "item", i))</code> writes straight into the
+element slot. Rendering per type:</p>
+<ul>
+<li>integers, floats (shortest round-tripping form),
+<code>bool</code>.</li>
+<li>a <code>u8</code> array or slice: raw bytes at the top level
+(concatenation is the common case), quoted and escaped when nested
+inside an aggregate.</li>
+<li>other arrays and slices: <code>[1, 2, 3]</code>.</li>
+<li>structs and ADT variants: the type name and the positional literal
+form, <code>float3 { 1, 2, 3 }</code>, <code>Circle { 1.5 }</code>, no
+field labels. The name keeps nested values and variants readable, and
+the output stays valid Goose.</li>
+<li>references: their pointee; optionals: <code>null</code> or the
+pointee; relative references likewise.</li>
+<li>a type with a user overload
+<code>fn format(out: u8[&gt;..]&amp;, v: T)</code> renders through it
+instead, wherever it occurs — the builtin is the structural fallback of
+the <code>format</code> overload set, and user overloads are found by
+the same resolution as any call.</li>
+</ul>
+<p>Code generation specializes rendering for each type, using a
+traversal like the one for equality. This follows Lobster's approach to
+printing values for debugging (spec §3.7).</p>
+<h3 id="82-defaultt">8.2 <code>default&lt;T&gt;()</code></h3>
+<p>The value a fixed-size <code>T</code> has before anything is written
+to it, with declared defaults honoured: numbers 0, <code>false</code>,
+empty arrays (length 0, capacity as declared), null optionals, an empty
+slice, variant 0 with its own default payload, and structs field by
+field — a field with a declared default (§3.2) gets it, every other
+field gets its type's default. So a struct that declares
+<code>count: i64 = 1</code> as an invariant keeps it when the library
+fills a slot with <code>default</code>. Needed by <code>sum</code> (an
+accumulator seed for generic <code>T</code>) and by
+<code>dictionary</code> (fill values for fresh slots); useful anywhere
+<code>resize(n, v)</code> wants a neutral <code>v</code>. It is a
+builtin because a generic function has no way to write a literal of an
+unknown type (§4.1), and because the field defaults are the compiler's
+to know.</p>
+<h3 id="83-abortmsg-u8-and-exitcode-i64">8.3
+<code>abort(msg: u8[:])</code> and <code>exit(code: i64)</code></h3>
+<p>Diverging calls: code after them is unreachable, so a branch ending
+in one gives no value (§6.4). <code>abort</code> prints
+<code>goose runtime error: &lt;msg&gt;</code> and exits nonzero, like
+the checked aborts of §9.3; <code>exit</code> flushes and exits with the
+code. The library uses <code>abort</code> for contract violations that
+are not plain <code>assert</code>s (an unknown base in
+<code>format_int</code>).</p>
+<h3 id="84-extern-fn-spec-710">8.4 <code>extern fn</code> (spec
+§7.10)</h3>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">sqrt</span>(x<span class="op">:</span> <span class="dt">f64</span>) <span class="op">-&gt;</span> <span class="dt">f64</span><span class="op">;</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="st">&quot;sqrtf&quot;</span> <span class="kw">fn</span> <span class="fu">sqrt</span>(x<span class="op">:</span> <span class="dt">f32</span>) <span class="op">-&gt;</span> <span class="dt">f32</span><span class="op">;</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="st">&quot;gs_os_read_file&quot;</span> <span class="kw">fn</span> <span class="fu">read_file</span>(path<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]<span class="op">,</span> out<span class="op">:</span> <span class="dt">u8</span>[<span class="op">&gt;..</span>]<span class="op">&amp;</span>) <span class="op">-&gt;</span> <span class="dt">bool</span><span class="op">;</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> <span class="kw">fn</span> <span class="fu">gl_vertex3</span>(v<span class="op">:</span> float3<span class="op">&amp;</span>)<span class="op">;</span></span></code></pre></div>
+<ul>
+<li>A declaration without a body; the optional string is the C symbol
+(default: the Goose name). It joins overload resolution like any
+function and is called directly from the generated C, with a prototype
+emitted unless the runtime defines the symbol.</li>
+<li>Parameter and return types: the integer and float scalars and
+<code>bool</code>; any <em>flat, fixed-size</em> struct or fixed array,
+passed by value as its generated packed C type (<code>gs_float3</code>);
+<code>T&amp;</code> to such a <code>T</code>, passed as a pointer
+(<code>const gs_float3 *</code> — what an OpenGL-style API wants, since
+a packed <code>float3</code> is three contiguous floats);
+<code>T[:]</code> of such a <code>T</code>, passed as pointer and count;
+and <code>u8[&gt;..]&amp;</code>, passed as the resizable's header plus
+its stack, so C code can append through a runtime helper
+(<code>gs_bld_append(bld, ptr, n)</code>) — the one parameter shape that
+lets the whole <code>os</code> layer be externs instead of builtins.
+Returns are a scalar, a flat fixed struct, or nothing.</li>
+<li>What does not cross: <code>varint</code>, references inside structs,
+variable and resizable values by value, slices of variable elements. The
+checker rejects them with the reason.</li>
+<li>Writability is checked at the call site as for <code>push</code>
+(§9.5). Extern functions are usable from thread programs when the C is
+re-entrant, which the runtime's are.</li>
+<li>Initial implementation, with room for later extensions: the compiler
+always emits its own prototype from the Goose declaration; the C for the
+library's externs lives in <code>src/runtime/runtime_os.h</code>, part
+of the runtime like the other runtime files; user externs get their C in
+via <code>--include &lt;header&gt;</code>, emitted after the generated
+type declarations so a header can implement shims against the
+<code>gs_&lt;name&gt;</code> typedefs. An existing C API whose
+declaration differs from the emitted prototype (alignment,
+<code>APIENTRY</code>, pointer types) gets a one-line shim in that
+header.</li>
+</ul>
+<h3 id="85-map-and-the-empty-array-declaration-spec-42">8.5
+<code>map</code> and the empty-array declaration (spec §4.2)</h3>
+<p>Nothing about generics is needed: a generic body is checked only at
+an instantiation where every type is concrete, including what
+<code>F(x)</code> returns (spec §7.7). What <code>map</code> needs is
+its result local, <code>var out = [];</code>, whose <code>[]</code> has
+no element type <em>yet</em>: an empty-array local without an annotation
+gets a pending array type that the first
+<code>push</code>/<code>append</code>/assignment of a concrete element
+completes; using it in a way that needs the element type before then
+(<code>out[0]</code>) is an error, <code>out.len</code> is fine, and a
+body that never completes it is an error at its end. Codegen sees only
+completed types. So <code>map</code> is</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> map<span class="op">&lt;</span><span class="dt">T</span><span class="op">,</span> <span class="dt">F</span><span class="op">&gt;</span>(xs<span class="op">:</span> <span class="dt">T</span>[<span class="op">:</span>]) { <span class="kw">var</span> out <span class="op">=</span> []<span class="op">;</span> <span class="kw">for</span> x <span class="kw">in</span> xs { out<span class="op">.</span><span class="bu">push</span>(<span class="fu">F</span>(x))<span class="op">;</span> } <span class="kw">return</span> out<span class="op">;</span> }</span></code></pre></div>
+<p>with the return type inferred as usual (§7.1), and the same rule
+makes <code>var names = [];</code> idiomatic user code.</p>
+<h3 id="86-where-import-std-looks-spec-111">8.6 Where
+<code>import std;</code> looks (spec §11.1)</h3>
+<p>The search path of §3, a <code>--stdlib</code> flag and a
+<code>GOOSE_STDLIB</code> variable; the compiler finds the source tree's
+<code>stdlib/</code> from its own location, so the test runner needs no
+flag.</p>
+<h3 id="87-checker-and-language-rules">8.7 Checker and language
+rules</h3>
+<p><strong>Passing by size class (spec §4.1).</strong> The rule replaced
+"explicit <code>&amp;</code> on both ends": it is keyed on the size
+class of the value being connected to a destination — a call argument, a
+<code>let</code>/<code>var</code> initializer, an assignment, a field
+initializer, a <code>push</code>, a <code>for</code> binding, a match
+binder, a queue put:</p>
+<ul>
+<li>A <strong>fixed</strong> value connects by value. A reference-typed
+destination (<code>x: T&amp;</code>, <code>T?</code>, an annotated
+<code>let r: T&amp;</code>) binds the lvalue's address implicitly;
+<code>&amp;x</code> stays legal and means the same, so forwarding a
+reference variable is unchanged.</li>
+<li>A <strong>non-fixed</strong> value is never copied implicitly. A
+reference-typed destination binds it; an untyped or generic destination
+binds it by reference too, that being the only free option; a
+value-typed destination accepts an rvalue — a call result, a literal, a
+slice or other conversion, a local being returned — or an explicit
+<code>copy(x)</code>, a builtin that constructs the copy at the
+destination (§4.3 semantics; an explicit marker that is easy to search
+for).</li>
+<li><code>&amp;</code> at call sites is thereby redundant rather than
+required, and a redundant <code>&amp;</code> — one written at a source
+whose reference-typed destination would have bound it anyway — is a
+warning, so that code in the language keeps one style rather than a
+scatter of leftover <code>&amp;</code>.</li>
+</ul>
+<p>The rule applies to individual constructs as follows:</p>
+<ul>
+<li><code>let y = x;</code> for a non-fixed <code>x</code> is an error:
+write <code>let y = &amp;x;</code> (a reference, the inferred type) or
+<code>let y = copy(x);</code>. For fixed <code>x</code> it copies.</li>
+<li><code>push(v)</code> is a construction context (§4.2): a non-fixed
+lvalue <code>v</code> needs <code>copy(v)</code>; a slice
+<code>v[..]</code>, a literal or a call result does not.
+<code>append(src)</code> takes its source as a slice and copies elements
+as its defined operation, so <code>g.append(h)</code> stays as it
+is.</li>
+<li><code>g = h</code> between resizables (§4.4's clear-then-copy)
+becomes <code>g = copy(h)</code>; <code>g = f()</code> stays. This is
+where a <code>move(x)</code> (spec TODO 3) would first be wanted: an
+assignment of a dying local.</li>
+<li><code>return x</code> of a non-fixed local moves it (NRVO, no copy);
+returning a non-fixed <em>field</em> or parameter copies and takes
+<code>copy</code>. The one implicit copy of §7.3 — two different locals
+returned on different paths — stays implicit, because the programmer
+cannot know which of the two will be the copied one.</li>
+<li><code>for x in xs</code> and <code>Circle c =&gt;</code> copy fixed
+elements and payloads; non-fixed ones already require the
+<code>&amp;x</code> binder form (§6.5, §8.1) — the rule makes that a
+consequence rather than a special case.</li>
+<li>An untyped or <code>&lt;T&gt;</code> parameter given a non-fixed
+lvalue binds <code>T</code> to the reference type; given a fixed lvalue,
+to the value type. A type variable normally adopts the caller's type
+exactly; this is the one pragmatic exception, and it is what lets
+<code>fn total(xs)</code> serve a fixed array (copied), a
+<code>[&gt;..]</code> and a <code>[&gt;..&lt;]</code> (by reference)
+with one body. A body that writes through <code>xs</code> is an error at
+the fixed instantiation (an immutable copy) rather than a silently
+discarded write.</li>
+<li>Overloads <code>f(x: T)</code> and <code>f(x: T&amp;)</code> for the
+same fixed <code>T</code> become ambiguous for an lvalue argument; the
+pair <code>f&lt;T&gt;(xs: T[:])</code> /
+<code>f&lt;A&gt;(xs: A&amp;)</code> does not (a
+<code>[&gt;..&lt;]</code> reaches only the second, an array reaches the
+second at the generic tier, a slice only the first), so the library's
+two container conventions coexist.</li>
+<li>An explicit <code>&amp;x</code> argument whose destination would
+have bound <code>x</code> without it draws the redundancy warning.
+Forwarding a reference <em>variable</em> (<code>f(r)</code> with
+<code>r: T&amp;</code>) involves no <code>&amp;</code> and is silent, as
+is <code>&amp;x</code> where the destination is inferred
+(<code>let r = &amp;x;</code>), since there the <code>&amp;</code> is
+what selects the reference type.</li>
+</ul>
+<p>For the library: no binder parameters, no <code>&amp;</code> in any
+example, UFCS works for every mutator, generic HOFs could even be
+untyped, and the library's own copies become visible where they are
+intended (<code>stable_sort</code>'s temporary is a construction).</p>
+<p>Pros, beyond the UFCS fix that motivated it: the rule matches the
+cost model (registers for fixed values, in-place construction or a
+reference for everything else); non-fixed copies become
+<em>impossible</em> to write by accident, which is stronger than the
+explicit-<code>&amp;</code> rule, under which <code>f(arr)</code> to a
+by-value non-fixed parameter compiled and silently copied; one rule
+covers calls, <code>let</code>, <code>=</code>, fields,
+<code>push</code> and <code>for</code> alike; <code>copy</code> gives
+<code>move</code> a natural sibling; and §4.1's "everything is a value"
+simplifies to "fixed values are values; non-fixed values live in one
+place and are copied only on request".</p>
+<p>Cons, and what limits them:</p>
+<ul>
+<li>Mutation of a fixed value is no longer visible at the call site:
+<code>normalize(v)</code> may write <code>v</code>. Accepted: the UFCS
+discussion had already concluded that mutable arguments would go
+unmarked at the call site, and it is rarer than mutating arrays.
+Writability provenance (§9.5) confines it to <code>var</code> locals — a
+<code>let</code> argument yields a non-writable reference, and a callee
+that writes through it is a compile error with the call chain — so the
+reader's rule is "a <code>var</code> passed to a function may change",
+which is the C++ situation restricted to values the programmer already
+declared mutable.</li>
+<li>"Fixed" is not "small". A limited array <code>u8[..4096]</code> or a
+fixed <code>f32[1024]</code> is fixed-class and copies silently.
+Accepted, with no mitigation for now: resizables will be far more common
+in this language than large fixed arrays, and the compiler may pass an
+unwritten by-value argument by pointer when the specialization's roots
+prove nothing writes the source during the call.</li>
+<li><code>copy</code> will appear in places that feel like plain data
+flow — <code>items.push(copy(item))</code>,
+<code>let name = copy(rec.name)</code> — so readers can identify
+operations that copy data, and if it turns out to be everywhere a
+<code>*</code> spelling can be considered. The existing tests and
+benchmarks change in a handful of places
+(<code>let copy: u8[][] = src;</code>, <code>g = h</code>,
+<code>d.slots = ns</code>, pushes of variable-size locals); every
+<code>&amp;</code> they already write stays valid, modulo the redundancy
+warning.</li>
+<li><code>&amp;</code> does not leave the language, only the places
+where the destination's type already says "reference": inferred
+<code>let r = &amp;x;</code> keeps it, because there it chooses the
+type. A reference-typed <em>field</em> initializer and <code>.=</code>
+bind an lvalue implicitly too, uniformly: the struct declaration is the
+source of truth exactly as a parameter list is.</li>
+</ul>
+<p><strong>Slices of <code>[&gt;..&lt;]</code> (spec §5.2).</strong>
+Creating a slice or reference into a <code>[&gt;..&lt;]</code> is legal.
+A shrinking operation on that array (<code>pop</code>,
+<code>resize</code>, <code>clear</code>, whole assignment) while a
+variable in scope may refer into it is a compile error at the shrink,
+naming the variable and where it was bound, so the programmer can fix
+either end: end the slice's block before the shrink, or move the shrink.
+Scope stands in for liveness, which is the same test a grow-only local's
+shrink already used (§5.1) and needs no last-use analysis; inside a loop
+it is exactly right, since a binding made earlier in the body is in
+scope at the shrink. Such a slice may be passed down and returned but
+not stored into a container (a field, an element, a global), which is
+what keeps every holder a variable the scan can see. The shrinks a scope
+scan cannot see — through a reference parameter, or of a global — are
+summarized per function specialization (which globals, which parameters'
+pointees, transitively through callees), and a call is checked against
+the summary the same way, so the error for a callee's shrink lands at
+the call. The memory argument stands: a live <code>[&gt;..&lt;]</code>
+owns its stack region exclusively (§1.3(2)), so the rule catches logic
+errors, not memory ones. The same pass treats the whole assignment of a
+grow-only array as the shrink it is (§5.1).</p>
+<p><strong>References to resizable tails (spec C.2).</strong> Before the
+frame object, <code>&amp;bag.items</code> was rejected because a
+resizable-tailed struct was one frame header <code>{ base, len }</code>
+whose <code>base</code> is the <em>struct's</em> start on the data stack
+(static prefix fields, then tail elements) and whose <code>len</code> is
+the tail's count; a <code>T[&gt;..]&amp;</code> is a pointer to a header
+whose <code>base</code> must be the element region, and there is no such
+header for the tail alone. Offsetting the struct's header (an earlier
+option) fixes it at the cost of every struct being addressed relative to
+its tail. The review's instinct — give the tail its own independent
+header — leads to this layout: a resizable-tailed struct is represented
+as a <em>frame object</em> holding its fixed prefix fields exactly as a
+fixed local would, followed by the tail's own <code>gs_rhdr</code>; only
+the tail's elements live on the data stack. Then
+<code>&amp;bag.items</code> is a pointer to that header field — an
+ordinary <code>gs_rref</code>, indistinguishable from a reference to a
+standalone resizable, so nothing downstream needs to know it came from a
+struct; <code>&amp;bag</code> is a pointer to the frame object;
+<code>bag.n</code> through either is a plain field access;
+<code>d.slots</code> via <code>d: dictionary&amp;</code> is a normal
+header; and the implicit slice coercion <code>count(bag.items)</code>
+follows. Copying such a value copies the frame object and the elements
+(the <code>RzShape</code> prefix walk of the bytes-on-stack shape
+becomes a struct copy plus <code>EmitCopyElems</code>); by-value
+parameters and returns pass the frame object where an array passes its
+header (C.3 passes "the metadata appropriate to the type"). Nesting
+composes: a struct whose tail is itself a resizable-tailed struct nests
+frame objects. The two awkward cases keep the bytes-on-stack shape
+behind a base pointer in the frame object: a <em>variable-size</em>
+prefix (a <code>u8[]</code> field before the tail, which
+<code>RzShape</code> already refuses to copy), and a resizable-class
+ADT, whose payload shape is per variant. Spec C.2 changes from
+"outermost values have a frame header" to "a resizable-class value's
+fixed part lives in the owning frame, and every resizable tail has its
+own header there". In the compiler, <code>StructInst::frameobj</code>
+marks the shape, codegen's <code>IsFrameObj</code> routes locals,
+parameters, returns, globals, copies, literals and references through
+the frame object, and the checker's "nested resizable" error is left
+only for the variable-size-prefix and ADT shapes.</p>
+<p><strong>Untyped parameters bind exact types (spec §3.8).</strong> An
+untyped parameter binds a reference argument as a reference, exactly as
+an explicit <code>&lt;T&gt;</code> parameter does, so
+<code>f(&amp;gs)</code> into <code>fn f(xs)</code> mutates
+<code>gs</code>.</p>
+<p><strong><code>return null</code> is root-neutral (spec
+§9.2).</strong> <code>fn find&lt;T, F&gt;(xs: T[:]) -&gt; T?</code>
+written as
+<code>for &amp;x in xs { if F(x) { return x; } } return null;</code>
+typechecks: a null return names no root, so it adds nothing to the roots
+the other returns give.</p>
+<p><strong>Generic type aliases</strong>
+(<code>type set&lt;K&gt; = dictionary&lt;K, bool&gt;;</code>) do not
+parse. Non-generic aliases of generic instances
+(<code>type float3 = vec3&lt;f32&gt;;</code>) work and are all
+<code>vec</code> needs, so this is a convenience only.</p>
+<p><strong>Constants in thread programs.</strong> <code>let</code>
+globals of flat fixed type are static data (§11.1); a
+<code>thread_fn</code> should be allowed to read them (<code>PI</code>,
+<code>float3_0</code>), since they are not mutable shared memory. Still
+open: the checker bans every global from a thread program.</p>
+<p><strong>Identity of references</strong> (spec TODO 0b) is not needed
+by the library. <code>index_of</code> (spec §3.3), the subtraction the
+checker validates through roots, is what <code>lru.goose</code> relinks
+with.</p>
+<hr />
+<h2 id="9-deliberately-not-included">9. Deliberately not included</h2>
+<p>These operations can be expressed using existing functions and short
+loops:</p>
+<ul>
+<li><code>zip</code>/<code>map2</code>/<code>each2</code>:
+<code>for i in min(a.len, b.len) { … a[i] … b[i] … }</code>. Without
+tuples there is nothing for <code>zip</code> to return.</li>
+<li><code>reduce</code> (fold without a seed):
+<code>fold(xs[1..], xs[0]) { … }</code>.</li>
+<li><code>reversed</code> copies, <code>enumerate</code>:
+<code>each_rev</code>, and <code>for x, i in xs</code>.</li>
+<li><code>product</code>, <code>average</code>: two-line folds.</li>
+<li><code>first</code>/<code>top</code>: <code>xs[0]</code>, and
+<code>last</code> exists only because <code>xs[xs.len - 1]</code> is the
+one everybody gets wrong by one.</li>
+<li><code>flatten</code>, <code>partition</code>,
+<code>filter_indices</code>, <code>find_or_push</code>,
+<code>insert_ordered</code>: each is
+<code>filter</code>/<code>lower_bound</code>/<code>insert_at</code> plus
+a line.</li>
+<li><code>keys</code>/<code>values</code> of a dictionary:
+<code>each</code> plus a push.</li>
+<li>String <code>concat</code> of many pieces, <code>repeat</code>,
+<code>pad</code>, <code>capitalize</code>, <code>escape</code>:
+<code>str(a, b, c)</code>, <code>push_n</code>,
+<code>format_int</code>'s width, and a loop.</li>
+<li><code>lines</code>: <code>each_split(s, '\n')</code> plus
+<code>trim</code>. (<code>words</code> is in §4.8:
+<code>each_split(s, ' ')</code> keeps the empty parts repeated spaces
+leave, which a command line wants dropped.)</li>
+<li>Multiple-resizable containers (a deque, an owning string
+dictionary): the language has one resizable per struct (§3.4); idioms in
+§5.3.</li>
+<li>Binary serialization: Goose data is already its own serialized form
+(<code>bench/design.md</code>); <code>read_file</code> into a
+<code>u8[&gt;..]</code> and spec TODO 16's whole-region copy are the
+path, and typed <code>read_u32_le</code>-style accessors can wait for a
+format that needs them.</li>
+<li>Date/time formatting, directories, subprocesses, networking:
+<code>os</code> grows when a program needs them, one extern at a
+time.</li>
+<li>Thread helpers: <code>thread_fn</code>s take no function values and
+no generics (§11.2), so a <code>parallel_for</code> cannot be written in
+the library. A <code>wait_all(ids: i64[:])</code> loop is one line.
+Revisit with spec TODO 9.</li>
+</ul>
+<hr />
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/stdlib_design.md"><code>docs/design/stdlib_design.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

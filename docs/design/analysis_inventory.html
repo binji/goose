@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compiler analyses: inventory and simplification
+options · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#compiler-analyses-inventory-and-simplification-options"
+id="toc-compiler-analyses-inventory-and-simplification-options">Compiler
+analyses: inventory and simplification options</a>
+<ul>
+<li><a href="#1-summary" id="toc-1-summary">1. Summary</a></li>
+<li><a href="#2-what-is-tracked-where"
+id="toc-2-what-is-tracked-where">2. What is tracked where</a></li>
+<li><a href="#3-inventory" id="toc-3-inventory">3. Inventory</a></li>
+<li><a href="#4-per-analysis-notes" id="toc-4-per-analysis-notes">4.
+Per-analysis notes</a>
+<ul>
+<li><a href="#41-root-provenance-2" id="toc-41-root-provenance-2">4.1
+Root provenance (2)</a></li>
+<li><a href="#42-read-back-roots-3" id="toc-42-read-back-roots-3">4.2
+Read-back roots (3)</a></li>
+<li><a href="#43-store-rule-and-store-record-4"
+id="toc-43-store-rule-and-store-record-4">4.3 Store rule and store
+record (4)</a></li>
+<li><a href="#44-grow-shrink-storage-exclusion-5"
+id="toc-44-grow-shrink-storage-exclusion-5">4.4 Grow-shrink storage
+exclusion (5)</a></li>
+<li><a href="#45-shrink-checks-within-a-body-6"
+id="toc-45-shrink-checks-within-a-body-6">4.5 Shrink checks within a
+body (6)</a></li>
+<li><a href="#46-shrink-summaries-caller-judged-pairs-balanced-calls-7"
+id="toc-46-shrink-summaries-caller-judged-pairs-balanced-calls-7">4.6
+Shrink summaries, caller-judged pairs, balanced calls (7)</a></li>
+<li><a
+href="#47-growth-during-construction-uses-during-whole-assignment-8"
+id="toc-47-growth-during-construction-uses-during-whole-assignment-8">4.7
+Growth during construction, uses during whole assignment (8)</a></li>
+<li><a href="#48-specialization-keys-and-root-classes-9"
+id="toc-48-specialization-keys-and-root-classes-9">4.8 Specialization
+keys and root classes (9)</a></li>
+<li><a href="#49-recursion-10" id="toc-49-recursion-10">4.9 Recursion
+(10)</a></li>
+<li><a href="#410-return-roots-11" id="toc-410-return-roots-11">4.10
+Return roots (11)</a></li>
+<li><a href="#411-flow-state-definite-assignment-and-narrowing-12"
+id="toc-411-flow-state-definite-assignment-and-narrowing-12">4.11 Flow
+state: definite assignment and narrowing (12)</a></li>
+<li><a href="#412-copy-semantics-and-reference-transparency-13"
+id="toc-412-copy-semantics-and-reference-transparency-13">4.12 Copy
+semantics and reference transparency (13)</a></li>
+<li><a
+href="#413-writability-14-relative-references-15-literal-parameters-17"
+id="toc-413-writability-14-relative-references-15-literal-parameters-17">4.13
+Writability (14), relative references (15), literal parameters
+(17)</a></li>
+<li><a href="#414-held-temporaries-and-liveness-18"
+id="toc-414-held-temporaries-and-liveness-18">4.14 Held temporaries and
+liveness (18)</a></li>
+<li><a href="#415-bounds-check-elimination-19"
+id="toc-415-bounds-check-elimination-19">4.15 Bounds-check elimination
+(19)</a></li>
+<li><a href="#416-optimizer-analyses-20"
+id="toc-416-optimizer-analyses-20">4.16 Optimizer analyses (20)</a></li>
+<li><a href="#417-codegen-analyses-21"
+id="toc-417-codegen-analyses-21">4.17 Codegen analyses (21)</a></li>
+</ul></li>
+<li><a href="#5-cross-cutting-findings-and-recommendations"
+id="toc-5-cross-cutting-findings-and-recommendations">5. Cross-cutting
+findings and recommendations</a>
+<ul>
+<li><a
+href="#1-alternative-sets-instead-of-one-root-plus-bits-medium-effort-highest-payoff-per-line"
+id="toc-1-alternative-sets-instead-of-one-root-plus-bits-medium-effort-highest-payoff-per-line">1.
+Alternative sets instead of one root plus bits (medium effort, highest
+payoff per line)</a></li>
+<li><a
+href="#2-derive-statement-liveness-and-later-use-from-the-tree-small-effort"
+id="toc-2-derive-statement-liveness-and-later-use-from-the-tree-small-effort">2.
+Derive statement liveness and later-use from the tree (small
+effort)</a></li>
+<li><a
+href="#3-split-lifetime-analysis-from-type-checking-fixpoint-per-cycle-large-effort-largest-deletion"
+id="toc-3-split-lifetime-analysis-from-type-checking-fixpoint-per-cycle-large-effort-largest-deletion">3.
+Split lifetime analysis from type checking; fixpoint per cycle (large
+effort, largest deletion)</a></li>
+<li><a
+href="#4-one-storage-and-effect-model-for-checker-bce-and-codegen-medium-effort"
+id="toc-4-one-storage-and-effect-model-for-checker-bce-and-codegen-medium-effort">4.
+One storage and effect model for checker, BCE and codegen (medium
+effort)</a></li>
+<li><a href="#5-obligations-instead-of-key-facts-medium-effort-after-3"
+id="toc-5-obligations-instead-of-key-facts-medium-effort-after-3">5.
+Obligations instead of key facts (medium effort, after 3)</a></li>
+<li><a
+href="#6-loops-two-iteration-check-instead-of-name-scans-small-effort-independent"
+id="toc-6-loops-two-iteration-check-instead-of-name-scans-small-effort-independent">6.
+Loops: two-iteration check instead of name scans (small effort,
+independent)</a></li>
+<li><a href="#7-smaller-items" id="toc-7-smaller-items">7. Smaller
+items</a></li>
+</ul></li>
+<li><a href="#6-sequencing-and-validation"
+id="toc-6-sequencing-and-validation">6. Sequencing and
+validation</a></li>
+<li><a href="#7-status" id="toc-7-status">7. Status</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="compiler-analyses-inventory-and-simplification-options">Compiler
+analyses: inventory and simplification options</h1>
+<p>Step 1 of the effort to stop the fix-a-hole, add-a-flag cycle in the
+checker's analyses. This document inventories every analysis the
+compiler runs, what each one tracks and how, roughly how much code it
+is, how solid it is, and where a different representation would cover
+the language more conclusively. The ranked recommendations are at the
+end.</p>
+<p>Numbers are as of master <code>bfea86b</code> (2026-09-24). Line
+counts are of function bodies, attributed by function (a throwaway scan
+of the function definitions in <code>src/typecheck*.h</code>,
+<code>bce.h</code>, <code>optimize*.h</code> and
+<code>codegen*.h</code>), so they are rough; the state each analysis
+keeps is listed separately, since that is where the growth actually
+happens.</p>
+<h2 id="1-summary">1. Summary</h2>
+<ul>
+<li>The compiler runs about 20 distinct analyses. The lifetime family
+(provenance, read-back, stores, shrinks, growth, recursion, return
+roots, specialization keys) is ~5,000 lines of checker function bodies
+plus ~400 lines of state declarations, and accounts for nearly all of
+the churn: of the 60 most recent commits, about 30 fix a construct one
+of these analyses did not cover, and another dozen refactor the same
+code. BCE (~2,300 lines) and the optimizer's and codegen's small
+analyses are structurally sound and rarely churn.</li>
+<li>The code quality is not the problem. The comments are unusually good
+and the style is consistent. The churn comes from four architectural
+choices:
+<ol type="1">
+<li><strong>A reference's provenance is one root plus patch
+bits.</strong> A value that may point at several places is collapsed to
+its innermost root (<code>InnerRoot</code>), and what the collapse lost
+is carried as side bits (<code>intogs</code>, <code>cyclelocal</code>,
+<code>hidesclass</code>, <code>rootfrom</code>, <code>slotread</code>,
+<code>holderroot</code>, ...). Every bit must be propagated at ~25
+transformation points, and every new construct is a new chance to drop
+one. This is the single largest source of fixes.</li>
+<li><strong>Bodies are checked once, inside the call that first reaches
+them.</strong> A call back into a cycle sees an incomplete callee, so
+every interprocedural analysis has a second, syntactic "callee still
+being checked" path, plus take-back and settle machinery (cycle
+return-root prediction, threaded classes, assumed-balanced shrinks,
+cycle sites). Roughly 1,500 lines exist only for this.</li>
+<li><strong>Three passes keep three models of storage and callee
+effects.</strong> The checker (<code>NoteRootEvent</code>,
+<code>ShrinkTargets</code>, <code>RootCandidates</code>,
+<code>MayAliasRoots</code>, <code>NamedOutside</code>), BCE
+(<code>UltOf</code>, <code>Reach</code>, <code>AffectedByWrite</code>,
+<code>Effects</code>) and codegen (<code>CollectSpecs</code>,
+<code>RefTopsOk</code>, <code>SyncReach</code>) each answer "what may
+this reach / alias / mutate" with their own call-graph traversal.</li>
+<li><strong>Facts are pushed into state at many sites instead of derived
+from the tree.</strong> Held temporaries, growth logs, liveness,
+loop-assigned names and pending shrinks are maintained by calls
+scattered over the checker; a construct without the call is a hole.</li>
+</ol></li>
+<li>Top recommendations, in order of payoff per effort: (1) replace the
+single root with an explicit set of alternatives and derive the patch
+bits from it; (2) derive "what is live in this statement" and "what is
+used after this point" from the tree with one walker each, instead of
+maintained stacks; (3) split lifetime analysis out of type checking and
+run it as a per-cycle fixpoint over summaries, which deletes the
+in-progress machinery; (4) one storage/effect model (regions) shared by
+the checker, BCE and codegen; (5) move class comparisons out of the
+specialization key into call-site obligations. Details in section
+5.</li>
+</ul>
+<h2 id="2-what-is-tracked-where">2. What is tracked where</h2>
+<p>The analysis state, by owner. Everything below is what a fix
+touches.</p>
+<table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Fields</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Prov</code> (ast.h, 11 fields)</td>
+<td><code>root</code>, <code>rootexact</code>, <code>rootfrom</code>,
+<code>writable</code>, <code>reusable</code>, <code>byteview</code>,
+<code>intogs</code>, <code>cyclelocal</code>, <code>hidesclass</code>,
+<code>slotread</code>, <code>reached</code></td>
+<td>where a reference points, and what the merge or read-back lost</td>
+</tr>
+<tr>
+<td><code>Val</code> (adds 13)</td>
+<td><code>holderroot/holderexact/holderset/holderfrom</code>,
+<code>lvalue</code>, <code>storagebranches</code>,
+<code>implicitcopy</code>, <code>nonneg</code>,
+<code>unsized/unsizedparam</code>,
+<code>strlit/emptyarr/isnull</code></td>
+<td>holder contents, copy semantics, constants</td>
+</tr>
+<tr>
+<td><code>VarDef</code> (17 analysis fields)</td>
+<td><code>ref</code> (a <code>Prov</code>), <code>refrootknown</code>,
+<code>refprebound</code>, <code>refidentityused</code>,
+<code>contentroot/contentexact/contentset/contentbyteview</code>,
+<code>rootalias</code>, <code>classfrom</code>, <code>poolclass</code>,
+<code>classpool</code>, <code>growshrink</code>, <code>viewslot</code>,
+<code>captured</code>, <code>markof</code>, <code>nonneg</code></td>
+<td>a variable's binding, its contents, and what a class root stands
+for</td>
+</tr>
+<tr>
+<td><code>RootArg</code> (14)</td>
+<td><code>cls</code>, <code>depth</code>, <code>depthkey</code>,
+<code>writable</code>, <code>reusable</code>, <code>growshrink</code>,
+<code>byteview</code>, <code>viewslot</code>, <code>intogs</code>,
+<code>exact</code>, <code>heldexact</code>, <code>concrete</code>,
+<code>via</code>, <code>pool</code></td>
+<td>the specialization key's view of one argument</td>
+</tr>
+<tr>
+<td><code>FnSpec</code> summaries (17)</td>
+<td><code>shrinkexternals/params</code>,
+<code>shrinkexternalbounds/parambounds</code>,
+<code>unbalancedshrink</code>, <code>liveshrinks</code>,
+<code>growexternals/params</code>, <code>classevents</code>,
+<code>eventstart</code>, <code>retroots</code>,
+<code>reboundoptionals</code>, <code>narrowedenv</code>,
+<code>needs</code>, <code>neededges</code>, <code>litadapts</code>,
+<code>litflows</code></td>
+<td>what a body does that its callers must replay</td>
+</tr>
+<tr>
+<td><code>RetAlt</code>/<code>RetRoot</code> (19)</td>
+<td><code>alts</code>, <code>pred</code>, <code>seeded</code>,
+<code>predunknown</code>, <code>predlost</code>, <code>used*</code> (6),
+<code>usedthreads</code>, <code>byteview</code>, <code>set</code></td>
+<td>return roots and the cycle prediction's take-back state</td>
+</tr>
+<tr>
+<td><code>StoreEvent</code> (9), <code>LiveShrink</code> (10),
+<code>BoundShrink</code>, <code>ShrinkBalance</code></td>
+<td></td>
+<td>the store record and the caller-judged shrink pairs</td>
+</tr>
+<tr>
+<td><code>TypeCheck</code> per-pass (≈30)</td>
+<td><code>heldtemps</code>, <code>shrinkrest</code>,
+<code>invalue</code>, <code>inreturn</code>, <code>curdst</code>,
+<code>constslot</code>, <code>argpath</code>, <code>storeevents</code>,
+<code>pendingshrinks</code>, <code>loopassigned</code>,
+<code>shrinkcache</code>, <code>growcache</code>,
+<code>cyclestores</code>, <code>threadedclasses</code>,
+<code>assumedshrinks/open/specs</code>, <code>livecapture</code>,
+<code>guessedshrink</code>, <code>cyclesites</code>,
+<code>growlog</code>, <code>growconflicts</code>,
+<code>namedoutside</code>, <code>litchecks</code>,
+<code>cyclecache</code>, <code>fitnode</code>, <code>fitfail</code></td>
+<td>in-flight state</td>
+</tr>
+<tr>
+<td><code>BCE</code></td>
+<td><code>Flow</code> (facts + generations), <code>places</code>,
+<code>addrof/intvars/wdecl/wbad/wkinds/relpids</code>,
+<code>cands/ge0/lelen/mono</code>, <code>effects</code>,
+<code>ifaces/sites/nsites/opaquesites</code>,
+<code>callees/calleesfirst</code></td>
+<td>its own domain, aliasing and summaries</td>
+</tr>
+<tr>
+<td><code>Optimizer</code></td>
+<td><code>facts</code> (writes/addrof per VarDef), <code>consts</code>,
+<code>inlineinfo</code>, <code>postorder</code>,
+<code>viewed</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>CodeGen</code></td>
+<td><code>SpecInfo</code> (freevars, globals, needssp),
+<code>nrvo</code>, <code>toporder/growth/loopparent</code>,
+<code>TopCachePlan</code>, <code>cscopes</code> watermarks,
+<code>views</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><code>ast.h</code> declares 119 <code>bool</code> fields; the structs
+above account for about half of them.</p>
+<h2 id="3-inventory">3. Inventory</h2>
+<p>Quality: <strong>A</strong> sound structure, holes unlikely;
+<strong>B</strong> works, some accretion; <strong>C</strong> accreted,
+hole-prone; <strong>D</strong> structurally fragile. "Signal" is fixture
+count in <code>test/errors_tc</code> mentioning the rule's spec section,
+and commit subjects since 2026-09-12 that touch it.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Analysis</th>
+<th>Spec</th>
+<th>Main code</th>
+<th>Body LOC</th>
+<th>Quality</th>
+<th>Signal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Types, generics, instantiation, overloads, dispatch, builtins,
+control constructs</td>
+<td>§3, §6, §7.1–7.7, §8</td>
+<td><code>typecheck_types.h</code>, <code>typecheck_calls.h</code>
+(resolution half), <code>typecheck_builtins.h</code>
+(<code>CheckBuiltin</code>), <code>typecheck_nodes.h</code>,
+<code>typecheck_flow.h</code> (constructs)</td>
+<td>~5,200</td>
+<td>B+</td>
+<td>low churn</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Root provenance and merged values</td>
+<td>§9.2</td>
+<td><code>Ident::Check</code>, <code>CheckRefOf</code>,
+<code>DecayRef</code>, <code>SlotView</code>, <code>MergeVals</code>,
+<code>Hides</code>, <code>InnerRoot</code>, <code>TempRoot</code>,
+<code>TempCopy</code>, <code>CheckBranchRoot</code>,
+<code>CheckBindingRoot</code>, <code>BindProv</code>,
+<code>RefProvOf</code>, <code>CheckRefRebindRoot</code>,
+<code>PrebindLoopRefs</code></td>
+<td>~1,000 (+<code>Prov</code>/<code>Val</code>/<code>VarDef</code>
+state)</td>
+<td>C</td>
+<td>§9.2: 91 fixtures; 22 commits mention roots</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Read-back roots</td>
+<td>§9.5</td>
+<td><code>RootCandidates</code>, <code>ReadBackRoot</code>,
+<code>ReadBackLVal</code>, <code>ContainerRead</code>,
+<code>TempContents</code>, <code>CanContain</code>,
+<code>ReachesThroughRefs</code>, <code>VisibleVars</code></td>
+<td>~250</td>
+<td>B-</td>
+<td>16 commits mention read-backs/slots</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Store rule and store record</td>
+<td>§9.2 store, §5.1</td>
+<td><code>FitsAt</code> (store half, ~100 lines),
+<code>RecordStore</code>, <code>AddStoreEvent</code>,
+<code>NoteContentRoot</code>, <code>ApplyCalleeStores</code>,
+<code>ShrinkTargets</code>, <code>ClassArgRoot</code></td>
+<td>~250</td>
+<td>C+</td>
+<td>11 commits</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Grow-shrink storage exclusion (taint, slot reads)</td>
+<td>§5.2</td>
+<td><code>GrowShrinkTaint</code>, <code>StoredIntoGrowShrink</code>,
+<code>IntoGrowShrink</code>, <code>GrowShrinkCanHold</code>,
+<code>SlotReadable</code>, <code>SlotReadMayRetarget</code>,
+<code>RefMayPointInto</code>, <code>RefMayRetarget</code></td>
+<td>~110</td>
+<td>C</td>
+<td>§5.2: 158 fixtures</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Shrink checks within a body (grow-only, grow-shrink)</td>
+<td>§5.1, §5.2</td>
+<td><code>CheckGrowShrink</code>, <code>GrowOnlyShrinkAt</code>,
+<code>CheckShrinkHolders</code>, <code>CheckHeldShrinks</code>,
+<code>HeldRefsMayPointInto</code>, <code>HolderMayPointInto</code>,
+<code>ResolvePendingShrinks</code>, <code>ShrinkThrough</code>,
+<code>ShrinkMayFree</code>, <code>UsedAfter</code>,
+<code>HoldValue</code>/<code>HoldLocation</code>/<code>HoldSequence</code></td>
+<td>~440</td>
+<td>C-</td>
+<td>§5.1: 65 fixtures; 225 fixture names contain "shrink"</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Shrink summaries, caller-judged pairs, balanced calls</td>
+<td>§5.1 calls, §5.2 balanced</td>
+<td><code>NoteRootEvent</code>, <code>NoteShrink</code>,
+<code>ApplyCalleeShrinks</code>, <code>NoteLiveViews</code>,
+<code>NoteLiveShrink</code>, <code>MapLiveShrinks</code>,
+<code>ApplyCalleeLiveShrinks</code>, <code>ResolveCycleSites</code>,
+<code>ResizesToMark</code>, <code>SamePath</code>,
+<code>KeepShrinkChecks</code>, <code>SettleAssumedShrinks</code>,
+<code>SyntacticShrinks</code>, <code>ScanReceivers</code></td>
+<td>~560 (+<code>LiveShrink</code>, <code>AssumedShrink</code>,
+<code>CycleSite</code> state)</td>
+<td>D</td>
+<td>14 commits; <code>ApplyCalleeShrinks</code> alone is 183 lines</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Growth during construction, uses during whole assignment</td>
+<td>§1.3(4), §4.4</td>
+<td><code>NoteGrow</code>, <code>CheckGrowsSince</code>,
+<code>ApplyCalleeGrows</code>, <code>SyntacticGrows</code>,
+<code>MayAliasRoots</code>, <code>ResolveGrowConflicts</code>,
+<code>CheckBuiltUses</code>, <code>ReachesBuilt</code>,
+<code>EachUse</code>, <code>FieldsApart</code>,
+<code>NamedOutside</code>, <code>BuiltInPlace</code>,
+<code>AppendedRun/Copies</code></td>
+<td>~310</td>
+<td>B-</td>
+<td>§1.3: 14, §4.4: 17 fixtures; 15 commits mention growth</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Specialization keys and root classes</td>
+<td>§3.4 (impl. notes), §10.2</td>
+<td><code>GetOrCreateSpec</code> (239 lines), <code>CheckSpecBody</code>
+(class roots), <code>ClassDepth</code>, <code>EnvReach</code>,
+<code>SettleParamRootExactness</code>, <code>CanonRoot</code>,
+<code>UltimateRoot</code></td>
+<td>~690 (+<code>RootArg</code>)</td>
+<td>B-</td>
+<td>key has 9 parts plus <code>depthkey</code> compared apart;
+<code>exact</code>/<code>concrete</code> ANDed after the fact</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Recursion: cycles, cycle return-root prediction, threaded and pool
+classes, cycle stores</td>
+<td>§7.8</td>
+<td><code>typecheck_cycles.h</code> (all, 690 lines),
+<code>ValidateCycle</code>, <code>JoinCycle</code>,
+<code>ValidatePoolArgs</code>, <code>ValidateThreadArgs</code>,
+<code>NoteThreadedClass</code>, <code>ThreadStorable</code>,
+<code>RelyOnThread</code>, <code>Unthread</code>,
+<code>CycleStorable</code>, <code>CheckCycleInit</code>,
+<code>InProgressRebinds</code>, the <code>inprogress</code> branches of
+every <code>ApplyCallee*</code></td>
+<td>~770 (+~600 inside other functions)</td>
+<td>D</td>
+<td>§7.8: 58 fixtures; 12 commits</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Return roots, inferred results, long-distance returns</td>
+<td>§9.2 return, §7.9</td>
+<td><code>RecordReturn</code>, <code>RetAltVal</code>,
+<code>CallResult</code>, <code>CheckReturn</code>,
+<code>CheckInferredResult</code>, <code>ValidateNeeds</code>,
+<code>AddNeed</code></td>
+<td>~360</td>
+<td>B-</td>
+<td>4 commits this week</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Flow state: definite assignment, optional narrowing</td>
+<td>§3.8</td>
+<td><code>SaveFlow/RestoreFlow/MergeFlow</code>,
+<code>NarrowCond</code>, <code>CollectAssignedNames</code>,
+<code>KillNarrowingsAssignedIn</code>, <code>FinishLoopNarrowing</code>,
+<code>ApplyCalleeRebinds</code>, <code>ExternalOptionals</code></td>
+<td>~250</td>
+<td>B</td>
+<td>name-based loop rule; snapshot per branch is O(vars)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Copy semantics and reference transparency</td>
+<td>§4.1, §3.8</td>
+<td><code>CheckValue</code>, <code>DecayRef</code>,
+<code>KeepsRef</code>, <code>AutoRef</code>, <code>BindsRef</code>,
+<code>ImplicitCopy</code>, <code>CheckBranchCopy</code>,
+<code>BindBranchesByRef</code>, <code>UnrefForValueParam</code>,
+<code>IsOwnLocal</code>, <code>inreturn</code>,
+<code>argpath</code></td>
+<td>~170</td>
+<td>B-</td>
+<td>§4.1: 35 fixtures; flags <code>argpath</code>,
+<code>storagebranches</code>, <code>implicitcopy</code>,
+<code>inreturn</code>, <code>branchcopy</code>, <code>inferred</code>,
+<code>synth</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Writability</td>
+<td>§9.5</td>
+<td><code>constslot</code>, <code>Prov::writable</code>,
+<code>PointeeWritable</code>, <code>WholeWritable</code>,
+<code>NoLetAssign</code>, <code>NoCopyWrite</code>,
+<code>RootArg::writable</code></td>
+<td>~60</td>
+<td>A-</td>
+<td>§9.5: 62 fixtures (mostly read-back, not constness)</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Relative references and pools</td>
+<td>§3.9</td>
+<td><code>ResolvePools</code>, <code>PoolOf</code>,
+<code>ValidatePool</code>, <code>FitsAt</code> (relative half),
+<code>CheckSelfInit</code>, <code>RootedAtReceiver</code>,
+<code>classpool</code></td>
+<td>~130</td>
+<td>A-</td>
+<td>§3.9: 29 fixtures, stable</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Format overload effects</td>
+<td>§3.7</td>
+<td><code>CheckPrintable</code>, <code>CheckRenderable</code>,
+<code>UserFormatIn</code>, <code>heldtemps.render</code>,
+<code>shrinkrest</code></td>
+<td>~110</td>
+<td>B-</td>
+<td>8 commits</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Literal parameters</td>
+<td>§7.7</td>
+<td><code>RecordLitAdapt</code>, <code>NoteLitArgs</code>,
+<code>VerifyLiterals</code>, <code>LitAdapt/LitFlow</code></td>
+<td>~50</td>
+<td>B+</td>
+<td>stable</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Held temporaries and liveness (support for 6–8)</td>
+<td>§5.1</td>
+<td><code>heldtemps</code>, <code>TempScope</code>,
+<code>shrinkrest</code>, <code>RestScope</code>, <code>blockpos</code>,
+<code>UsedAfter</code>, <code>MentionsName</code>, <code>invalue</code>,
+<code>loopassigned</code></td>
+<td>~120</td>
+<td>C+</td>
+<td>pushed at ~12 sites</td>
+</tr>
+<tr>
+<td>19</td>
+<td>Bounds-check elimination</td>
+<td>§10.5</td>
+<td><code>bce.h</code></td>
+<td>~2,300</td>
+<td>A-</td>
+<td>8 commits total; the two recent ones fixed operand types</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Optimizer facts: reachability, writes/addr-of, constants, inlining
+classification, views of copies, base-case and TRE eligibility</td>
+<td>§4 (impl. notes)</td>
+<td><code>Reach</code>, <code>Analyze</code>, <code>Scan</code>,
+<code>OptViewed</code>, <code>NamesStorage</code>,
+<code>CodeFree</code>, <code>BaseOK</code>, <code>Pure</code>,
+<code>RootStable</code>, <code>Rebindable</code></td>
+<td>~230 of ~2,000</td>
+<td>B+</td>
+<td><code>OptViewed</code> is a patch for a checker decision the tree
+does not record</td>
+</tr>
+<tr>
+<td>21</td>
+<td>Codegen: free variables, globals and <code>gs_sp</code> need
+(fixpoint), stack assignment, top caching, NRVO, evaluation
+snapshots</td>
+<td>C.2, C.3, §6.10 (impl. notes)</td>
+<td><code>CollectSpecs</code>, <code>PlanTopClasses</code>,
+<code>RefTopsOk</code>, <code>PlanTopCaches</code>,
+<code>ExpandTopMarkers</code>, <code>SyncReach</code>,
+<code>DetectNrvo</code>, <code>NamedResult</code>,
+<code>Snapshot</code>, <code>AllocStk/SaveBase</code>,
+<code>HoistAggregateDecls</code></td>
+<td>~520 of ~9,500</td>
+<td>B (marker expansion C)</td>
+<td>17 commits mention stacks/caching</td>
+</tr>
+</tbody>
+</table>
+<p>Supporting weight: <code>docs/implementation.md</code> needs 800
+lines (§3.4–3.11) to describe analyses 2–11; <code>test/errors_tc</code>
+holds 647 fixtures (8,400 lines), <code>test/lifetimes</code> 51 (2,400
+lines). That suite is the asset any rework leans on.</p>
+<h2 id="4-per-analysis-notes">4. Per-analysis notes</h2>
+<p>Each entry: what it tracks, how, where the holes come from, and the
+option.</p>
+<h3 id="41-root-provenance-2">4.1 Root provenance (2)</h3>
+<p><strong>Tracks.</strong> For every reference-like value: the variable
+whose scope bounds the pointee (<code>root</code>), whether that
+variable owns it (<code>rootexact</code>), and the ordering "A outlives
+B iff <code>depth(A) &lt;= depth(B)</code>" along the compile-time call
+path. Temporaries get a <code>VarDef</code> of their own one scope
+deeper.</p>
+<p><strong>How.</strong> One root per value. A value that may be any of
+several (branches, rebinds, a call's returns, dispatch arms) keeps the
+innermost root (<code>InnerRoot</code>) and records what that hides in
+bits: <code>intogs</code> (may point into a grow-shrink array the kept
+root does not hold), <code>cyclelocal</code> (may be rooted where a
+cycle stores nothing), <code>hidesclass</code> (may be a parameter
+class's pointee), <code>rootfrom</code> (the container an inexact
+read-back came out of, for diagnostics and store-record
+<code>src</code>), <code>slotread</code> (every alternative was loaded
+out of storage), <code>byteview</code>, <code>reached</code>. Holder
+values carry a second root (<code>holderroot</code>), variables a third
+(<code>contentroot</code>).</p>
+<p><strong>Holes.</strong> Each bit has to survive ~25 transformations:
+<code>MergeVals</code>, <code>DecayRef</code>, <code>SlotView</code>,
+<code>ReadBackLVal</code>, <code>DerefLValue</code>,
+<code>ContainerRead</code>, <code>RetAltVal</code>,
+<code>CallResult</code>, <code>RecordReturn</code>,
+<code>CheckRefRebindRoot</code>, <code>GetOrCreateSpec</code> (into
+<code>RootArg</code>), <code>CheckSpecBody</code> (into class roots),
+<code>TempCopy</code>, <code>NoteLitElem</code>,
+<code>CheckFor</code>/<code>CheckMatch</code> binders,
+<code>FitsAt</code> (whole array to slice), <code>LoadSliceArgs</code>,
+<code>HoldValue</code>, <code>AppendedCopies</code>,
+<code>CheckBreak</code>, <code>TryDispatch</code>,
+<code>Ident::Check</code>, <code>CheckRefOf</code>. The commits "keep
+what a merged value may be when only one root is kept" (365b87c), "root
+a construct's by-value result at a temporary of its own" (b7c6de1),
+"root a function value's result at a temporary" (bed55a1) and the
+<code>goose-provenance-consumers</code> checklist are this hole class.
+<code>RetRoot::alts</code> and <code>CycleRoots::RootSet</code> are
+already sets; <code>CallResult</code> maps each alternative and then
+collapses them with <code>MergeVals</code> again.</p>
+<p><strong>Option.</strong> Make the alternative set the representation:
+<code>Prov</code> holds a small vector of
+<code>{root, exact, bound-type}</code> and merging is set union. The
+bits become queries over the set at the consumer: "may point into a
+grow-shrink array" is "some alternative's root is one", "cycle-storable"
+is "every alternative is", "hides a class" is "some alternative is a
+class root", <code>rootfrom</code> is the alternative's own record. The
+outlives check loops over alternatives. This removes five flags and
+their propagation, and any new construct that merges values gets the
+right answer by construction. <code>holderroot</code> can be the same
+set on the holder's contents. This is the prerequisite for every other
+recommendation.</p>
+<h3 id="42-read-back-roots-3">4.2 Read-back roots (3)</h3>
+<p><strong>Tracks.</strong> Where a reference loaded out of a container
+points.</p>
+<p><strong>How.</strong> Re-derived at the load by enumerating the
+variables in scope whose type can hold the pointee by value
+(<code>RootCandidates</code> over <code>CanContain</code>), plus
+globals, static data, and parameter class roots whose references lead
+there; deepest candidate, exact only when unique. Temporaries answer
+with their holder root.</p>
+<p><strong>Assessment.</strong> Principled and small. Its weakness is
+that it is a type-based approximation consulted at the use, so it
+reasons about the scope as it is at the use rather than about what was
+stored, while the store record (4.3) knows exactly what was stored. The
+two are reconciled by hand in <code>RecordStore</code> (<code>src</code>
+via <code>rootfrom</code>) and <code>HolderMayPointInto</code>.</p>
+<p><strong>Option.</strong> With root sets (4.1) and a per-container
+contents set kept by the store record, a read-back is simply the
+container's contents set when the container is a local of the
+activation, and the type-based enumeration is the fallback for
+containers the activation cannot see into (parameters, globals). Same
+rule, one source of truth.</p>
+<h3 id="43-store-rule-and-store-record-4">4.3 Store rule and store
+record (4)</h3>
+<p><strong>Tracks.</strong> That a stored reference outlives its
+destination; and, for the shrink rules, every store of a reference or
+holder into a container (<code>storeevents</code>, program-wide list;
+per-container <code>contentroot</code>).</p>
+<p><strong>How.</strong> <code>FitsAt</code> runs the rule for every
+value meeting a typed slot, against every storage an inexact destination
+may stand for (<code>ShrinkTargets</code> over
+<code>Dest::reached</code>). A store through a parameter's class is kept
+on the specialization (<code>classevents</code>) and replayed at each
+call (<code>ApplyCalleeStores</code>), widened again at the call. A back
+edge conservatively records every reference argument as stored into
+every container argument.</p>
+<p><strong>Assessment.</strong> The rule is fine. The record is a flat
+list scanned linearly per query (<code>HolderMayPointInto</code>,
+<code>EachHolderRoot</code>), with <code>src</code> chains to follow
+copies; <code>reached</code> and <code>bound</code> were added this
+month to widen inexact destinations. Two recent fixes (3362c37, 12e291b)
+were about which storages an inexact destination enumerates.</p>
+<p><strong>Option.</strong> Keep the record, but as per-container
+contents sets (the same set type as 4.1) updated at stores, with a copy
+recorded as a reference to the source container's set.
+<code>ShrinkTargets</code> and <code>RootCandidates</code> then are one
+function: "the storages a root of type T may stand for".</p>
+<h3 id="44-grow-shrink-storage-exclusion-5">4.4 Grow-shrink storage
+exclusion (5)</h3>
+<p><strong>Tracks.</strong> That no reference that may point into a
+grow-shrink array is ever stored, so the §5.2 shrink scan can look at
+variables only.</p>
+<p><strong>How.</strong> <code>GrowShrinkTaint</code> asks the root,
+then <code>intogs</code>, then a reference to a slice's slot;
+<code>slotread</code> says a value came out of storage and therefore is
+clean; <code>SlotReadMayRetarget</code> and <code>RefMayRetarget</code>
+re-admit <code>var</code> references a later rebind in a loop could
+move.</p>
+<p><strong>Assessment.</strong> Small but the most recent hole class
+(<code>slotread</code>: 1a06b13; <code>viewslot</code>;
+<code>intogs</code> on keys). All of it is "which alternatives does this
+value have", again.</p>
+<p><strong>Option.</strong> Disappears into 4.1: taint is "some
+alternative is a grow-shrink root", cleanliness is "every alternative
+was read out of storage", both derived.</p>
+<h3 id="45-shrink-checks-within-a-body-6">4.5 Shrink checks within a
+body (6)</h3>
+<p><strong>Tracks.</strong> At a shrink, every live thing that may point
+into the array: held temporaries of the statement, reference and slice
+variables in scope (and what a reference to a slice or holder reaches),
+holders by their store record, and, once the whole program has been
+checked, other globals by theirs (<code>CheckGlobalShrinks</code>).</p>
+<p><strong>How.</strong> Three scans (<code>CheckHeldShrinks</code>,
+<code>GrowOnlyShrinkAt</code> over <code>vars</code>,
+<code>CheckShrinkHolders</code> over <code>VisibleVars</code>), each
+with its own case analysis of "may point into"
+(<code>RefMayPointInto</code>, <code>HeldRefsMayPointInto</code> alone
+has eight outcomes), liveness by <code>UsedAfter</code> (syntactic
+mention after the statement, <code>shrinkrest</code>, loops), and
+<code>pendingshrinks</code> for stores later in a loop body.</p>
+<p><strong>Assessment.</strong> The most patched area. Grow-only and
+grow-shrink take different scans, byte views and slot reads take
+exemptions from each, and "through an inexact root" multiplies the scan
+by <code>ShrinkTargets</code>.</p>
+<p><strong>Option.</strong> One scan: for each live view (variables plus
+the statement's earlier operands, see 4.14), intersect its alternative
+set with the shrunk array's alternative set. Grow-only versus
+grow-shrink then differs only in whether holders' contents sets are
+included. The eight-way case analyses collapse into set intersection
+plus the two existing exemptions (byte views, relative references).</p>
+<h3 id="46-shrink-summaries-caller-judged-pairs-balanced-calls-7">4.6
+Shrink summaries, caller-judged pairs, balanced calls (7)</h3>
+<p><strong>Tracks.</strong> What a body shrinks (by parameter, external,
+or bound type), which still-used views only its callers can tell apart
+from the shrunk array (<code>liveshrinks</code>), and which shrinks are
+balanced resizes.</p>
+<p><strong>How.</strong> Summaries on <code>FnSpec</code>, applied at
+calls by <code>ApplyCalleeShrinks</code> (183 lines) which expands,
+judges balance against aliasing, and either scans or defers. Pairs are
+mapped through arguments at every call and again when a cycle closes
+(<code>cyclesites</code>). A back edge is assumed balanced, its skipped
+checks are run anyway with errors captured by catching
+<code>CompileError</code> (<code>KeepShrinkChecks</code>), and settled
+when the cycle closes.</p>
+<p><strong>Assessment.</strong> Structurally fragile: three interleaved
+deferral mechanisms (pending shrinks, cycle sites, assumed shrinks),
+error capture by exception, and a <code>guessed</code> bit for wording.
+<code>liveshrinks</code> is the right idea (record an obligation, let
+the caller judge) applied to one rule only.</p>
+<p><strong>Option.</strong> Make obligations the general mechanism
+(section 5, item 5) and compute summaries to a fixpoint per cycle (item
+3), which removes the deferrals. A summary is then: shrunk regions with
+balance, and the pairs.</p>
+<h3
+id="47-growth-during-construction-uses-during-whole-assignment-8">4.7
+Growth during construction, uses during whole assignment (8)</h3>
+<p><strong>Tracks.</strong> That nothing grows an array while a value is
+built in place in it, and that a whole assignment's right-hand side does
+not use the array it rebuilds.</p>
+<p><strong>How.</strong> A per-activation log (<code>growlog</code>)
+checked against the constructed root after the expression
+(<code>CheckGrowsSince</code>) with <code>MayAliasRoots</code>;
+conflicts between two parameter classes deferred to the end
+(<code>growconflicts</code>, <code>ResolveGrowConflicts</code>); callees
+contribute <code>growparams</code> /<code>growexternals</code> or, in
+progress, their text. <code>CheckBuiltUses</code> walks the right-hand
+side and every callee's <code>NamedOutside</code>.</p>
+<p><strong>Assessment.</strong> Reasonable. <code>MayAliasRoots</code>
+is a fourth alias oracle (beside <code>RefMayPointInto</code>, BCE's
+<code>AffectedByWrite</code>, codegen's <code>RefTopsOk</code>).</p>
+<p><strong>Option.</strong> Aliasing over alternative sets; growth as
+one more effect in the shared summary (item 4).</p>
+<h3 id="48-specialization-keys-and-root-classes-9">4.8 Specialization
+keys and root classes (9)</h3>
+<p><strong>Tracks.</strong> Which call sites may share one checked
+body.</p>
+<p><strong>How.</strong> The key is types, bindings, literal parameters,
+function values, narrowed environment, <code>escaped</code>,
+<code>needs</code>, and per argument a <code>RootArg</code> with class
+number, <code>depthkey</code>, writability, pool, and four grow-shrink
+and view bits; <code>exact</code> and <code>concrete</code> are ANDed
+across sites afterwards and settled by
+<code>SettleParamRootExactness</code>. A back edge reuses the
+in-progress body whatever its roots.</p>
+<p><strong>Assessment.</strong> Well-commented, but the key mixes two
+strategies: facts the body needs to answer comparisons inline
+(<code>depthkey</code>, <code>growshrink</code>, <code>heldexact</code>,
+<code>viewslot</code>, <code>intogs</code>) and facts settled after the
+fact (<code>exact</code>, <code>concrete</code>,
+<code>growconflicts</code>). Each new hole prompts a debate about which
+side to put it on (<code>goose-spec-key-depth-ties</code>,
+<code>goose-holder-param-exactness</code>). Key growth also multiplies
+bodies checked.</p>
+<p><strong>Option.</strong> Item 5: keep types, writability and pools in
+the key; let the body record obligations over its class roots
+(<code>A outlives B</code>, <code>A ≠ B</code>,
+<code>A holds no grow-shrink array</code>) that call sites discharge, as
+<code>liveshrinks</code> does today.
+<code>depthkey</code>/<code>EnvReach</code> and the
+<code>exact</code>/<code>concrete</code> settling then go.</p>
+<h3 id="49-recursion-10">4.9 Recursion (10)</h3>
+<p><strong>Tracks.</strong> Which functions are in a cycle; the roots of
+results a back edge returns before the returns are checked; which
+parameter classes a cycle may store through (pools, threaded classes);
+stores made before a function knew it was in a cycle; non-fixed locals
+held across a call into the cycle.</p>
+<p><strong>How.</strong> A syntactic fixpoint over returns
+(<code>CycleRoots</code>, 690 lines) predicts roots; real returns are
+checked against the prediction with take-back rules
+(<code>ReturnConflict</code>, <code>RetRoot::used*</code>,
+<code>predlost</code>). Threaded classes are tracked with heirs,
+<code>relied</code> and retroactive <code>Unthread</code> errors.
+<code>cyclestores</code> are refused retroactively by
+<code>JoinCycle</code>. Every <code>ApplyCallee*</code> has an
+<code>inprogress</code> branch using syntactic scans
+(<code>SyntacticShrinks</code>, <code>SyntacticGrows</code>,
+<code>InProgressRebinds</code>, <code>NamedOutside</code> pending). The
+§7.8 conservatisms are listed in <code>implementation.md</code> §10.</p>
+<p><strong>Assessment.</strong> The hardest code in the compiler, and
+all of it a consequence of checking a body once inside the call that
+first reaches it. BCE and codegen face the same recursion and solve it
+with a fixpoint over summaries in ~30 lines each
+(<code>ComputeEffects</code>, <code>CollectSpecs</code>).</p>
+<p><strong>Option.</strong> Item 3: run the lifetime analysis after type
+checking, per strongly connected component, iterating bodies with
+optimistic summaries until stable. Predictions, take-backs,
+threaded-class heirs, cycle stores, assumed shrinks and every syntactic
+fallback go. What remains of §7.8 is the stack rule
+(<code>JoinCycle</code>'s non-fixed-local check) and the pool argument
+rule.</p>
+<h3 id="410-return-roots-11">4.10 Return roots (11)</h3>
+<p><strong>Tracks.</strong> Every root a function's results may have,
+mapped at each call.</p>
+<p><strong>How.</strong> <code>RetRoot::alts</code>, one
+<code>RetAlt</code> per distinct root with ANDed guarantees;
+<code>RetAltVal</code> maps a class to the argument's root;
+<code>CallResult</code> merges the mapped alternatives with
+<code>MergeVals</code>. Long-distance returns are restricted to globals
+(TODO 0d). Inferred results follow <code>let</code> rules.</p>
+<p><strong>Option.</strong> With 4.1 the result is the mapped set,
+unmerged; <code>RetAlt</code> and <code>Prov</code> alternatives are one
+type. Long-distance returns can then use the real rule ("rooted at or
+above the target's frame").</p>
+<h3 id="411-flow-state-definite-assignment-and-narrowing-12">4.11 Flow
+state: definite assignment and narrowing (12)</h3>
+<p><strong>How.</strong> Snapshot of every variable in scope at each
+branch, joined by <code>MergeFlow</code>. Loops kill narrowings of names
+the body rebinds, found by a syntactic scan that follows calls by name
+(<code>CollectAssignedNames</code>) and callee summaries
+(<code>reboundoptionals</code>), then <code>FinishLoopNarrowing</code>
+errors when the scan missed a rebind through a call.</p>
+<p><strong>Assessment.</strong> Works; the name-based loop rule and the
+"error if the guess was wrong" pattern are the same
+single-pass-over-loops symptom as <code>PrebindLoopRefs</code> and
+<code>refidentityused</code>. Snapshots are O(variables in scope) per
+branch, which is what makes deep call paths cost gigabytes.</p>
+<p><strong>Option.</strong> Snapshot only variables the construct
+touches (a prescan of the branch, or copy-on-write), and treat loops
+with a two-iteration check (item 6) instead of name scans.</p>
+<h3 id="412-copy-semantics-and-reference-transparency-13">4.12 Copy
+semantics and reference transparency (13)</h3>
+<p><strong>How.</strong> <code>CheckValue</code> decays references
+unless the destination keeps them, rewrites lvalues to
+<code>&amp;x</code> (<code>AutoRef</code>, <code>synth</code>), and
+decides implicit copies with <code>inreturn</code>,
+<code>argpath</code>, <code>storagebranches</code>,
+<code>implicitcopy</code>, <code>branchcopy</code>,
+<code>inferred</code>. Calls check arguments twice (phase 1 without a
+parameter type, phase 2 with) and <code>BindBranchesByRef</code>
+re-checks constructs at reference parameters.</p>
+<p><strong>Assessment.</strong> The two-phase argument check plus
+construct-as-argument handling is where several recent fixes landed
+(4c05a0f, fe901f5, 3259cd7). Six context flags for one rule is a
+smell.</p>
+<p><strong>Option.</strong> Decide "by value or by reference" once per
+argument from the parameter type and the argument's shape (lvalue,
+reference, construct of lvalues) in one function, before phase 2, and
+record the decision on the node; the flags become locals of that
+function.</p>
+<h3
+id="413-writability-14-relative-references-15-literal-parameters-17">4.13
+Writability (14), relative references (15), literal parameters (17)</h3>
+<p>Sound and small. Writability is a bit plus <code>const</code> in the
+type with one enforcement point (<code>FitsAt</code> under
+<code>constslot</code>). Relative references need root identity and ask
+<code>rootexact</code>, which is the right dependency. Literal
+parameters are a clean record-and-verify design. No action.</p>
+<h3 id="414-held-temporaries-and-liveness-18">4.14 Held temporaries and
+liveness (18)</h3>
+<p><strong>Tracks.</strong> Values evaluated earlier in the statement
+that are still live (<code>heldtemps</code>), the parts of the statement
+that run after the shrink (<code>shrinkrest</code>), whether a variable
+is mentioned later (<code>UsedAfter</code>).</p>
+<p><strong>How.</strong> Pushed at ~12 sites (<code>CheckArg</code>,
+index and slice receivers, assignment locations, <code>Binary</code>
+operands, <code>==</code> views, render, dispatch arguments, literal
+fields, returns), popped by <code>TempScope</code>.
+<code>UsedAfter</code> rescans blocks with <code>MentionsName</code>,
+following nested functions by name, on every shrink.</p>
+<p><strong>Assessment.</strong> A site missing a push is a hole
+(7027e7f, 5896dbd, 756e1fe), and <code>shrinkrest</code> exists because
+<code>heldtemps</code> cannot see the right-hand side of the
+statement.</p>
+<p><strong>Option.</strong> Derive both from the tree with one walker
+each: "the reference-typed subexpressions evaluated before node N within
+its statement, in evaluation order" and "the variables mentioned at or
+after position P in the enclosing blocks", computed once per statement
+or body (a backward pass gives every position's later-use set in O(n)).
+No sites to forget; evaluation order lives in one function shared with
+codegen's <code>Snapshot</code>.</p>
+<h3 id="415-bounds-check-elimination-19">4.15 Bounds-check elimination
+(19)</h3>
+<p>A self-contained difference-constraint domain with generations,
+places with an ultimate owner, kills, per-spec effect summaries to a
+fixpoint, entry facts from call sites, recorded invariants, and
+loop-view hoisting. Sound structure, documented gaps, low churn. It
+consumes checker provenance (<code>ref.root</code>,
+<code>rootexact</code>, class roots) and re-derives aliasing and effects
+for itself. No structural action; it is the model for item 3, and a
+consumer of item 4.</p>
+<h3 id="416-optimizer-analyses-20">4.16 Optimizer analyses (20)</h3>
+<p><code>Analyze</code> (writes and address-taking per variable,
+flow-insensitive), reachability with use counts, inline classification
+with C-nesting depth, <code>OptViewed</code> (re-materialize a value the
+checker rooted at a temporary when folding reduces it to storage), and
+purity checks for base-case inlining and tail-recursion elimination.
+Sound. <code>OptViewed</code> re-derives syntactically a decision the
+checker made (<code>TempCopy</code>); recording "this value is a
+temporary copy" on the node would let the optimizer read it instead.</p>
+<h3 id="417-codegen-analyses-21">4.17 Codegen analyses (21)</h3>
+<p><code>CollectSpecs</code> computes free variables, touched globals
+and <code>gs_sp</code> need by a fixpoint over the call graph (its third
+computation of the call graph). Top caching decides per function and
+class of stack (<code>PlanTopClasses</code>, <code>RefTopsOk</code>
+reading <code>RootArg::exact</code>/<code>concrete</code>), plans
+regions, and then rewrites the emitted C text:
+<code>ExpandTopMarkers</code> parses <code>goto</code>s and labels out
+of the generated code to place flushes, and
+<code>HoistAggregateDecls</code> moves declarations by text for an MSVC
+bug. NRVO is a syntactic scan of returns.</p>
+<p><strong>Option.</strong> Emit into a minimal statement list with
+explicit loop and flush nodes and expand from that instead of from text
+(medium, isolated). Consume the shared storage summary (item 4) in
+<code>RefTopsOk</code> and <code>SyncReach</code>.</p>
+<h2 id="5-cross-cutting-findings-and-recommendations">5. Cross-cutting
+findings and recommendations</h2>
+<p>Ranked by expected reduction in future churn per unit of effort.
+Effort is a rough size in lines touched; "deletes" names what goes
+away.</p>
+<h3
+id="1-alternative-sets-instead-of-one-root-plus-bits-medium-effort-highest-payoff-per-line">1.
+Alternative sets instead of one root plus bits (medium effort, highest
+payoff per line)</h3>
+<p>Replace
+<code>Prov::root/rootexact/rootfrom/intogs/cyclelocal/hidesclass/ slotread</code>
+with a small set of alternatives
+<code>{root, exact, fromcontainer, slotread}</code> and merge by union.
+Consumers loop: outlives means every alternative outlives; taint means
+some alternative is a grow-shrink root; cycle-storable means every
+alternative is; class-hidden means some alternative is a class root.
+<code>holderroot</code> becomes the contents set; <code>RetAlt</code>
+and <code>CycleRoots::RootSet</code> become the same type. Touches
+~1,500 lines mechanically (<code>MergeVals</code>, <code>Hides</code>,
+<code>InnerRoot</code>, <code>GrowShrinkTaint</code>,
+<code>RetAltVal</code>, <code>CallResult</code>,
+<code>CheckRefRebindRoot</code>, <code>RootArg</code>, the scans).
+Deletes: five flags, <code>Hides</code>, <code>InnerRoot</code>'s tie
+rule, the <code>intogs</code>/<code>hidesclass</code> propagation in ~20
+places, and the class of bugs "merged value hid X". Risk: low; the
+fixture suite pins every rule. Do this first; every later item assumes
+it.</p>
+<h3
+id="2-derive-statement-liveness-and-later-use-from-the-tree-small-effort">2.
+Derive statement liveness and later-use from the tree (small
+effort)</h3>
+<p>One walker for "operands evaluated before N in its statement"
+replaces the <code>heldtemps</code> pushes,
+<code>HoldValue</code>/<code>HoldLocation</code>/<code>HoldSequence</code>,
+<code>shrinkrest</code>/<code>RestScope</code>, <code>render</code> and
+<code>invalue</code>; one precomputed later-use table per body replaces
+<code>UsedAfter</code>/<code>MentionsName</code>/<code>blockpos</code>
+rescans and <code>loopassigned</code>. ~300 lines replaced by ~150, no
+push sites left to forget, and evaluation order stated once (codegen's
+<code>Snapshot</code> should read the same function). Risk: low.</p>
+<h3
+id="3-split-lifetime-analysis-from-type-checking-fixpoint-per-cycle-large-effort-largest-deletion">3.
+Split lifetime analysis from type checking; fixpoint per cycle (large
+effort, largest deletion)</h3>
+<p>Type checking keeps its single pass and creates specializations on
+types, bindings, literal parameters, function values, writability and
+pools. Lifetime analysis (2–11 in the inventory) then runs over the
+finished specialization graph in callee-first order, iterating each
+recursive cycle's bodies with optimistic summaries until the summaries
+stabilize, exactly as <code>BCE::ComputeEffects</code> and
+<code>CodeGen::CollectSpecs</code> already do. Deletes:
+<code>typecheck_cycles.h</code> (prediction and
+<code>ReturnConflict</code>),
+<code>RetRoot::pred/used*/predlost/usedthreads</code>, the
+<code>cycleroot</code> sentinel, threaded-class
+heirs/<code>relied</code>/<code>Unthread</code>,
+<code>cyclestores</code>, <code>assumedshrinks</code>
+/<code>SettleAssumedShrinks</code>/<code>KeepShrinkChecks</code>,
+<code>cyclesites</code>/ <code>ResolveCycleSites</code>,
+<code>SyntacticShrinks</code>/<code>SyntacticGrows</code>/<code>ScanReceivers</code>,
+<code>InProgressRebinds</code>, <code>NamedOutside</code>'s pending
+case, and the <code>inprogress</code> branch of every
+<code>ApplyCallee*</code> — around 1,500 lines, and the §7.8
+conservatisms in <code>implementation.md</code> §10 become the spec's
+real rule. Cost: a body is analyzed more than once inside a cycle
+(bounded by the lattice height, in practice two or three rounds), and
+the analysis needs its own walk over checked bodies (the
+<code>Check</code> methods stay for types). Risk: medium; it changes
+when errors are reported, not which programs are legal, so the fixtures
+still decide. Prerequisite: item 1.</p>
+<h3
+id="4-one-storage-and-effect-model-for-checker-bce-and-codegen-medium-effort">4.
+One storage and effect model for checker, BCE and codegen (medium
+effort)</h3>
+<p>Define regions (a variable, a class root, a temporary, a global,
+static data) and one per-specialization summary computed once: regions
+reached, written, resized (with balance), stored into (with what),
+grown, returned, rebound optionals, free variables, and integers
+written. The checker's
+<code>NoteRootEvent</code>/<code>ShrinkTargets</code>/<code>RootCandidates</code>/<code>MayAliasRoots</code>/
+<code>NamedOutside</code>, BCE's
+<code>UltOf</code>/<code>Reach</code>/<code>AffectedByWrite</code>/<code>Effects</code>,
+and codegen's
+<code>CollectSpecs</code>/<code>RefTopsOk</code>/<code>SyncReach</code>
+become queries on it. Deletes three call-graph traversals and four alias
+oracles. Natural to do together with item 3, since that is when the
+checker gets a summary fixpoint of its own.</p>
+<h3 id="5-obligations-instead-of-key-facts-medium-effort-after-3">5.
+Obligations instead of key facts (medium effort, after 3)</h3>
+<p>Keep the specialization key to what changes the body's meaning
+(types, bindings, literal parameters, function values, writability,
+pools, <code>escaped</code>, <code>needs</code>). Let the analysis
+record obligations over class roots (<code>A outlives B</code>,
+<code>A is not B</code>, <code>A holds no grow-shrink array</code>,
+<code>A's contents are exactly one array</code>) that each call site
+discharges with its concrete roots, generalizing
+<code>liveshrinks</code>. Deletes
+<code>depthkey</code>/<code>EnvReach</code>,
+<code>growshrink</code>/<code>byteview</code>/<code>viewslot</code>/<code>intogs</code>/<code>heldexact</code>
+from <code>RootArg</code>, <code>SettleParamRootExactness</code>,
+<code>growconflicts</code>/<code>ResolveGrowConflicts</code>, and the
+specialization splits they cause (a function called once with a global
+and once with a local today gets two bodies).</p>
+<h3
+id="6-loops-two-iteration-check-instead-of-name-scans-small-effort-independent">6.
+Loops: two-iteration check instead of name scans (small effort,
+independent)</h3>
+<p>Check a loop body twice, the second time with the bindings, stores
+and narrowings the first found (a widening step), and report on the
+second pass. Deletes
+<code>PrebindLoopRefs</code>/<code>ResolvePrebind</code>,
+<code>refprebound</code>, <code>refidentityused</code>,
+<code>loopassigned</code>/<code>AssignedInEnclosingLoop</code>,
+<code>pendingshrinks</code>/<code>ResolvePendingShrinks</code>,
+<code>CollectAssignedNames</code>'s call following and
+<code>FinishLoopNarrowing</code>'s "guess was wrong" error. Cost: loop
+bodies are checked twice (nested loops 2^depth; cap at two rounds per
+loop by checking inner loops once inside each outer round, or memoize).
+Can be done before or after item 3.</p>
+<h3 id="7-smaller-items">7. Smaller items</h3>
+<ul>
+<li>Decide by-value versus by-reference once per argument (4.12) and
+record it on the node; drop
+<code>argpath</code>/<code>storagebranches</code>/<code>implicitcopy</code>/
+<code>branchcopy</code>.</li>
+<li>Record "temporary copy" on nodes so <code>OptViewed</code> reads it
+(4.16).</li>
+<li>Emit codegen's top-cache flushes from a statement list, not from
+text (4.17).</li>
+<li>Snapshot flow state per construct rather than per scope (4.11).</li>
+</ul>
+<h2 id="6-sequencing-and-validation">6. Sequencing and validation</h2>
+<p>Order: 1 → 2 → 6 → (3 + 4 together) → 5 → 7. Items 1, 2 and 6 are
+each a week-scale change that pays for itself; 3 + 4 is the structural
+rewrite and should start only once 1 has landed, since sets are what its
+summaries are made of.</p>
+<p>Validation for every step is the existing suite:
+<code>test/errors_tc</code> (647 rejections with expected messages),
+<code>test/lifetimes</code> and <code>test/expected</code> (positive
+programs whose output is fixed), samples and the standard library, at
+both optimization levels and through TinyCC. A change that reports an
+error at a different line, or with different wording, needs the
+expectation updated; a change that accepts a program the old compiler
+rejected needs a review of the fixture (many rejections in
+<code>errors_tc</code> are conservatisms, and item 3 in particular will
+lift some). Keep a scratch build of the pre-change compiler and diff
+verdicts over all fixtures and samples before each landing
+(<code>docs/testing.md</code>,
+<code>goose-branch-validation-snapshots</code>).</p>
+<h2 id="7-status">7. Status</h2>
+<ul>
+<li><strong>1. Alternative sets</strong> landed 2026-09-25:
+<code>Roots</code>/<code>RootAlt</code> in <code>ast.h</code> replace
+<code>root</code>/<code>rootexact</code>/<code>rootfrom</code>/<code>intogs</code>/<code>cyclelocal</code>/<code>hidesclass</code>/
+<code>slotread</code>, <code>Val::contents</code> replaces
+<code>holderroot</code>/<code>holderexact</code>,
+<code>VarDef::contents</code> replaces
+<code>contentroot</code>/<code>contentexact</code>/<code>contentset</code>;
+read-backs enumerate their candidates once, at the read, as exact
+alternatives (§9.5), and the cycle predictor holds each alternative of a
+return on its own. <code>RootArg::intogs</code> became
+<code>gsvia</code>; <code>InnerRoot</code>, <code>CanonRoot</code>
+(<code>rootalias</code> was never set), <code>Hides</code> and
+<code>NoteContentRoot</code> are gone. A <code>var</code> of several
+roots that a loop rebinds to one the syntactic scan cannot show it has
+is read as bounded by its roots inside the loop
+(<code>loopretargets</code>), the single-pass replacement for what the
+collapsed inexact root used to guarantee; item 6 removes that too.</li>
+<li><strong>6. Loops checked to a fixpoint</strong> landed 2026-09-25:
+<code>CheckLoopPasses</code> (<code>typecheck_flow.h</code>) re-checks a
+body from the join of the loop's entry with the previous pass's back
+edges until no fact fed back to the head changes (<code>LoopPass</code>,
+<code>NoteFact</code> at
+<code>BindProv</code>/<code>CheckRefRebindRoot</code>/
+<code>RecordStore</code>, the flow state compared), every pass but the
+last being discovery, in which a variable read before its binding has no
+roots (<code>RefProvOf</code>, <code>RootArg::unknown</code> for a call
+given one) and the shrink scans pass it by. Deleted:
+<code>PrebindLoopRefs</code>/<code>ResolvePrebind</code>/
+<code>refprebound</code>,
+<code>RefExactOf</code>/<code>refidentityused</code>,
+<code>PushLoopAssigned</code>/
+<code>loopassigned</code>/<code>AssignedInEnclosingLoop</code>/<code>CollectAssignedBases</code>,
+<code>loopretargets</code>,
+<code>pendingshrinks</code>/<code>ResolvePendingShrinks</code>,
+<code>CollectAssignedNames</code>/<code>KillNarrowingsAssignedIn</code>,
+<code>NarrowedOptionals</code>/
+<code>CollectCheckedRebinds</code>/<code>FinishLoopNarrowing</code>,
+<code>SlotReadMayRetarget</code>, <code>EndLoop</code>. Three fixtures
+now report at the use instead of at the rebind or after the loop
+(rebind_root_identity, optional_loop_fnval_rebind,
+optional_while_condition_value). Loops with no rebind or store of an
+outer variable take one pass; the test suite's checking time is
+unchanged.</li>
+<li><strong>3. Cycles checked in rounds</strong> landed 2026-09-25,
+without the split of lifetime analysis from type checking the item
+proposed: the fixpoint the split was for is had by checking a cycle's
+bodies again (<code>CheckSpecBody</code> runs
+<code>CheckSpecBodyOnce</code> for the head until no member's record
+changes, members re-checked as calls reach them,
+<code>FnSpec::stale</code>), each round reading the round before's
+records at its back edges (<code>FnSpec::prev</code>,
+<code>RecordOf</code>) and the first reading none: a back edge's result
+then points nowhere yet (<code>Roots::unknown</code>, the same bottom as
+item 6's discovery passes, now a flag holder contents carry too), which
+every rule passes by. Type checking is repeated per round, which costs
+nothing measurable. Deleted: <code>typecheck_cycles.h</code> (669 lines:
+the syntactic return-root predictor, <code>ReturnConflict</code>),
+<code>RetRoot::pred/used*</code>, the <code>cycleroot</code> sentinel,
+<code>cyclestores</code> (a re-check with <code>incycle</code> set
+replaces the replay),
+<code>ThreadedClass::relied</code>/<code>RelyOnThread</code> (a re-check
+finds the class broken),
+<code>assumedshrinks</code>/<code>SettleAssumedShrinks</code>/<code>KeepShrinkChecks</code>/
+<code>SB_ASSUMED</code>/<code>livecapture</code>,
+<code>cyclesites</code>/<code>ResolveCycleSites</code>/<code>CycleOpen</code>,
+<code>SyntacticShrinks</code>/<code>SyntacticGrows</code>/<code>ScanReceivers</code>,
+<code>InProgressRebinds</code>, <code>LiveShrink::guessed</code>, and
+the <code>inprogress</code> branch of every <code>ApplyCallee*</code>:
+719 lines against 433 added. The predictor's conflict errors ("use one
+source", "back edges were not given") are gone: a cycle's result is the
+union of what its returns give, checked at every use like any call's, so
+13 fixtures now report at the use (a store that does not outlive, a view
+into a grow-shrink array) and two programs the predictor refused for its
+own imprecision are accepted and became positive fixtures
+(cycle_holder_unknown_store, cycle_threaded_return). Cycles settle in
+two or three rounds (<code>GOOSE_ROUNDS=1</code> traces them).</li>
+<li><strong>4. One storage and effect model</strong> was reconsidered
+after item 3: BCE and codegen summarize the optimized tree after
+inlining and folding, which the checker's records, made before the
+optimizer runs, cannot stand in for; sharing the region vocabulary (a
+variable, a class root, a temporary, static data) is already the case
+through <code>VarDef</code>. Left as is.</li>
+<li><strong>5. Obligations instead of key facts</strong> was measured
+before being attempted (2026-09-25, a temporary
+<code>GOOSE_KEYSTATS</code> count over every sample and the largest
+tests): no two specializations of any function differed only in the
+depth key, and the fact bits (<code>growshrink</code>,
+<code>byteview</code>, <code>viewslot</code>, <code>heldexact</code>)
+split one to four specializations per program (twelve of 847 in the
+physics sample), class grouping a few more. The redesign would move
+every class-dependent check in a body to its call sites (outlives,
+grow-shrink taint, exactness, the shrink scans' byte-view and view-slot
+exemptions), with the errors and their fixtures, for a two-percent
+reduction in bodies: not done. <code>RootArg::unknown</code> (item 3) is
+the one key bit added since.</li>
+<li><strong>7. Smaller items</strong> (2026-09-25): flow snapshots cover
+the variables the code between a save and its restore can name
+(<code>NamedFrames</code>, <code>SaveFlow</code>,
+<code>CheckSpecBodyOnce</code>'s restore of outer narrowings) instead of
+every variable on the call path; measured on a chain of 3,000 nested
+calls, checking is a fifth faster and peak memory unchanged, so the
+"gigabytes" of §4.11 were the per-activation bodies and records, not the
+snapshots. The by-value/by-reference decision (4.12), the temporary-copy
+annotation for <code>OptViewed</code> (4.16) and codegen's marker
+expansion (4.17) were left as they are: the first three of the six flags
+were each the subject of a recent fix and the fixtures pin them,
+<code>OptViewed</code>'s syntactic test
+(<code>r != n &amp;&amp; NamesStorage(r)</code>) is equivalent to the
+checker's <code>TempCopy</code> sites by construction (folding only
+rewrites a node that was a construct or a call, whose value is a
+temporary copy), and the text expansion is isolated and correct.</li>
+<li><strong>2. Statement liveness from the tree</strong> landed
+2026-09-25: <code>nodepath</code> (<code>PathEntry</code>,
+<code>NodeScope</code>), <code>nodevals</code> and
+<code>ForOperands</code> in
+<code>typecheck.h</code>/<code>typecheck_exprs.h</code>;
+<code>HeldOperands</code> replaces <code>heldtemps</code>,
+<code>TempScope</code>,
+<code>HoldValue</code>/<code>HoldLocation</code>/<code>HoldSequence</code>,
+the receiver and render pushes and the <code>render</code> flag (now
+<code>renderarg</code>/<code>renderwhere</code>);
+<code>LaterOperands</code> replaces
+<code>shrinkrest</code>/<code>RestScope</code> and gives
+<code>UsedAfter</code> the rest of the statement. The two phases of a
+call are stated once: a call <code>discovering</code> its overload holds
+nothing, a call applying its callee's summary has consumed its own
+operands. <code>UsedAfter</code>'s block and loop rescans
+(<code>blockpos</code>, <code>MentionsName</code>) stay for item 3,
+whose liveness pass subsumes them. §5.1's syntactic position rules
+(<code>Call::standalone</code>, <code>invalue</code>) were dropped
+afterwards for the held operands, the parts a construct's head leads to
+(<code>AfterHead</code>) and shrinks logged against values under
+construction.</li>
+</ul>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/analysis_inventory.md"><code>docs/design/analysis_inventory.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

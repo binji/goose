@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Root structs: library state with independent
+storage · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#root-structs-library-state-with-independent-storage"
+id="toc-root-structs-library-state-with-independent-storage">Root
+structs: library state with independent storage</a>
+<ul>
+<li><a href="#motivation" id="toc-motivation">Motivation</a></li>
+<li><a href="#syntax-and-explicit-contract"
+id="toc-syntax-and-explicit-contract">Syntax and explicit
+contract</a></li>
+<li><a href="#v1-ownership-and-placement"
+id="toc-v1-ownership-and-placement">V1 ownership and placement</a></li>
+<li><a href="#storage-and-construction"
+id="toc-storage-and-construction">Storage and construction</a></li>
+<li><a href="#component-identity-and-lifetime-analysis"
+id="toc-component-identity-and-lifetime-analysis">Component identity and
+lifetime analysis</a></li>
+<li><a href="#code-generation-and-performance"
+id="toc-code-generation-and-performance">Code generation and
+performance</a></li>
+<li><a href="#serialization-workers-and-other-boundaries"
+id="toc-serialization-workers-and-other-boundaries">Serialization,
+workers, and other boundaries</a></li>
+<li><a href="#separate-follow-up-reusable-pools-in-the-stdlib"
+id="toc-separate-follow-up-reusable-pools-in-the-stdlib">Separate
+follow-up: reusable pools in the stdlib</a>
+<ul>
+<li><a href="#global-component-paths"
+id="toc-global-component-paths">Global component paths</a></li>
+<li><a href="#destination-aware-library-construction"
+id="toc-destination-aware-library-construction">Destination-aware
+library construction</a></li>
+<li><a href="#checked-slice-position"
+id="toc-checked-slice-position">Checked slice position</a></li>
+<li><a href="#policy-and-compatibility"
+id="toc-policy-and-compatibility">Policy and compatibility</a></li>
+</ul></li>
+<li><a href="#v2-candidates" id="toc-v2-candidates">V2
+candidates</a></li>
+<li><a href="#implementation-sequence-and-acceptance"
+id="toc-implementation-sequence-and-acceptance">Implementation sequence
+and acceptance</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="root-structs-library-state-with-independent-storage">Root
+structs: library state with independent storage</h1>
+<p>Status: accepted direction, implementation planned. This document
+describes the target, not an implemented language feature. Establish
+root structs first; evaluating a stdlib replacement for
+<code>reusable</code> and <code>reusable[]</code> is a separate
+milestone and is not a prerequisite for shipping root structs.</p>
+<h2 id="motivation">Motivation</h2>
+<p>A library should be able to package its state in one type,
+initialized by one declaration. Today a struct may contain only one
+resizable value, on its tail. A library needing two independently
+growing arrays must ask its user to declare both arrays and assemble a
+borrowed context. This makes library state awkward to instantiate and
+expose, even when its complete storage requirements are known
+statically.</p>
+<p>Root structs group independently stored values under one owning
+lifetime. They do not put several growing arrays into one contiguous
+byte image, relocate fields on growth, or introduce a heap allocator.
+Every simultaneously live resizable component still tops its own data
+stack.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>root <span class="kw">struct</span> <span class="dt">ParserState</span> {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    tokens<span class="op">:</span> <span class="dt">Token</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">,</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    work<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..&lt;</span>] <span class="op">=</span> []<span class="op">,</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    position<span class="op">:</span> <span class="dt">i64</span> <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> parser <span class="op">=</span> <span class="dt">ParserState</span> { <span class="op">..</span> }<span class="op">;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">parse</span>(parser<span class="op">,</span> input)<span class="op">;</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">parse</span>(state<span class="op">:</span> <span class="dt">ParserState</span><span class="op">&amp;,</span> input<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>]) {</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Ordinary field access and UFCS, with independent array storage.</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The illustration assumes a separately declared <code>Token</code>
+type. Root structs are useful for parser state, parallel arrays, lookup
+structures with separate metadata, and pools. They remain worthwhile if
+reusable pools stay built in.</p>
+<h2 id="syntax-and-explicit-contract">Syntax and explicit contract</h2>
+<p>Use <code>root struct</code>, retaining struct fields, type
+arguments, defaults, namespaces, and function-based methods. Store the
+distinction on the existing struct declaration/instantiation rather than
+creating a separate family of field-access AST nodes.</p>
+<p>Treat <code>root</code> as a contextual modifier immediately before
+<code>struct</code> at a type declaration. Existing variables, fields,
+parameters, and functions named <code>root</code> remain legal. Do not
+reserve the word throughout the language merely to parse this
+modifier.</p>
+<p>The modifier means that owning instances are storage roots. It does
+not mean that the declaration or instance must be at file scope. An
+explicitly declared root struct retains its restrictions with zero or
+one resizable field, including in generic specializations. Ordinary
+structs retain their current placement and layout rules; adding a second
+resizable field to one remains an error suggesting
+<code>root struct</code>.</p>
+<p>Inference alone would make a field edit, or a generic specialization,
+change a type's placement, copying, and representation contract. A
+replacement for <code>struct</code> would obscure how much existing
+struct behavior remains. <code>local</code> would misdescribe globals,
+and <code>stack</code> would distinguish little in Goose.</p>
+<p>For comparison, Rust infers dynamically sized struct restrictions
+from an unsized last field, still describing one object; C# explicitly
+marks its restricted <code>ref struct</code> category. Neither has the
+same rules as this proposal. References: <a
+href="https://doc.rust-lang.org/reference/dynamically-sized-types.html">Rust
+dynamically sized types</a>, <a
+href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/ref-struct">C#
+ref structs</a>.</p>
+<h2 id="v1-ownership-and-placement">V1 ownership and placement</h2>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>V1 rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local or global <code>var</code>/<code>let</code></td>
+<td>Allowed; construct directly at its declaration using a literal and
+field defaults.</td>
+</tr>
+<tr>
+<td>Fields</td>
+<td>Ordinary fields and multiple independently stored resizable fields,
+in any order. Their own existing element, construction, and lifetime
+restrictions still apply.</td>
+</tr>
+<tr>
+<td>Root owner inside another struct</td>
+<td>Forbidden by value, including inside another root struct.</td>
+</tr>
+<tr>
+<td>Root owner as an array/slice element or ADT payload</td>
+<td>Forbidden, including fixed-length arrays.</td>
+</tr>
+<tr>
+<td>Reference to an owner</td>
+<td>Allowed, including optional references and references stored in
+fields/arrays when ordinary lifetime rules permit.</td>
+</tr>
+<tr>
+<td>Function argument</td>
+<td>By reference. Untyped parameters bind owning lvalues by reference as
+for nonfixed values.</td>
+</tr>
+<tr>
+<td>Function result</td>
+<td>References to existing owners may be returned under normal lifetime
+rules; owning results are deferred. Never return a reference to a local
+owner.</td>
+</tr>
+<tr>
+<td>Unannotated binding from an existing owner</td>
+<td>Binds by reference, consistent with nonfixed lvalues. Explicit
+<code>.=</code> remains available.</td>
+</tr>
+<tr>
+<td><code>copy</code>, whole-owner assignment, by-value parameters</td>
+<td>Forbidden. No implicit descriptor copying or ownership
+transfer.</td>
+</tr>
+<tr>
+<td>Temporary owners</td>
+<td>Forbidden; owning construction requires a named local/global
+declaration.</td>
+</tr>
+<tr>
+<td>Field assignment and array operations</td>
+<td>Use the field's usual rules, including shrink and construction
+checks.</td>
+</tr>
+<tr>
+<td>Whole-owner raw serialization or C ABI</td>
+<td>Unsupported; explicitly supported component operations remain
+available.</td>
+</tr>
+<tr>
+<td>Transfer into a worker</td>
+<td>Unsupported, including implicit capture of a root global. See the
+threading rules below.</td>
+</tr>
+</tbody>
+</table>
+<p>The prohibition on ownership nesting does not prohibit ordinary
+fields whose types are existing resizable-tailed structs. Such a field
+is an independently stored component with its existing internal layout.
+A root struct itself is never such a by-value component in v1.
+Variable-size ordinary fields likewise retain their construction rules;
+the enclosing root has no contiguous image.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Context</span> { parser<span class="op">:</span> <span class="dt">ParserState</span><span class="op">&amp;</span> }   <span class="co">// Borrowing is allowed.</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Object</span> { parser<span class="op">:</span> <span class="dt">ParserState</span> }     <span class="co">// Owning containment is an error.</span></span></code></pre></div>
+<p>Diagnose the prohibited use with the declaration and
+field/element/argument path, and suggest a reference or a local/global
+owner. For example:</p>
+<pre class="text"><code>ParserState is a root struct and cannot be stored by value in Object.parser.
+Declare it as a local/global variable, or store ParserState&amp;.</code></pre>
+<p>Enforce the rules through aliases, generic instantiation, inferred
+types, defaults, inferred results, and unreachable/standalone checking
+as applicable. An apparently fixed-size control record must never escape
+the owning rules. <code>const</code> and writability follow existing
+struct and reference rules, including their existing treatment of
+reference-valued fields; add no blanket transitive immutability
+rule.</p>
+<h2 id="storage-and-construction">Storage and construction</h2>
+<p>An instance has a stable control record for ordinary fields and
+component metadata. Each resizable component has its own stable element
+region, length header, and access to its data stack. Use existing
+representations for ordinary components where possible. The control
+record is an implementation detail, not a fixed-size Goose value that
+can be copied or serialized.</p>
+<p>The number of component stacks is statically determined by the
+instantiated type and owning declarations. Lifetime-disjoint owners can
+reuse stack indices as existing locals do. Globals use dedicated
+component storage. Restore all owned stack watermarks on scope exit,
+including <code>break</code>, <code>continue</code>, ordinary returns,
+and <code>return from</code>. Partial construction must also restore
+acquired storage without publishing an incomplete owner.</p>
+<p>Evaluate field initializers once, in declaration order. Preserve
+checks against observing under-construction storage. A completed owner
+can subsequently be initialized further by functions taking its
+reference. Do not introduce destructors, automatic resource cleanup,
+runtime owner counts, or moves.</p>
+<p>A root owner holding data stacks is subject to the existing
+recursive-cycle restrictions even though its metadata has constant size.
+It cannot be live across a recursive-cycle call that would require
+another set of stacks for each activation. Passing an owner declared
+outside the cycle by reference remains the intended pattern. Capturing
+such a reference in a nested function or a compile-time function value
+follows existing capture and escape rules.</p>
+<h2 id="component-identity-and-lifetime-analysis">Component identity and
+lifetime analysis</h2>
+<p>An enclosing variable's lifetime is not sufficient to identify its
+storage. Represent independently stored components with identities
+equivalent to an owning declaration plus a field path:</p>
+<pre class="text"><code>(state, .tokens)
+(state, .work)</code></pre>
+<p>These share an enclosing lifetime but are different regions. Preserve
+this distinction through field projection, direct and optional owner
+references, branches, rebinding, calls, returned references, globals,
+captures, and stored references. An unknown reference carries a
+conservative set of possible regions; never promote a lifetime bound to
+an exact component identity.</p>
+<p>In particular:</p>
+<ul>
+<li>Growing one field does not interfere with construction in another
+field.</li>
+<li>Shrinking one field does not invalidate references into another
+field, including when their element types are identical.</li>
+<li>Shrinking a field still rejects any live view or holder that can
+refer into that field, across calls and reference aliases.</li>
+<li><code>index_of</code> must establish the particular array, not
+merely the owner. Two arrays of the same element type in one root remain
+distinguishable.</li>
+<li>Whole-array references name their headers; element references name
+the element region. A shrink must preserve the existing
+distinction.</li>
+<li>Self-relative links remain within their permitted contiguous region.
+A common enclosing owner does not permit links between separate stacks
+or from its control record into an array. Use ordinary references for
+those links.</li>
+<li>Read-back, holder/store records, effect summaries, construction
+conflicts, and recursive specialization must propagate component
+identities consistently.</li>
+</ul>
+<p>Current code to audit includes
+<code>RootAlt</code>/<code>Roots</code> in <code>src/ast.h</code>,
+<code>RootedAtReceiver</code>/<code>OneArrayOf</code> in
+<code>src/typecheck_types.h</code>, and <code>SoleResizableIn</code>,
+growth logs and shrink summaries in
+<code>src/typecheck_builtins.h</code>. The present root-set join
+invariant merges entries by owning variable; adding paths requires
+revisiting join/equality/caching laws, not merely adding a field to the
+structure. Existing packed structs can still share one region: a field
+path is not automatically a new region everywhere.</p>
+<p>During investigation, small typecheck probes against the available
+compiler showed that a scalar allocator with separate data and freelist
+arguments accepts a retained reference across reuse. Grouping those
+arguments in a struct of references instead made the checker
+conservatively consider the result capable of pointing into the freelist
+and reject the next allocation. This is evidence of a current precision
+limit, not a test of root structs. Include this pattern, and two
+same-typed owned arrays, in the implementation's acceptance cases.</p>
+<h2 id="code-generation-and-performance">Code generation and
+performance</h2>
+<p>Preserving efficient array access is an explicit requirement. A root
+reference must not become an unexplained permanent extra load inside hot
+loops or disable the existing array optimizations merely because arrays
+are grouped.</p>
+<p>The current backend already has relevant machinery:</p>
+<ul>
+<li><code>ParamFields</code> in <code>src/codegen_frames.h</code> passes
+slices, fat references and pool references as separate C parameters.
+This avoids platform ABI costs and alias-related reloads of aggregate
+argument copies.</li>
+<li>Stack tops are cached in C locals, with synchronization around calls
+and exits (<code>RefTopsOk</code>, <code>HandedStacks</code>,
+<code>SyncReach</code>, <code>Top</code>/<code>TopW</code>).</li>
+<li>BCE's <code>hoistrefs</code> and <code>hoistfields</code> let
+codegen cache array bases and lengths when a loop cannot invalidate or
+rebind them.</li>
+<li>Existing frame objects keep fixed prefixes and a resizable tail's
+header outside the element region.</li>
+</ul>
+<p>A stable control-record reference is a reasonable v1 representation,
+but field projections must expose their normal header/stack information
+to those passes. Track every stack a root argument or captured root can
+reach. Flush and reload cached metadata when a call may mutate it,
+without assuming two parameters are distinct owners. Rebinding, globals,
+callbacks and nonlocal returns require the same care as existing
+references. Preserve observable left-to-right sampling.</p>
+<p>Inspect generated C as well as timings. Compare direct array
+arguments, an ordinary one-tail struct, a root with two arrays, a
+borrowed context, and the existing reusable pool. Cover reads, growth,
+freelist churn, same-typed fields, out-of-line calls, aliasing
+parameters, callbacks, and branches selecting owners. Check that
+base/length reads are hoisted where valid and that unrelated component
+mutations do not force unnecessary reloads or lose bounds-check
+elimination. Exercise O0/O2 and TinyCC/native C; include Windows x64 and
+other CI targets for ABI-sensitive changes. Record reservation count and
+code size as well as runtime.</p>
+<p>Do not promise zero overhead based only on an inlined benchmark. Keep
+existing <code>reusable</code> until a migration has demonstrated
+acceptable behavior and performance. For initial root support, report
+material regressions explicitly and fix basic integration with existing
+optimizations before calling the feature complete.</p>
+<p>Two more ambitious optimizations are deferred:</p>
+<ol type="1">
+<li><strong>Known-owner specialization.</strong> Where whole-program
+provenance proves exactly one possible instance, compile access directly
+to that instance's fields. A unique type is not proof of a unique live
+instance: repeated declarations, recursion, worker instances, aliases
+and reentrancy must be considered.</li>
+<li><strong>Field-by-field lowering.</strong> Treat an owner as
+component locals and pass the required headers, stack handles and field
+addresses as separate arguments. This may recover today's pool calling
+convention. Preserve writes and owner identity; scalar copies of mutable
+fields are not a substitute for shared locations. Materialize a
+descriptor when addressability or reference storage requires one.
+Measure register pressure, argument count and code growth.</li>
+</ol>
+<p>Keep the v1 language contract independent of either ABI strategy so
+that these can be introduced without changing user code.</p>
+<h2 id="serialization-workers-and-other-boundaries">Serialization,
+workers, and other boundaries</h2>
+<p>V1 has no root-level <code>to_bytes</code>, <code>bytes_of</code>,
+<code>from_bytes</code>, raw equality/copying, or public foreign value
+layout. A root owner has no single contiguous image, even when every
+component is individually flat. Do not accidentally accept it through
+existing flatness or fixed-size predicates.</p>
+<p>Serializing or viewing an eligible component, such as
+<code>pool.items</code>, remains an ordinary operation under the
+existing image-safety and lifetime rules. Such an image contains the
+items, not the root's other fields or freelist. Loading it into an
+existing component obeys ordinary assignment/shrink rules. Libraries
+that need a coordinated snapshot can define an explicit data format
+later.</p>
+<p>There are existing reusable-to-worker cases:
+<code>test/threads/thread_globals.goose</code> copies both a reusable
+slot pool and a reusable slice pool from the spawning instance,
+preserving freelist state, and tests a worker spawning another worker.
+Current codegen explicitly copies the freelist beside the data. Preserve
+that behavior for existing <code>reusable</code>.</p>
+<p>Root v1 rejects passing an owning root to <code>thread_spawn</code>
+or a queue, sending a reference to it, and any worker's direct or
+transitive use of a root global which would require implicitly copying
+that owner. Diagnose the reachable global/call path. A root local
+constructed within a worker needs no transfer and is allowed. An
+unrelated root global unused by the worker must not reject the program.
+Existing rules still govern passing eligible components as copied data;
+never transfer descriptor pointers or infer transferability from flat
+contents.</p>
+<p>Worker snapshot support can follow later by reconstructing
+independent storage for every component, copying the relevant metadata,
+and handling only reference forms for which transfer is already legal.
+This is an explicit compatibility gap to resolve before claiming that
+stdlib pools replace every reusable use.</p>
+<p>Formatting and reflection must distinguish inspecting a reference
+from copying or serializing its owner. Retain field access and UFCS;
+support inspection by reference where it does not request a forbidden
+value operation. Do not add array operator overloading merely to
+disguise a container's <code>items</code> field.</p>
+<h2 id="separate-follow-up-reusable-pools-in-the-stdlib">Separate
+follow-up: reusable pools in the stdlib</h2>
+<p>After root structs work as library state, evaluate:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>root <span class="kw">struct</span> slot_pool<span class="op">&lt;</span><span class="dt">T</span><span class="op">&gt;</span> {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    items<span class="op">:</span> <span class="dt">T</span>[<span class="op">&gt;..</span>] <span class="op">=</span> []<span class="op">,</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    free_slots<span class="op">:</span> <span class="dt">i64</span>[<span class="op">&gt;..&lt;</span>] <span class="op">=</span> []</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> pool <span class="op">=</span> slot_pool<span class="op">&lt;</span><span class="dt">i64</span><span class="op">&gt;</span> { <span class="op">..</span> }<span class="op">;</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> r <span class="op">.=</span> pool<span class="op">.</span><span class="bu">alloc_ref</span>(<span class="dv">42</span>)<span class="op">;</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>pool<span class="op">.</span><span class="bu">free</span>(pool<span class="op">.</span>items<span class="op">.</span><span class="bu">index_of</span>(r))<span class="op">;</span></span></code></pre></div>
+<p>This is proposed library usage, not a promise that root support alone
+makes all operations implementable. Slot pools require fixed-size
+elements. A slice pool has its items and a separate structure for free
+spans. Keep the actual current algorithm as the migration baseline:
+<code>src/runtime/runtime_impl.h</code> uses an augmented B+ tree, not a
+linear freelist. Preserve first-fit placement, coalescing, tail reuse
+and overlap-safe relocation before comparing alternatives.</p>
+<p>Preserve the existing safety contract: all published elements remain
+valid typed values, a free merely marks storage reusable, and a stale
+reference may observe a replacement value. Double frees are logical
+errors unless a library adds detection. Freeing does not promise
+decommit, reservation release, or destruction. Slice relocation does not
+retarget existing views; fragmentation, high-water storage and copying
+costs remain.</p>
+<p>Expose <code>items</code> explicitly for indexing, slicing and
+ordinary array algorithms. Its length is the high-water length, not a
+live-slot count. Live-only iteration requires additional metadata or
+work. Coordinated reset must update both data and metadata and satisfy
+the data array's normal shrink rules. Goose currently lacks field
+privacy: internal-field conventions and checked indexing preserve memory
+safety, but arbitrary user edits may violate pool invariants. Privacy is
+a separate possible improvement, not a prerequisite for root
+structs.</p>
+<p>The migration needs the following additional work:</p>
+<h3 id="global-component-paths">Global component paths</h3>
+<p>Allow pool-relative references and index/bound types to name a
+statically resolved global component, for example
+<code>Node&amp;&lt;u32 in nodes.items&gt;</code> and
+<code>u32 in nodes.items</code>. Resolve a global declaration plus field
+path, not arbitrary expressions or rebindable references. Preserve width
+checks, exact-root rules, type identity and the existing no-shrink rule
+for index-typed arrays. Do not silently interpret <code>in nodes</code>
+as whichever field looks like the data array.</p>
+<p>This extension can follow initial root support; generic root owners
+do not require a new global-index notation to be useful.</p>
+<h3 id="destination-aware-library-construction">Destination-aware
+library construction</h3>
+<p><code>EmitAlloc</code> currently selects a slot before constructing
+literals containing relative references there. An ordinary
+<code>value: T</code> parameter has already received its value
+elsewhere. Probes confirmed that a self-relative node linking to an
+existing node typechecks with built-in <code>alloc_ref</code>, but fails
+through both an ordinary value parameter and a current trailing builder
+block.</p>
+<p>Keep <code>alloc_ref(value)</code> for normally copyable values and
+investigate a builder API such as
+<code>pool.alloc_with() { Node { value: 2, next: first } }</code>.
+Extend the existing construction-destination machinery so a
+function-value initializer can construct directly into the selected
+existing slot or append destination. The existing trailing block
+mechanism alone does not supply this capability.</p>
+<p>Preserve <code>self</code>, root checks, evaluation once and in
+order, construction conflict checking, lexical/nonlocal returns, and
+publication of a fresh slot only once it contains a valid value. Do not
+expose uninitialized slots or silently require every slot element to
+have a default. Use <code>test/storage/alloc_half_built.goose</code> as
+a compatibility baseline, including initializer side effects on the
+freelist. This is a general construction feature, not a new
+pool-specific privilege.</p>
+<h3 id="checked-slice-position">Checked slice position</h3>
+<p>Current <code>free_slice</code>/<code>realloc_slice</code> can check
+alignment and complete containment at runtime when provenance cannot
+prove their input slice belongs to the pool. <code>index_of</code>
+currently requires stronger static provenance. Expose a general checked
+slice-to-array position operation (working name
+<code>range_index</code>): elide checks when proven, reject known
+foreign storage, otherwise check alignment and the full range. Specify
+empty-slice behavior explicitly. No library pointer arithmetic or
+unchecked index fabrication is needed.</p>
+<p>Preserve all-build checks for invalid frees, negative/overflowing
+allocation lengths and element bounds, with validation before metadata
+changes where the current contract requires it. Slice allocations
+initialize every added element; relocating slices retain the restriction
+on self-relative element types. Expose any needed length validation as a
+general array capability rather than copying runtime constants into the
+library.</p>
+<h3 id="policy-and-compatibility">Policy and compatibility</h3>
+<p>Library variants may add occupancy checks, generations, different
+span policies, or logical freelist counts over grow-only metadata
+arrays. Generational handles are an optional API and cannot protect
+escaped raw references. See <a
+href="https://docs.rs/slotmap/latest/slotmap/">slotmap's versioned
+keys</a> for a useful comparison, not a replacement for Goose's existing
+reuse semantics.</p>
+<p>Retain <code>reusable</code> and <code>reusable[]</code> while
+measuring and checking the alternative. Only decide on
+deprecation/removal after construction, relative/index types, reference
+behavior, worker compatibility, diagnostics and performance have a
+reviewed migration path. Root structs can ship independently of that
+decision.</p>
+<h2 id="v2-candidates">V2 candidates</h2>
+<ul>
+<li><strong>Nested root owners.</strong> Permit a root field inside
+another root, recursively flattening its finite region requirements.
+Define initialization, projection, lifetime identities and diagnostics
+before relaxing placement. Ordinary packed structs still cannot silently
+acquire this layout.</li>
+<li><strong>Small constant arrays of root owners.</strong> Explore
+<code>slot_pool&lt;T&gt;[N]</code> for a compile-time constant N. The
+stack requirement is statically multiplied by N; runtime indexing
+selects an owner descriptor/region set. Define permitted enclosing
+positions, whole-array references, dynamic-index alias joins,
+initialization, iteration, N=0, and practical reservation limits. This
+does not imply resizable or runtime-length arrays of owners. Do not
+choose an arbitrary small-N language limit before evaluating costs.</li>
+<li><strong>Known-owner specialization and field-by-field call
+lowering.</strong> As above; preserve addressability and alias semantics
+while minimizing indirections.</li>
+<li><strong>Owning factory results.</strong> Construct directly into
+several caller-provided destinations; no descriptor copy masquerading as
+a move. General copying, reassignment and moving need separate
+semantics.</li>
+<li><strong>Worker snapshots and coordinated serialization.</strong>
+Reconstruct independent components with an explicit format/lifecycle
+contract; never memcpy an owner.</li>
+</ul>
+<h2 id="implementation-sequence-and-acceptance">Implementation sequence
+and acceptance</h2>
+<ol type="1">
+<li><strong>Frontend foundation.</strong> Parse and round-trip the
+contextual modifier; carry it on struct metadata through generic
+instantiation and AST cloning. Add syntax coverage and precise errors.
+During incremental development, reject semantic uses explicitly until
+their storage support exists: do not allow a root to fall through
+ordinary fixed/resizable codegen.</li>
+<li><strong>Placement, storage classification and provenance.</strong>
+Introduce an explicit owning-layout distinction rather than treating the
+fixed metadata as a fixed Goose value. Audit
+size/flatness/copy/containment queries. Implement component identities
+and their join, specialization and effect-summary behavior.</li>
+<li><strong>Ownership and codegen.</strong> Allocate and restore all
+component stacks; support literals/defaults, locals/globals, references,
+field projection, aliases, captures and calls. Integrate top caches,
+call reachability and view hoisting. Reject unsupported transfers,
+copies, nested owners and temporaries before codegen. Update spec,
+reference, implementation notes and editor support when the feature is
+usable, without advertising scaffolding as working support.</li>
+<li><strong>Library-state acceptance.</strong> Demonstrate
+one-declaration multi-array state used by generic functions, with
+references retained across unrelated field operations. Test actual
+runtime behavior and generated code, not just parsing. This milestone
+does not depend on a reusable replacement.</li>
+<li><strong>Pool migration experiment.</strong> Port copyable-element
+slot allocation, compare code and timings, then address the separate
+construction/path/slice features above and evaluate slice pools and
+existing worker behavior.</li>
+</ol>
+<p>Required focused tests include independent same-typed fields; shrink
+rejection for the correct component and acceptance for unrelated
+components; stored, optional, returned and branch-selected owner
+references; const/writability; generic placement failures; recursion and
+nonlocal exits; partial initialization; component serialization;
+forbidden root serialization/FFI/thread use; allowed worker-local
+owners; and transitive worker-global rejection. Exercise aliases that
+refer to the same owner as well as distinct owners.</p>
+<p>Run the appropriate focused tests during each implementation slice,
+then the repository's baseline compiler/runtime suite for the complete
+feature. Extend <code>test/compiler_roots.cpp</code> when changing
+root-set laws. Keep performance probes repeatable and compare equivalent
+algorithms; do not conflate a different freelist policy with
+root-reference overhead.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/root_structs.md"><code>docs/design/root_structs.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

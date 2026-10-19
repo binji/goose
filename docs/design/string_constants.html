@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>String constants, writability, and threads · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#string-constants-writability-and-threads"
+id="toc-string-constants-writability-and-threads">String constants,
+writability, and threads</a>
+<ul>
+<li><a href="#1-what-could-be-written-before-the-fix"
+id="toc-1-what-could-be-written-before-the-fix">1. What could be written
+before the fix</a></li>
+<li><a href="#2-the-options" id="toc-2-the-options">2. The options</a>
+<ul>
+<li><a
+href="#option-1--a-literal-used-as-a-slice-is-a-temporary-on-a-data-stack"
+id="toc-option-1--a-literal-used-as-a-slice-is-a-temporary-on-a-data-stack">Option
+1 — a literal used as a slice is a temporary on a data stack</a></li>
+<li><a
+href="#option-2a--a-u8-read-back-is-never-writable-constants-are-never-stored"
+id="toc-option-2a--a-u8-read-back-is-never-writable-constants-are-never-stored">Option
+2a — a <code>u8</code> read-back is never writable; constants are never
+stored</a></li>
+<li><a href="#option-2b--track-may-point-at-static-data-through-storage"
+id="toc-option-2b--track-may-point-at-static-data-through-storage">Option
+2b — track "may point at static data" through storage</a></li>
+<li><a href="#option-3--static-data-is-per-program-instance"
+id="toc-option-3--static-data-is-per-program-instance">Option 3 — static
+data is per program instance</a></li>
+<li><a href="#option-4--const-in-the-type-mutable-by-default"
+id="toc-option-4--const-in-the-type-mutable-by-default">Option 4 —
+<code>const</code> in the type, mutable by default</a></li>
+<li><a href="#others-considered" id="toc-others-considered">Others
+considered</a></li>
+</ul></li>
+<li><a href="#3-compatibility-and-cost-summary"
+id="toc-3-compatibility-and-cost-summary">3. Compatibility and cost
+summary</a></li>
+<li><a href="#4-recommendation" id="toc-4-recommendation">4.
+Recommendation</a></li>
+<li><a href="#5-measurements" id="toc-5-measurements">5.
+Measurements</a></li>
+<li><a href="#6-globals-were-c-statics"
+id="toc-6-globals-were-c-statics">6. Globals were C statics</a></li>
+<li><a href="#7-side-findings" id="toc-7-side-findings">7. Side
+findings</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="string-constants-writability-and-threads">String constants,
+writability, and threads</h1>
+<p>Before the changes described here, static data consisted of string
+literals and <code>let</code> globals that workers could read. Storing a
+reference and reading it back could make read-only data writable, a
+behavior called <em>laundering</em> in the former §9.5. With workers,
+this allowed shared mutable memory. This note records the affected paths
+and compares fixes measured on temporary implementation branches:</p>
+<ol type="1">
+<li>a literal used as a slice is a hidden local on a data stack; 2a. a
+<code>u8</code> read-back is never writable, and constants are never
+stored; 2b. "may point at static data" tracked through storage (the
+<code>codex/readonly-literals</code> experiment, repaired);</li>
+<li>static data is per program instance, a worker getting its own
+copy;</li>
+<li>a user-level <code>const</code> on any type, literals typed
+<code>const u8[:]</code>, <code>let</code> rebind-only, and no
+laundering.</li>
+</ol>
+<p>Option 4 is what was adopted: it is the two commits preceding this
+note
+(<code>Add const types; let is rebind-only; literals are const u8[:]</code>
+and <code>Give every program instance its own globals</code>, §6). The
+other branches were removed once the decision was made. Every one of
+them passed the full test suite with its own fixtures and typechecked
+every benchmark; the samples and the numbers are in §5.</p>
+<h2 id="1-what-could-be-written-before-the-fix">1. What could be written
+before the fix</h2>
+<p>The original reproducer:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> <span class="dt">Box</span> { s<span class="op">:</span> <span class="dt">u8</span>[<span class="op">:</span>] }</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">thread_fn</span> <span class="fu">worker</span>() {</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> box <span class="op">=</span> <span class="dt">Box</span> { s<span class="op">:</span> <span class="st">&quot;abc&quot;</span> }<span class="op">;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    box<span class="op">.</span>s[<span class="dv">0</span>] <span class="op">=</span> <span class="dv">88</span><span class="op">;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">main</span>() {</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">&quot;abc&quot;</span>)<span class="op">;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">thread_wait</span>(<span class="bu">thread_spawn</span>(worker))<span class="op">;</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">&quot;abc&quot;</span>)<span class="op">;</span>       <span class="co">// Xbc</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>"abc"</code> is a <code>u8[:]</code> into
+<code>static uint8_t gs_str0[3]</code>, <code>Box { s: "abc" }</code>
+stores it, <code>box.s</code> reads it back, and the read-back is
+writable by design: the <em>path</em> is writable (<code>box</code> is a
+<code>var</code>, <code>s</code> is not a <code>let</code> field) and
+the slice's own provenance is gone. The write lands in the C static,
+which every thread shares.</p>
+<p>Tests of the compiler before the fix found additional affected
+paths:</p>
+<ul>
+<li>Every read-back path launders: a field (<code>box.s[0]</code>), an
+element (<code>views[0][0]</code>), a <code>for x in views</code> copy,
+a slice behind a <em>reference</em> to an element
+(<code>for &amp;x in views { x[0] = … }</code>,
+<code>&amp;views[0]</code>, the reference <code>push</code> returns), a
+<code>match … &amp;l</code> binder, a value returned out of a container
+through a reference parameter
+(<code>fn view(b: Box&amp;) -&gt; u8[:] { b.s }</code>).</li>
+<li><strong><code>let</code> globals have the same hole.</strong> A
+thread may read any <code>let</code> global of flat fixed type (§11.2),
+on the premise that it is never written. But <code>&amp;W</code> for
+<code>let W = 78;</code> stored into a reference field and read back
+writes <code>W</code> — from a worker too — and <code>TABLE[..]</code>
+for <code>let TABLE: u8[3] = "abc"</code> writes the constant's static
+storage. So the class of memory to protect is <em>static data plus every
+thread-visible constant</em>, not literals alone.</li>
+<li>What does <em>not</em> launder: a direct write through a literal or
+through a <code>var</code> slice variable holding one
+(<code>s[0] = 1</code> after <code>let s = "abc"</code>), a
+<code>let</code> variable's field path, a by-value parameter's field
+path, and a write through a slice parameter given a literal
+(<code>zap("abc")</code>), which provenance already rejects.</li>
+<li>The <code>[len][bytes]</code> image a literal takes as a
+<code>u8[]</code> <em>value</em> (an inlined <code>return "abc"</code>
+as <code>u8[]</code>) is also static, but a slice of it is a slice of a
+temporary, which cannot be stored or returned, so it cannot be
+laundered.</li>
+<li>Per-thread copies of anything only matter for what a thread can
+<em>reach</em>: slices, structs holding slices and every
+<code>var</code> global are already out of a thread program's reach, so
+a <code>let GREETING = "hello";</code> global is not a concern (a worker
+cannot name it).</li>
+</ul>
+<h2 id="2-the-options">2. The options</h2>
+<h3
+id="option-1--a-literal-used-as-a-slice-is-a-temporary-on-a-data-stack">Option
+1 — a literal used as a slice is a temporary on a data stack</h3>
+<p><strong>Rule.</strong> A literal is a <code>u8</code> array value:
+copied into any array type as today, and used as a <code>u8[:]</code> it
+denotes a hidden <code>let u8[]</code> local of the innermost scope,
+built from the static bytes where the literal is evaluated, exactly as
+if <code>let s: u8[] = "…";</code> stood there. Consumers that only read
+the literal (<code>print</code>, <code>format</code>,
+<code>abort</code>, <code>==</code>, <code>append</code>,
+<code>push</code>, array construction) keep reading the static bytes and
+build nothing. In a global initializer there is no scope to own the
+local and only main can reach a global's slice, so it stays static
+there.</p>
+<p>This is what "string literal = array literal" means once the array
+has to live somewhere. It is the only option that makes the language's
+<em>model</em> complete (no memory outside the stacks), and it needs no
+provenance machinery at all: the hidden local is an ordinary local, so a
+slice of it obeys every existing lifetime rule.</p>
+<p><strong>Language impact.</strong> The lifetime rules restrict
+existing uses. A slice of a local cannot be returned or stored outside
+its scope, so these no longer compile:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode goose"><code class="sourceCode goose"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> <span class="fu">name</span>(s<span class="op">:</span> <span class="dt">Shape</span>) <span class="op">-&gt;</span> <span class="dt">u8</span>[<span class="op">:</span>] { <span class="kw">match</span> s { <span class="dt">Circle</span> c <span class="op">=&gt;</span> <span class="st">&quot;circle&quot;</span><span class="op">,</span> … } }   <span class="co">// 05_shapes, 19_vm</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">let</span> verdict <span class="op">=</span> <span class="kw">block</span> { <span class="kw">guard</span> p<span class="op">.</span>alive <span class="kw">else</span> { <span class="kw">break</span> <span class="st">&quot;gone&quot;</span><span class="op">;</span> } … }<span class="op">;</span>      <span class="co">// 01_tour</span></span></code></pre></div>
+<p>Three of the 25 samples fail (<code>01_tour</code>,
+<code>05_shapes</code>, <code>19_vm</code>), all on "returning a slice
+of a literal" or "storing one outside its block". The fix is to return
+<code>u8[]</code> (a copy at the destination) or
+<code>u8[&gt;..]</code>, or to move the literal out; none of the
+benchmarks or tests needed any. Every function returning a
+<code>u8[:]</code> name for an enum — a common idiom — is affected.</p>
+<p><strong>Damage, runtime.</strong> One memcpy of the bytes plus a
+stack bump per evaluation that needs a slice, and a save/restore of the
+literal stack per function entry and per loop iteration. The manifest
+benchmarks do not move: their hot literals are equality operands and
+<code>append</code>/<code>format</code> arguments, which take the static
+path. A micro-benchmark that passes a literal to a user function, stores
+one in a struct literal and binds one to a <code>let</code>, 20M times,
+is <strong>+40%</strong> (33.6 → 47.3 ms). The cost is small per use,
+but applies at every call boundary that takes a slice.</p>
+<p><strong>Implementation</strong>: the typechecker gives the literal a
+synthetic <code>VarDef</code> at the current depth (so
+<code>while</code> conditions had to move inside the loop scope, where
+codegen already puts them); codegen keeps one literal stack per function
+whose top is saved on function entry and on every loop iteration and
+restored on their exits. That last point is what makes it sound: a
+per-literal save would be restored on a <code>continue</code> taken
+before the literal was reached, reading an unset base — which is a
+<strong>pre-existing codegen bug</strong> for ordinary locals, see §6.
+Recursion works because each activation's literal stack is one more
+<code>gs_sp + k</code> slot, which is the spec's "temporaries may
+consume slots proportional to depth" (§7.8).</p>
+<p>Variants considered: (a) treat the literal as an rvalue with a
+temporary's root, which would reject <code>Box { s: "abc" }</code>
+outright — far more damage; (b) hoist all of a function's literals to
+its entry, which pays for every literal on every call including the cold
+<code>abort("…")</code> paths; (c) a statement-scoped temporary, which
+is what call results are today and would leave
+<code>let s = "abc"; use(s);</code> dangling (the checker currently
+allows binding a slice of a statement temporary, §6).</p>
+<p>The branch also carries the no-store rule for constants from option
+2a, since the hidden local does nothing for
+<code>let W = 78;</code>.</p>
+<h3
+id="option-2a--a-u8-read-back-is-never-writable-constants-are-never-stored">Option
+2a — a <code>u8</code> read-back is never writable; constants are never
+stored</h3>
+<p><strong>Rules.</strong> Two, with no analysis behind either:</p>
+<ol type="1">
+<li>A reference or slice read out of storage whose pointee type is
+<code>u8</code> is never writable. Which container it came out of says
+nothing about what was stored there (that is what laundering means), but
+the pointee type does: a string literal could have been stored there,
+and static data is shared. Every other pointee type launders as before.
+The writable path through storage is a reference to the array itself
+(<code>u8[&gt;..]&amp;</code>, <code>u8[..]&amp;</code>), which no
+literal can be.</li>
+<li>A reference or slice into a thread-visible constant (a
+<code>let</code> global of flat fixed type) lives in variables, is
+passed down or returned, and is never stored into a field, element or
+global — the rule references into a grow-shrink array already follow
+(§5.2), for the same reason: a store is what a read-back could
+launder.</li>
+</ol>
+<p>Rule 2 exists because rule 1 cannot be extended to constants by type:
+the first attempt did that, and the aggregate test file failed on
+<code>gheld.r = 7</code> through an <code>i64&amp;</code> field, because
+<em>some</em> file in the program declares a <code>let</code> of type
+<code>i64</code>. Any program with <code>let W = 78;</code> would lose
+writes through every stored <code>i64&amp;</code>. Keeping the constants
+out of storage instead is local, exact, and costs nothing in the
+corpus.</p>
+<p><strong>Damage.</strong> Zero in the corpus: all tests, all samples,
+all benchmarks. The language change is visible, though: a
+<code>u8[:]</code> stored in a struct or an array is read-only through
+that path, and a design like
+<code>struct Cursor { buf: u8[:], pos: i64 }</code> that writes
+<code>c.buf[c.pos]</code> must hold a <code>u8[&gt;..]&amp;</code>
+instead. Since <code>u8[:]</code> is the read idiom by convention
+(§3.10) this is a small loss, and the diagnostic says why ("it was read
+out of storage and may point at a string literal, which every thread
+shares").</p>
+<p><strong>Implementation</strong>: under a hundred lines in the checker
+— a predicate on the pointee type consulted at the three places a
+read-back is granted writability (<code>ContainerRead</code>,
+<code>PointeeWritable</code>, <code>ReadBackLVal</code>), the
+<code>for</code> copy binding, and the return mapping through a
+parameter (which used to take the argument's writability wholesale); the
+slice behind a reference to an element now counts as read out of
+storage; plus the store rule for constants in <code>FitsAt</code>. A
+<code>maystatic</code> provenance bit carries the reason into the
+diagnostic.</p>
+<h3
+id="option-2b--track-may-point-at-static-data-through-storage">Option 2b
+— track "may point at static data" through storage</h3>
+<p>This was the <code>codex/readonly-literals</code> experiment, rebased
+and repaired, and requires analysis across the program: every
+<code>Prov</code> gains two pointers into a monotone origin graph
+(<code>literal</code>: the pointee may be static; <code>contents</code>:
+the references inside this value may be), every store, call, return,
+default value, iteration, <code>break</code> value and match binding
+joins nodes, and after the whole program is checked the graph is
+saturated and every recorded write through a node that reaches a static
+origin is an error. Order-insensitive, so later stores, loop back edges
+and later call sites of a shared specialization all count — which the
+fixtures cover — at the price of rejecting a write whose particular
+execution would precede the literal store.</p>
+<p><strong>What it missed.</strong> The slice behind a reference to an
+element was not a read-back to it:
+<code>for &amp;x in views { x[0] = 88; }</code>,
+<code>let r = &amp;views[0]; r[1] = 89;</code> and
+<code>let e .= views.push("abc"); e[0] = 88;</code> all compiled and
+wrote the static. The rebased branch fixes that (the same one-line
+change option 2a needed) and adds the three fixtures. Everything else
+probed here it caught, including the constant-global cases and the
+return-through-parameter case.</p>
+<p><strong>Damage.</strong> Zero in the corpus, and more precise than
+2a: a <code>u8[:]</code> field stays writable in a program that never
+stores a literal into that container. The cost is some 300 lines across
+the checker, a fourth provenance dimension next to roots, exactness and
+writability, and diagnostics that say a write "may point into immutable
+static storage" without being able to name the store that made it
+so.</p>
+<h3 id="option-3--static-data-is-per-program-instance">Option 3 — static
+data is per program instance</h3>
+<p><strong>Rule.</strong> Static data belongs to a program instance
+(§1.2). The main program has one copy; each worker (§11.2) starts from
+its own copy, taken from the state the global initializers left. A write
+laundered through storage stays in the instance that made it. Nothing
+else changes: no new errors, no provenance, and the single-threaded
+const-cast is exactly what it was.</p>
+<p>This is the semantics the spec already implies — a
+<code>thread_fn</code> "is compiled as a separate program" — applied to
+the one thing those programs still shared.</p>
+<p><strong>Damage.</strong> None in the language: every test, sample and
+benchmark compiles and runs unchanged. Runtime: a program that spawns no
+worker keeps the plain C statics, so it is byte-for-byte what it was.
+One that does gathers the literals and thread-visible constants into a
+struct, main's instance being the struct itself; the snapshot is one
+<code>malloc</code> + <code>memcpy</code> at startup, each worker copies
+it at spawn (kilobytes, next to reserving its stack block), and every
+access goes through the thread-local base <code>gs_st</code> — the same
+addressing every data-stack access already uses through
+<code>gs_stks</code>. Forcing the struct form on a single-threaded
+program (<code>--per-program-statics</code>) is the worst case for that
+indirection: the literal micro-benchmark and the manifest benchmarks are
+within noise of the baseline (§5), and the threaded Mandelbrot sample,
+which reads three constants in its inner loop, times the same.</p>
+<p><strong>Implementation</strong>: about 150 lines, all in codegen and
+the runtime; the typechecker only settles which globals are
+thread-visible constants. Constants with runtime initializers are
+initialized into main's copy by <code>gs_init_globals</code> before the
+snapshot, so a worker sees what main computed.</p>
+<h3 id="option-4--const-in-the-type-mutable-by-default">Option 4 —
+<code>const</code> in the type, mutable by default</h3>
+<p><strong>Rule.</strong> Any type may be qualified <code>const</code>:
+<code>const i64[3]</code> is a value whose contents cannot be written
+into, and <code>const T&amp;</code> / <code>const T[:]</code> are a
+reference and a slice through which the pointee, or the elements, cannot
+be — shallow (a reference read out of a <code>const Box&amp;</code>'s
+field is as writable as the field's type says). A string literal is a
+<code>const u8[:]</code>. <code>let</code> is orthogonal to all of this:
+it keeps a binding from being reassigned and says nothing about contents
+(<code>let xs = [1, 2, 3]; xs[0] = 9;</code> and a write through
+<code>&amp;xs</code> are fine), <code>const x = e;</code> is the sugar
+for <code>let x: const T</code>, and <code>const f: T</code> for
+<code>let f: const T</code> in a struct. Nothing else is annotated: a
+parameter or result declared <code>u8[:]</code> is <em>generic over
+constness</em> — checked read-only in the instantiation that gets
+read-only data, which is exactly what provenance already did — and
+<code>const u8[:]</code> on a parameter documents that the function only
+reads. The one place <code>const</code> is <em>required</em> is a
+<strong>slot</strong>: a field, an element, a global, an annotated
+variable or an assignment target holds a read-only reference or slice
+only if its type says <code>const</code>. So what a slot yields is
+exactly as writable as its type says, and the laundering rule is gone: a
+<code>u8[:]</code> field can only ever have been given a writable slice.
+Adding <code>const</code> is implicit, dropping it never is, and an
+<code>extern fn</code>'s parameters are exact. A by-value
+<code>for</code> or <code>match</code> binding is a copy and is not
+written (the write would go nowhere), which is the one place
+<code>let</code>'s old strictness was worth keeping as a rule of its
+own.</p>
+<p>This differs from 2b in kind, not degree: 2b infers what a container
+may hold and forbids the write; 4 has the programmer say what the
+container holds and forbids the store. The check is local and exact, the
+diagnostic names the slot and the fix ("declare the slot const"), the
+model loses a rule (laundering) instead of gaining an exception, and the
+same feature lets a struct hold a read-only view of anything — a
+<code>let</code> buffer, a <code>bytes_of</code> view — which today is
+only possible by laundering. The same rule protects constants:
+<code>&amp;W</code> is a <code>const i64&amp;</code>, which no
+<code>i64&amp;</code> slot can hold.</p>
+<p><strong>Damage, language.</strong> Annotation churn at slots that
+hold read-only data, and <code>const</code> where a global must be a
+constant. In the corpus: 11 sites outside the standard library — three
+<code>extern fn</code> declarations taking a literal
+(<code>s: const u8[:]</code>), a <code>let s: const u8[:] = ""</code>,
+two <code>dictionary&lt;const u8[:], …&gt;</code> keyed by literals, a
+<code>dictionary&lt;key, const u8[:]&gt;</code> holding literal values,
+a struct field <code>word: const u8[:]</code> filled from that
+dictionary's keys, the mandelbrot sample's three
+<code>const W = 78;</code> globals its worker reads (a <code>let</code>
+global is no longer a constant a worker may read, since
+<code>&amp;W</code> is a writable <code>i64&amp;</code>), and a
+<code>const N = 4;</code> used as an array size — plus the standard
+library's eight <code>os</code> extern parameters and
+<code>split</code>, whose parts become <code>const u8[:]</code> so one
+function serves literals and buffers alike. No benchmark changed. The
+shape of the churn is the C++ one: generic containers keyed by views
+need the view type spelled <code>const</code> (a
+<code>dictionary&lt;u8[:], V&gt;</code> given a literal key is an error
+asking for <code>dictionary&lt;const u8[:], V&gt;</code>), and a
+function that <em>stores</em> views of its input must commit to a
+constness for the container, since the container's element type is a
+slot. Three details required care during implementation:
+<code>null</code> and <code>default&lt;T&gt;()</code> are "empty" values
+that must count as writable or they refuse every non-<code>const</code>
+slot; a load of a <code>const</code> value is a plain copy while a
+reference to one is a <code>const T&amp;</code>, so the qualifier has to
+move from the storage type to the reference type at every
+<code>&amp;</code>; and the flag for the <code>const</code> binding form
+has to survive the clones the checker and the inliner make of every
+declaration, or the contents silently become writable — the test that
+caught it is <code>const_value_write</code>. The first version of the
+branch had <code>let</code> make derived references <code>const</code>,
+which reproduced the old transitive rule; the second commit takes that
+out, which is what made the mandelbrot constants and the array size need
+<code>const</code>.</p>
+<p><strong>Damage, runtime.</strong> None; the generated C is the
+baseline's, with the literal data now emitted <code>static const</code>
+(the checker admits no write to it, so a hole in the analysis would
+fault rather than corrupt).</p>
+<p><strong>Implementation</strong> (the first of the two commits): about
+250 lines: a <code>cq</code> bit on every type, in type equality,
+substitution and the dumper (<code>const</code> binds to the first
+<code>&amp;</code> or <code>[:]</code> after the base type, else to the
+whole type; <code>(const i64[3])&amp;</code> and
+<code>const (u8[:])&amp;</code> parenthesize), the store rule at slots
+(a scoped flag set by field, element, assignment and
+annotated-declaration checks and cleared by argument and return checks),
+const-adding coercions in <code>FitsAt</code> and branch unification,
+constness on read-back, parameter and result constness, the
+<code>extern</code> check, and — in place of the
+transitive-<code>let</code> rule, which is deleted — a
+<code>letbound</code> mark on the last step of an lvalue path (the only
+thing <code>let</code> now forbids), contents writability read from the
+type at each path step, and the copy-binding rule for
+<code>for</code>/<code>match</code>. Narrowing a <code>const T?</code>,
+loading a relative reference, and resolving a <code>const Alias</code>
+all had to keep the qualifier.</p>
+<h3 id="others-considered">Others considered</h3>
+<ul>
+<li><strong>Read-only pages.</strong> Emit the literal data
+<code>const</code> (or <code>mprotect</code> it) so a laundered write
+faults. Zero cost and one word of change, but it turns a compile-time
+question into a crash, and it does nothing for constants with runtime
+initializers. Worth doing <em>on top of</em> 2a or 2b as a check that
+the analysis has no holes, not as the fix.</li>
+<li><strong>Copy on store.</strong> Materialize a literal only where a
+slice of it is stored into a container. The slice being stored may be a
+variable bound to one of several literals, so the copy would be a
+runtime memcpy of an arbitrary slice: option 1's cost at option 1's
+lifetime rules, with a stranger rule.</li>
+<li><strong>No laundering at all.</strong> Track writability through
+storage precisely for every provenance, not just static. It is 2b
+generalized, and it rejects the documented const-cast (<code>let</code>
+locals laundered through a struct) that the spec chose
+deliberately.</li>
+<li><strong>Threads may not read <code>let</code> globals.</strong>
+Closes the constant half without any of the above, but the mandelbrot
+sample's <code>let W = 78;</code> in a worker is exactly the use the
+exception exists for.</li>
+</ul>
+<h2 id="3-compatibility-and-cost-summary">3. Compatibility and cost
+summary</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>tests (280)</th>
+<th>samples (25)</th>
+<th>benchmarks</th>
+<th>spec change</th>
+<th>runtime cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 stack temporaries</td>
+<td>all pass</td>
+<td><strong>3 fail</strong> (return/store of a literal slice)</td>
+<td>all compile</td>
+<td>literals become locals; §3.7 rewritten</td>
+<td>memcpy per slice use; +39% on the literal micro-benchmark,
+benchmarks unchanged</td>
+</tr>
+<tr>
+<td>2a read-back by type</td>
+<td>all pass</td>
+<td>all pass</td>
+<td>all compile</td>
+<td>one rule each for <code>u8</code> read-backs and constants</td>
+<td>none</td>
+</tr>
+<tr>
+<td>2b origin graph</td>
+<td>all pass</td>
+<td>all pass</td>
+<td>all compile</td>
+<td>laundering has an exception, described as an analysis</td>
+<td>none</td>
+</tr>
+<tr>
+<td>3 per-program static</td>
+<td>all pass</td>
+<td>all pass</td>
+<td>all compile</td>
+<td>static data is per program instance</td>
+<td>none without workers; snapshot + per-worker copy + TLS base with
+them, unmeasurable</td>
+</tr>
+<tr>
+<td>4 <code>const</code> types</td>
+<td>all pass after 8 annotations</td>
+<td>all pass after 4 (an extern, three constants)</td>
+<td>all compile</td>
+<td><code>const</code> on any type; <code>let</code> is rebind-only;
+slots must say <code>const</code>; laundering removed</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-recommendation">4. Recommendation</h2>
+<p>Option 1 is the one to rule out. It is the cleanest <em>model</em> —
+no memory outside the stacks — but the model's cleanliness is paid for
+by the user: every function that returns a name as <code>u8[:]</code>
+stops compiling, every slice parameter given a literal costs a copy, and
+the implementation is not smaller than the others (a new stack per
+function with its own scoping, and it still needs option 2a's rule for
+constants). The spec's own line is that the language exists to avoid
+exactly this kind of hidden copy.</p>
+<p>Option 2b works and is the most precise, but it is the "complex
+analysis" the discussion anticipated, in some 300 lines that touch every
+place provenance flows, and its diagnostics cannot say which store
+poisoned the container. The three paths missed by the first
+implementation also suggest a substantial maintenance burden alongside
+the existing root analysis.</p>
+<p>Option 4 is preferable for the language design. It is the only option
+that <em>removes</em> a rule: the laundering clause and its "const-cast"
+loophole go, writability becomes a property of a type you can read off a
+declaration, and the same feature supports other uses — read-only views
+in data structures, <code>extern</code> declarations that say what the C
+side may do, a <code>split</code> that serves literals. Its costs are
+real but bounded and predictable: <code>const</code> at slots that hold
+read-only data, which in the corpus meant nine sites and the
+<code>os</code> externs, and the C++-shaped consequence that a generic
+container keyed by views must be told <code>const u8[:]</code>. What it
+is <em>not</em> is a runtime fix for the thread race by itself if the
+annotation is ever wrong — but it cannot be wrong, because dropping
+<code>const</code> is never implicit; static data is provably unwritten
+and is emitted as C <code>const</code>.</p>
+<p>Against 3: 3 costs nothing in the language and nothing at runtime
+without workers, and it keeps laundering, which the spec chose
+deliberately. If laundering is worth keeping, 3 is the fix. If the
+const-cast loophole was a compromise rather than a feature — the
+discussion that produced §9.5 says the aim was to preserve
+const-correctness while limiting annotations, and 4 keeps that property
+because only slots require annotations — then 4 is the better language,
+and 3 becomes unnecessary for literals.</p>
+<p>Between the other two, the real choice is between <strong>2a</strong>
+and <strong>3</strong>.</p>
+<ul>
+<li>2a is a language rule with no machinery: "a <code>u8</code> slice
+you read out of storage is read-only; a reference into a constant is
+never stored." It costs nothing at runtime, it costs nothing in the
+corpus, and its restriction follows from the compiler's inability to
+determine what was stored. <code>u8[:]</code> is also commonly used for
+reading. Its cost is that the language now has a rule shaped by an
+implementation limit, and a struct holding a writable byte view has to
+hold a reference to the array instead.</li>
+<li>3 changes nothing a program can see except that workers stop sharing
+static data, which is what the spec's thread model says already. It is
+the option that keeps "acceptable as a corner case" true in exactly the
+single-threaded sense in which it was acceptable, and it keeps the
+laundering rule the spec chose on purpose. Its cost is a runtime
+mechanism (~60 lines) that exists only in threaded programs, and an
+indirection on static-data accesses in those programs that did not show
+up in any measurement.</li>
+</ul>
+<p>The recommendation is <strong>option 4</strong>. It requires few
+source changes, places annotations where readers need to know whether
+stored views are writable, and requires no runtime mechanism. If the
+laundering rule is to stay as a feature, take <strong>option 3</strong>
+with rule 2 of option 2a — constants are never stored — so that
+thread-visible constants stay plain C statics the C compiler can fold
+and only the literals go into the per-program image; that is the
+smallest change with the smallest language cost. 2a alone remains a
+sound, zero-cost fallback.</p>
+<h2 id="5-measurements">5. Measurements</h2>
+<p>Windows 11, MSVC 19.51 <code>/O2</code>, best of the runs shown after
+two warm-ups (<code>bench/run_bench.py</code>'s method), medium
+sizes.</p>
+<p><code>lit_micro</code> is the literal micro-benchmark described under
+option 1 (20M iterations; a literal argument to a user function, a
+struct literal holding one, a <code>let</code> bound to one, an equality
+against one). The baseline is listed twice, from two separate runs, to
+show the noise: <code>words</code> moves by 13% between them, the rest
+by 1–2%. Option 3 is measured with <code>--per-program-statics</code>,
+i.e. the struct form forced on single-threaded programs; without workers
+its output is identical to the baseline.</p>
+<table>
+<thead>
+<tr>
+<th>program</th>
+<th>baseline</th>
+<th>baseline (again)</th>
+<th>1 stack temporaries</th>
+<th>3 per-program, forced</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lit_micro</code></td>
+<td>33.6 ms</td>
+<td>33.8 ms</td>
+<td><strong>47.3 ms</strong></td>
+<td>33.9 ms</td>
+</tr>
+<tr>
+<td><code>words</code></td>
+<td>322.9 ms</td>
+<td>365.0 ms</td>
+<td>348.9 ms</td>
+<td>311.7 ms</td>
+</tr>
+<tr>
+<td><code>words_dictionary</code></td>
+<td>274.1 ms</td>
+<td>310.3 ms</td>
+<td>267.4 ms</td>
+<td>269.6 ms</td>
+</tr>
+<tr>
+<td><code>strlist</code></td>
+<td>76.9 ms</td>
+<td>78.0 ms</td>
+<td>76.8 ms</td>
+<td>77.2 ms</td>
+</tr>
+<tr>
+<td><code>calc</code></td>
+<td>139.5 ms</td>
+<td>141.2 ms</td>
+<td>141.1 ms</td>
+<td>140.2 ms</td>
+</tr>
+<tr>
+<td><code>sexp</code></td>
+<td>484.8 ms</td>
+<td>490.9 ms</td>
+<td>498.8 ms</td>
+<td>494.3 ms</td>
+</tr>
+<tr>
+<td><code>sum</code></td>
+<td>48.4 ms</td>
+<td>48.5 ms</td>
+<td>48.7 ms</td>
+<td>49.6 ms</td>
+</tr>
+</tbody>
+</table>
+<p>The threaded sample (<code>23_mandelbrot_threads</code>, which reads
+<code>W</code>, <code>H</code> and <code>MAXITER</code> in its inner
+loop and does use the struct form under option 3):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>baseline</th>
+<th>1 stack temporaries</th>
+<th>3 per-program</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>serial render</td>
+<td>20.2 ms</td>
+<td>20.2 ms</td>
+<td>20.5 ms</td>
+</tr>
+<tr>
+<td>32 workers</td>
+<td>3.5 ms</td>
+<td>3.6 ms</td>
+<td>3.2 ms</td>
+</tr>
+</tbody>
+</table>
+<p>Options 2a, 2b and 4 generate the same C as the baseline for every
+program that compiles under them (4 adds <code>const</code> to the
+literal data), so they are not in the table.</p>
+<h2 id="6-globals-were-c-statics">6. Globals were C statics</h2>
+<p>The constants half of §1 had a second cause, independent of
+laundering: every global was a process-wide C static — fixed ones as
+<code>static T name</code>, resizable and variable ones as a static
+header plus a static dedicated stack — which is why a worker was only
+ever allowed to read a constant. That contradicts §11.1's own model, in
+which the program runs inside an implicit outermost function whose
+locals the globals are, and a <code>thread_fn</code> is a separate
+program with its own instance of them.</p>
+<p>The second commit makes that true. Every global that is not read-only
+static data (a <code>const</code> global with a compile-time
+initializer, which every instance can share as it is) is a member of one
+struct per program instance, with the dedicated stacks of the resizable
+ones inside it. Main's instance is a static; a worker's is allocated by
+its entry thunk and filled from the spawn image, which carries the
+globals the worker's program uses behind the arguments as
+<code>[size][image]</code> records (a resizable's is the queue image; a
+<code>reusable</code> pool's carries its freelist). The worker reads and
+writes its copies, a worker's worker copies the worker's, and a global
+whose type is not flat is an error in a thread program, as a non-flat
+argument is. Every access goes through <code>GS_GL-&gt;</code>, which is
+<code>(&amp;gs_globals_main)</code> in a program without workers — a
+link-time constant, so the generated code is what it was — and the
+thread-local <code>gs_gl</code> in one with them, the addressing every
+data-stack access already uses.</p>
+<p>With that, <code>let W = 78;</code> read by a worker is simply the
+worker's own <code>W</code>, whatever anyone does with
+<code>&amp;W</code>, and the mandelbrot sample keeps its
+<code>let</code>s. The typechecker's rule shrinks to "flat globals
+only", and the only C statics left are string literals and compile-time
+<code>const</code> globals, both provably never written.
+<code>test/threads/thread_globals.goose</code> exercises a counter, a
+resizable log, a <code>let</code> array written through a reference, a
+struct, a variable-size string, a pool with a freelist and a
+<code>const</code>, from a worker and from a worker's worker, checking
+main's values after each. This also retires option 3's per-thread static
+image: the same mechanism now covers every global, and string literals
+no longer need a per-instance copy since nothing can write them.</p>
+<h2 id="7-side-findings">7. Side findings</h2>
+<p>Found while probing; none is caused by the branches, and each has a
+one-file repro in the session's scratchpad:</p>
+<ul>
+<li><strong><code>continue</code> before a nonfixed local
+crashes</strong> (base compiler, <code>-O0</code> and <code>-O2</code>):
+<code>for x in xs { if x == 0 { continue; } let s: u8[] = "abc"; … }</code>
+faults, because the loop's continue label restores every save of the
+loop scope, including the base of a local whose declaration the
+<code>continue</code> jumped over, so <code>s</code>'s base is read
+unset. Option 1 hit this immediately and works around it for its own
+stack by saving at scope entry instead; the same fix applies to ordinary
+locals.</li>
+<li><strong><code>push</code> through a fat reference read out of a
+struct field at <code>-O0</code></strong> writes the pushed byte
+elsewhere: <code>struct Buf { bytes: u8[&gt;..]&amp; }</code> …
+<code>fn bump(b: Buf&amp;) { b.bytes.push('!'); }</code> prints
+<code>Hello\0</code> at <code>-O0</code> and <code>Hello!</code> at
+<code>-O2</code>. The option 2a positive test had to avoid the
+pattern.</li>
+<li><strong>A slice of a statement temporary can be bound to a
+variable</strong>: <code>let s = f()[..]</code> where <code>f</code>
+returns a <code>u8[]</code> typechecks (the temporary's sentinel root is
+accepted as a binding) while codegen restores the temporary's stack at
+the end of the statement. It works today only because each temporary
+gets a stack of its own within the function. (Since fixed: a temporary
+is rooted at its statement's depth, and a binding without an annotation
+is held to the store rule, §9.2.)</li>
+<li>The <code>codex/readonly-literals</code> experiment missed the
+reference-to-element paths listed under option 2b.</li>
+</ul>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/string_constants.md"><code>docs/design/string_constants.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

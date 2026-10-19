@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goose for Visual Studio Code · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#goose-for-visual-studio-code"
+id="toc-goose-for-visual-studio-code">Goose for Visual Studio Code</a>
+<ul>
+<li><a href="#features" id="toc-features">Features</a></li>
+<li><a href="#install-the-prebuilt-extension"
+id="toc-install-the-prebuilt-extension">Install the prebuilt
+extension</a></li>
+<li><a href="#build-or-develop" id="toc-build-or-develop">Build or
+develop</a></li>
+<li><a href="#compiler-setup" id="toc-compiler-setup">Compiler
+setup</a></li>
+<li><a href="#tasks" id="toc-tasks">Tasks</a></li>
+<li><a href="#run-configurations" id="toc-run-configurations">Run
+configurations</a></li>
+<li><a href="#verification" id="toc-verification">Verification</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="goose-for-visual-studio-code">Goose for Visual Studio Code</h1>
+<p>An extension for the <a
+href="https://github.com/aardappel/goose">Goose language</a>. No
+language server, runtime dependencies, or compiler changes are
+required.</p>
+<h2 id="features">Features</h2>
+<ul>
+<li>Syntax highlighting for <code>.goose</code> files, including nested
+block comments, escaped strings and characters, raw <code>"""</code>
+strings across lines, decimal/hex floats, namespaces and builtins.</li>
+<li>Highlighting for <code>goose</code> fenced code blocks in Markdown
+(``` or <code>~~~</code>), in the editor and in the Markdown
+preview.</li>
+<li>Bracket matching, auto-closing, indentation, comment toggling,
+folding and snippets (<code>main</code>, <code>fn</code>,
+<code>struct</code>, <code>enum</code>, <code>for</code>,
+<code>guard</code>, <code>match</code>, and more).</li>
+<li>Compiler checks on open/save, error and warning underlines, and
+Problems entries. Use <strong>F8 / Shift+F8</strong> to jump between
+problems. Lexer errors use the compiler's caret; type errors highlight
+the source line. Instantiation chains appear as related locations in
+Problems. While a Goose file is open, a status bar item shows the last
+check: <strong>Goose</strong> with a check mark, <strong>Goose: N
+errors</strong> (opens Problems), or <strong>Goose: Check
+Failed</strong> when the check failed without a source location
+(compiler not found, timeout, or an unlocated message). A failure also
+adds a warning in Problems on the checked file with no text underlined,
+and clicking the item opens the Goose output with the full compiler
+output. <strong>Run</strong> next to it runs the file with the JIT.</li>
+<li><strong>Goose: Check Program</strong>, <strong>Goose: Run with
+JIT</strong>, <strong>Goose: Build Executable</strong>
+(<code>goose build</code>: an executable beside the source, linked with
+the packages the program uses), <strong>Goose: Generate C</strong>, and
+<strong>Goose: Show Compiler Output</strong> in the Command Palette. The
+editor's play button and <strong>Run</strong> status-bar button run the
+program in a task terminal, with stdin and clickable errors.</li>
+<li><strong>Ctrl+Shift+B</strong>, <strong>F5</strong>, and
+<strong>Ctrl+F5</strong> run with JIT while editing Goose
+(<strong>Cmd+Shift+B</strong> for build on macOS). <strong>Goose: Run
+with JIT</strong> is also available in VS Code's Run configuration
+picker.</li>
+<li>Top-level declarations in Outline, breadcrumbs and Go to Symbol
+(<strong>Ctrl+Shift+O</strong>).</li>
+<li>Clickable imports, with root-relative, importing-file-relative
+(<code>import .foo;</code>), and standard-library resolution matching
+the compiler.</li>
+<li>Check, Run, Build and Generate C tasks, plus the <code>$goose</code>
+problem matcher for custom tasks with absolute paths or paths relative
+to the workspace folder.</li>
+</ul>
+<p>The extension uses lexical analysis and compiler commands. It does
+not yet provide semantic completion, rename, cross-file symbol
+definitions, formatting, debugging, or an LSP.</p>
+<h2 id="install-the-prebuilt-extension">Install the prebuilt
+extension</h2>
+<p>The repository includes <a
+href="goose-language.vsix">goose-language.vsix</a>. Download it and
+select <strong>Extensions: Install from VSIX...</strong> in VS Code, or
+install from a checkout with:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">code</span> <span class="at">--install-extension</span> vscode/goose-language.vsix</span></code></pre></div>
+<p>No Python, Node.js, or npm is needed to install the prebuilt
+extension. Compiler checks and running programs still require the Goose
+compiler (see below).</p>
+<h2 id="build-or-develop">Build or develop</h2>
+<p>To rebuild the VSIX, install Python 3 and Node.js with npm (Node.js
+22+ recommended), then run from the repository root:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> vscode/build_vsix.py</span></code></pre></div>
+<p>The script works from any working directory. It installs the locked
+npm build dependencies, runs the extension tests, and writes
+<code>vscode/goose-language.vsix</code>. Use <code>--skip-install</code>
+to reuse existing <code>node_modules</code>. The VSIX file is tracked in
+Git. Commit the rebuilt file with extension updates so people can
+install without building locally. The extension version still comes from
+<code>package.json</code>.</p>
+<p>Open this <code>vscode/</code> directory in VS Code and press
+<strong>F5</strong> to launch an Extension Development Host with the
+parent Goose repository open. No build is needed. Packaging is local;
+the package is not published to the Marketplace. The extension is under
+the repository's <a href="../LICENSE.html">Apache License 2.0</a>; the
+build copies that file into this directory, where <code>vsce</code>
+looks for it, so it ships inside the package.</p>
+<h2 id="compiler-setup">Compiler setup</h2>
+<p>Build Goose separately. By default the extension looks in the
+workspace folder for <code>goose</code>,
+<code>build/Release/goose</code>, <code>build/Debug/goose</code>, and
+<code>build/goose</code> (with <code>.exe</code> on Windows), then uses
+<code>goose</code> on PATH. For another location, set
+<code>goose.compilerPath</code> to the executable, without shell quotes
+or arguments.</p>
+<p>Checking accepts a file with no <code>fn main()</code>, so editing an
+imported file does not report a missing <code>main</code>. For a project
+with imported files, set the entry file so that checks and runs use the
+whole program:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;goose.compilerPath&quot;</span><span class="fu">:</span> <span class="st">&quot;${workspaceFolder}/build/Release/goose.exe&quot;</span><span class="fu">,</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;goose.entryFile&quot;</span><span class="fu">:</span> <span class="st">&quot;samples/01_tour.goose&quot;</span><span class="fu">,</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;goose.checkOnSave&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;goose.checkTimeout&quot;</span><span class="fu">:</span> <span class="dv">15000</span><span class="fu">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;goose.runArguments&quot;</span><span class="fu">:</span> <span class="ot">[]</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>Paths are relative to the containing workspace folder, or the source
+directory when no folder is open. Settings can be configured per folder
+in a multi-root workspace. <code>goose.stdlibPath</code> supplies
+<code>--stdlib</code>; leave it empty to use Goose's usual lookup,
+including <code>GOOSE_STDLIB</code> and directories near the
+executable.</p>
+<p>Checks use <code>goose check</code> and never run the program or
+generate C. They check saved files, wait while any open Goose file in
+the same folder has unsaved changes, and keep the last result, marked
+stale, until the next check completes. Changing Goose settings or
+workspace folders, or closing the files that use an entry file, clears
+its results instead. Explicit commands save open Goose files in the same
+folder first. The compiler currently stops at the first error and
+typechecks instantiated functions; the extension preserves those
+limitations. Configuring the entry file is particularly useful for
+libraries.</p>
+<p><strong>Run with JIT</strong> uses <code>--jit</code> and needs a
+Goose build with TinyCC enabled. <strong>Generate C</strong> writes a
+<code>.c</code> file alongside the entry file, replacing an existing
+file of that name. Compiler execution is disabled in untrusted
+workspaces; highlighting, snippets and the outline remain available.</p>
+<h2 id="tasks">Tasks</h2>
+<p>JIT Run is the extension's build task. <strong>Ctrl+Shift+B</strong>
+runs it directly while editing a Goose file; Check, Build Executable and
+Generate C remain explicit commands under <strong>Tasks: Run
+Task</strong> and in the Command Palette. The editor and status-bar play
+buttons use the same JIT command. Check-on-save still only checks the
+program.</p>
+<p>The Goose shortcuts take precedence while a Goose editor has focus.
+To use your existing VS Code build/debug shortcuts instead, set
+<code>"goose.useRunKeybindings": false</code>. Existing
+<code>tasks.json</code> group/default choices are preserved. Buttons
+contributed by other extensions, such as CMake Tools, still control
+their own build systems; use the <strong>Run</strong> button for
+Goose.</p>
+<p><strong>Tasks: Run Task</strong> offers tasks for the current Goose
+file (or configured entry, even when no Goose editor is active). For a
+persistent task, add this to your project's
+<code>.vscode/tasks.json</code>:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;2.0.0&quot;</span><span class="fu">,</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;tasks&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;goose&quot;</span><span class="fu">,</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;label&quot;</span><span class="fu">:</span> <span class="st">&quot;Run Goose with JIT&quot;</span><span class="fu">,</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;action&quot;</span><span class="fu">:</span> <span class="st">&quot;run&quot;</span><span class="fu">,</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;file&quot;</span><span class="fu">:</span> <span class="st">&quot;main.goose&quot;</span><span class="fu">,</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;group&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;kind&quot;</span><span class="fu">:</span> <span class="st">&quot;build&quot;</span><span class="fu">,</span> <span class="dt">&quot;isDefault&quot;</span><span class="fu">:</span> <span class="kw">true</span> <span class="fu">},</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;problemMatcher&quot;</span><span class="fu">:</span> <span class="st">&quot;$goose&quot;</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;goose&quot;</span><span class="fu">,</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;label&quot;</span><span class="fu">:</span> <span class="st">&quot;Generate C&quot;</span><span class="fu">,</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;action&quot;</span><span class="fu">:</span> <span class="st">&quot;generateC&quot;</span><span class="fu">,</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;file&quot;</span><span class="fu">:</span> <span class="st">&quot;main.goose&quot;</span><span class="fu">,</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;output&quot;</span><span class="fu">:</span> <span class="st">&quot;main.c&quot;</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><code>file</code> defaults to <code>goose.entryFile</code> or the
+active Goose document; <code>${file}</code> and
+<code>${workspaceFolder}</code> are supported. <code>output</code>
+defaults to the entry file with a <code>.c</code> suffix. Tasks use
+process arguments directly, including paths with spaces. Use VS Code's
+task save behavior to save edited files before running custom tasks.</p>
+<h2 id="run-configurations">Run configurations</h2>
+<p>Select <strong>Goose: Run with JIT</strong> in the Run and Debug
+configuration picker to use VS Code's native Run controls. This launches
+the same terminal task, using <code>goose.entryFile</code> or the
+current Goose file. An optional <code>.vscode/launch.json</code>
+configuration can choose a specific program:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;0.2.0&quot;</span><span class="fu">,</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;configurations&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;goose&quot;</span><span class="fu">,</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;request&quot;</span><span class="fu">:</span> <span class="st">&quot;launch&quot;</span><span class="fu">,</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;Goose: Run with JIT&quot;</span><span class="fu">,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;program&quot;</span><span class="fu">:</span> <span class="st">&quot;${workspaceFolder}/main.goose&quot;</span><span class="fu">,</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;noDebug&quot;</span><span class="fu">:</span> <span class="kw">true</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span><span class="ot">]</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>Run configurations execute programs without breakpoints or stepping.
+Stop an executing program with <strong>Tasks: Terminate Task</strong> or
+its terminal's trash button. Program arguments still come from
+<code>goose.runArguments</code>.</p>
+<h2 id="verification">Verification</h2>
+<p><code>npm test</code> exercises the actual TextMate/Oniguruma
+grammar, declaration/import scanning, diagnostic parsing (including
+Windows paths and UTF-8 carets), task arguments, and
+cancellation/stale-result handling. Compiler integration tests run when
+a Goose build exists in the parent repository; set
+<code>GOOSE_TEST_COMPILER</code> to test another executable. Missing
+compilers are reported as skipped tests.</p>
+<p>For the editor integration suite, create an empty directory
+<code>build/goose-extension-fixture</code> in the parent repository,
+then select <strong>Test Goose Extension</strong> in this directory's
+Run and Debug menu. This suite writes fixtures and settings only in that
+disposable directory. It exercises activation, real compiler
+diagnostics, related error locations, imports, outline, tasks, and the
+edit/save lifecycle, and real JIT execution through commands, build
+tasks, and Run configurations. Build the compiler with TinyCC first.</p>
+<p>The implementation uses VS Code's <a
+href="https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide">TextMate
+grammar support</a>, <a
+href="https://code.visualstudio.com/api/extension-guides/task-provider">task
+provider API</a>, and <a
+href="https://code.visualstudio.com/api/extension-guides/workspace-trust">workspace
+trust API</a>.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/vscode/README.md"><code>vscode/README.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,3279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goose benchmark results · Goose</title>
+<link rel="icon" href="../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../style.css">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  background-color: #f8f8f8; }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ef2929; } /* Alert */
+code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #204a87; } /* Attribute */
+code span.bn { color: #0000cf; } /* BaseN */
+code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4e9a06; } /* Char */
+code span.cn { color: #8f5902; } /* Constant */
+code span.co { color: #8f5902; font-style: italic; } /* Comment */
+code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code span.dt { color: #204a87; } /* DataType */
+code span.dv { color: #0000cf; } /* DecVal */
+code span.er { color: #a40000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #0000cf; } /* Float */
+code span.fu { color: #204a87; font-weight: bold; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code span.ot { color: #8f5902; } /* Other */
+code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+code span.ss { color: #4e9a06; } /* SpecialString */
+code span.st { color: #4e9a06; } /* String */
+code span.va { color: #000000; } /* Variable */
+code span.vs { color: #4e9a06; } /* VerbatimString */
+code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html"><img src="../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../docs/index.html">Docs</a>
+    <a href="../docs/tutorial.html">Tutorial</a>
+    <a href="../docs/reference.html">Reference</a>
+    <a href="../docs/goose_spec.html">Spec</a>
+    <a href="../docs/stdlib.html">Library</a>
+    <a href="../samples/index.html">Samples</a>
+    <a href="../bench/summary.html">Benchmarks</a>
+    <a href="../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#goose-benchmark-results"
+id="toc-goose-benchmark-results">Goose benchmark results</a>
+<ul>
+<li><a href="#how-to-read-this" id="toc-how-to-read-this">How to read
+this</a></li>
+<li><a href="#environment" id="toc-environment">Environment</a></li>
+<li><a href="#across-all-benchmarks"
+id="toc-across-all-benchmarks">Across all benchmarks</a></li>
+<li><a href="#sum" id="toc-sum">sum</a></li>
+<li><a href="#push" id="toc-push">push</a></li>
+<li><a href="#strlist" id="toc-strlist">strlist</a></li>
+<li><a href="#records" id="toc-records">records</a></li>
+<li><a href="#tree" id="toc-tree">tree</a></li>
+<li><a href="#interp" id="toc-interp">interp</a></li>
+<li><a href="#graph" id="toc-graph">graph</a></li>
+<li><a href="#words" id="toc-words">words</a></li>
+<li><a href="#particles" id="toc-particles">particles</a></li>
+<li><a href="#sexp" id="toc-sexp">sexp</a></li>
+<li><a href="#lru" id="toc-lru">lru</a></li>
+<li><a href="#scene" id="toc-scene">scene</a></li>
+<li><a href="#calc" id="toc-calc">calc</a></li>
+<li><a href="#bintrees" id="toc-bintrees">bintrees</a></li>
+<li><a href="#respond" id="toc-respond">respond</a></li>
+<li><a href="#blur" id="toc-blur">blur</a></li>
+<li><a href="#toolchain-v145-vs-clang"
+id="toc-toolchain-v145-vs-clang">Toolchain: v145 vs clang</a></li>
+<li><a href="#goose-compiled-vs-jit"
+id="toc-goose-compiled-vs-jit">Goose: compiled vs JIT</a></li>
+<li><a href="#october-16-2026-refresh"
+id="toc-october-16-2026-refresh">October 16, 2026 refresh</a>
+<ul>
+<li><a href="#index-types-and-checkfree-kernels"
+id="toc-index-types-and-checkfree-kernels">Index types and checkfree
+kernels</a></li>
+<li><a href="#paired-comparison-of-the-graph-rewrite"
+id="toc-paired-comparison-of-the-graph-rewrite">Paired comparison of the
+graph rewrite</a></li>
+</ul></li>
+<li><a href="#historical-analysis-through-october-10-2026"
+id="toc-historical-analysis-through-october-10-2026">Historical analysis
+through October 10, 2026</a></li>
+<li><a href="#reading-the-rust-rows-historical"
+id="toc-reading-the-rust-rows-historical">Reading the Rust rows
+(historical)</a>
+<ul>
+<li><a href="#data-layouts-and-memory-use"
+id="toc-data-layouts-and-memory-use">Data layouts and memory
+use</a></li>
+</ul></li>
+<li><a href="#reading-the-toolchain-table"
+id="toc-reading-the-toolchain-table">Reading the toolchain
+table</a></li>
+<li><a href="#reading-the-jit-table"
+id="toc-reading-the-jit-table">Reading the JIT table</a></li>
+<li><a href="#bounds-check-elimination-measured"
+id="toc-bounds-check-elimination-measured">Bounds-check elimination,
+measured</a></li>
+<li><a href="#what-the-standard-library-costs-the-benchmarks"
+id="toc-what-the-standard-library-costs-the-benchmarks">What the
+standard library costs the benchmarks</a></li>
+<li><a href="#where-goose-loses" id="toc-where-goose-loses">Where Goose
+loses</a></li>
+<li><a href="#caveats-on-these-numbers"
+id="toc-caveats-on-these-numbers">Caveats on these numbers</a></li>
+<li><a href="#what-the-benchmarks-say-about-the-language"
+id="toc-what-the-benchmarks-say-about-the-language">What the benchmarks
+say about the language</a></li>
+<li><a href="#what-the-rust-implementations-say-about-rust"
+id="toc-what-the-rust-implementations-say-about-rust">What the Rust
+implementations say about Rust</a></li>
+<li><a
+href="#where-the-goose-rust-gap-comes-from-and-where-it-can-still-move"
+id="toc-where-the-goose-rust-gap-comes-from-and-where-it-can-still-move">Where
+the Goose-Rust gap comes from, and where it can still move</a></li>
+<li><a href="#compiler-work-ordered-by-measured-benefit"
+id="toc-compiler-work-ordered-by-measured-benefit">Compiler work,
+ordered by measured benefit</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="goose-benchmark-results">Goose benchmark results</h1>
+<p>Generated by <code>bench/run_bench.py</code> on 2026-10-16 14:59. Do
+not edit by hand. The benchmarks themselves are
+<code>bench/goose/*.goose</code>, <code>bench/cpp/*.cpp</code> and
+<code>bench/rust/*.rs</code>; their purpose is explained in
+<code>bench/design.md</code>.</p>
+<h2 id="how-to-read-this">How to read this</h2>
+<ul>
+<li>Start with <strong>Across all benchmarks</strong>: it is the whole
+suite in one table. The per-benchmark sections below it are the detail,
+each ending in a sentence or two of what that row means.</li>
+<li>One table per benchmark. Rows are implementations, the three time
+columns are the data sizes -- the small one is meant to fit in cache,
+the large one is meant not to -- and the last column is peak memory at
+the large size.</li>
+<li>Every Goose and C++ time cell is <code>v145 / clang</code>: the same
+source built by each of the toolchains in the table below, so a gap
+between those numbers is the backend and nothing else. Goose is compiled
+to C once per size and every toolchain builds that same C. Rust rows
+carry a single time, because rustc is the only Rust backend here; it is
+LLVM, so it is the clang column they are most directly comparable
+with.</li>
+<li>Times are the best of 3 whole-process wall clocks, after two
+discarded warm-up runs. Memory is the peak working set, the larger of
+the toolchains (they rarely differ).</li>
+<li>Everything a program does -- generating its input, building its
+structure, tearing it down -- is inside the measurement. Whole-process
+timing measures these lifecycle costs together; input generation can
+dilute differences in the phase under study. Goose now has
+<code>os.clock_ns</code> for separate kernel experiments, but this suite
+retains its whole-process measurement policy.</li>
+<li>Every implementation of a benchmark, under every toolchain, prints
+the same checksum lines and the harness verifies they agree.</li>
+</ul>
+<h2 id="environment">Environment</h2>
+<table>
+<tbody>
+<tr>
+<td>CPU</td>
+<td>AMD Ryzen 9 9950X3D 16-Core Processor</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>94 GB</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Windows 11 10.0.26200 (AMD64)</td>
+</tr>
+<tr>
+<td>v145</td>
+<td>MSVC 19.51.36260 (toolset 14.51.36231), <code>/O2</code> (C++20 for
+the C++ rows)</td>
+</tr>
+<tr>
+<td>clang</td>
+<td>clang-cl 22.1.3 (bundled with VS), <code>/O2</code> (C++20 for the
+C++ rows)</td>
+</tr>
+<tr>
+<td>Goose</td>
+<td><code>goose -O2</code> to C, then each toolchain above on that
+C</td>
+</tr>
+<tr>
+<td>Goose JIT</td>
+<td><code>goose -O2 --jit</code>: TinyCC in the compiler's own process,
+no C file</td>
+</tr>
+<tr>
+<td>Rust</td>
+<td>rustc 1.98.0 (88d9e12ae 2026-08-18),
+<code>-O -C codegen-units=1</code></td>
+</tr>
+</tbody>
+</table>
+<p>Startup floor (an empty program, best of 5): Goose 13.1 ms / 7.8 MB,
+C++ 13.8 ms / 7.8 MB. Account for this startup cost when interpreting
+ratios at small sizes.</p>
+<h2 id="across-all-benchmarks">Across all benchmarks</h2>
+<p>How many times faster (or smaller) Goose is than the best row of each
+comparison at the <code>large</code> size. <em>Idiomatic</em> is what a
+C++ programmer writes first (<code>unique_ptr</code>,
+<code>vector&lt;string&gt;</code>, <code>unordered_map</code>,
+<code>std::variant</code>); <em>expert</em> is the hand-built version
+(exactly-reserved arena with indices, <code>string_view</code>, flat
+offsets, open addressing, CSR); <em>rust</em> is the best safe Rust row
+for that benchmark, whichever shape won. Above 1.00 means Goose wins.
+The suite figure is the geometric mean over the 16 benchmarks.</p>
+<p>The Rust number is the same in every toolchain column -- there is
+only one rustc -- so those columns differ only in which Goose build they
+are against.</p>
+<table>
+<thead>
+<tr>
+<th>benchmark</th>
+<th style="text-align: right;">vs idiomatic (v145)</th>
+<th style="text-align: right;">vs idiomatic (clang)</th>
+<th style="text-align: right;">vs expert (v145)</th>
+<th style="text-align: right;">vs expert (clang)</th>
+<th style="text-align: right;">vs rust (v145)</th>
+<th style="text-align: right;">vs rust (clang)</th>
+<th style="text-align: right;">memory vs idiomatic</th>
+<th style="text-align: right;">memory vs expert</th>
+<th style="text-align: right;">memory vs rust</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sum</td>
+<td style="text-align: right;">1.60x</td>
+<td style="text-align: right;">1.52x</td>
+<td style="text-align: right;">1.11x</td>
+<td style="text-align: right;">1.14x</td>
+<td style="text-align: right;">1.05x</td>
+<td style="text-align: right;">0.98x</td>
+<td style="text-align: right;">1.42x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td>push</td>
+<td style="text-align: right;">3.13x</td>
+<td style="text-align: right;">3.08x</td>
+<td style="text-align: right;">1.19x</td>
+<td style="text-align: right;">1.93x</td>
+<td style="text-align: right;">1.08x</td>
+<td style="text-align: right;">1.08x</td>
+<td style="text-align: right;">1.87x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td>strlist</td>
+<td style="text-align: right;">3.52x</td>
+<td style="text-align: right;">3.27x</td>
+<td style="text-align: right;">1.32x</td>
+<td style="text-align: right;">1.20x</td>
+<td style="text-align: right;">1.24x</td>
+<td style="text-align: right;">1.22x</td>
+<td style="text-align: right;">3.12x</td>
+<td style="text-align: right;">0.88x</td>
+<td style="text-align: right;">1.04x</td>
+</tr>
+<tr>
+<td>records</td>
+<td style="text-align: right;">2.77x</td>
+<td style="text-align: right;">2.28x</td>
+<td style="text-align: right;">1.49x</td>
+<td style="text-align: right;">1.42x</td>
+<td style="text-align: right;">2.26x</td>
+<td style="text-align: right;">2.02x</td>
+<td style="text-align: right;">4.79x</td>
+<td style="text-align: right;">3.74x</td>
+<td style="text-align: right;">3.98x</td>
+</tr>
+<tr>
+<td>tree</td>
+<td style="text-align: right;">4.41x</td>
+<td style="text-align: right;">4.07x</td>
+<td style="text-align: right;">1.19x</td>
+<td style="text-align: right;">1.12x</td>
+<td style="text-align: right;">1.09x</td>
+<td style="text-align: right;">1.03x</td>
+<td style="text-align: right;">2.65x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td>interp</td>
+<td style="text-align: right;">5.51x</td>
+<td style="text-align: right;">6.13x</td>
+<td style="text-align: right;">1.35x</td>
+<td style="text-align: right;">1.39x</td>
+<td style="text-align: right;">1.41x</td>
+<td style="text-align: right;">1.29x</td>
+<td style="text-align: right;">3.68x</td>
+<td style="text-align: right;">2.26x</td>
+<td style="text-align: right;">2.04x</td>
+</tr>
+<tr>
+<td>graph</td>
+<td style="text-align: right;">4.96x</td>
+<td style="text-align: right;">5.49x</td>
+<td style="text-align: right;">1.12x</td>
+<td style="text-align: right;">1.23x</td>
+<td style="text-align: right;">1.16x</td>
+<td style="text-align: right;">1.32x</td>
+<td style="text-align: right;">1.31x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td>words</td>
+<td style="text-align: right;">2.20x</td>
+<td style="text-align: right;">2.53x</td>
+<td style="text-align: right;">1.38x</td>
+<td style="text-align: right;">1.66x</td>
+<td style="text-align: right;">1.30x</td>
+<td style="text-align: right;">1.74x</td>
+<td style="text-align: right;">1.34x</td>
+<td style="text-align: right;">1.51x</td>
+<td style="text-align: right;">1.32x</td>
+</tr>
+<tr>
+<td>particles</td>
+<td style="text-align: right;">1.20x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.07x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.03x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td>sexp</td>
+<td style="text-align: right;">3.72x</td>
+<td style="text-align: right;">3.41x</td>
+<td style="text-align: right;">1.14x</td>
+<td style="text-align: right;">1.18x</td>
+<td style="text-align: right;">1.11x</td>
+<td style="text-align: right;">1.16x</td>
+<td style="text-align: right;">5.04x</td>
+<td style="text-align: right;">2.57x</td>
+<td style="text-align: right;">2.43x</td>
+</tr>
+<tr>
+<td>lru</td>
+<td style="text-align: right;">3.36x</td>
+<td style="text-align: right;">4.23x</td>
+<td style="text-align: right;">0.88x</td>
+<td style="text-align: right;">1.09x</td>
+<td style="text-align: right;">0.81x</td>
+<td style="text-align: right;">1.09x</td>
+<td style="text-align: right;">3.16x</td>
+<td style="text-align: right;">1.36x</td>
+<td style="text-align: right;">1.03x</td>
+</tr>
+<tr>
+<td>scene</td>
+<td style="text-align: right;">5.78x</td>
+<td style="text-align: right;">7.06x</td>
+<td style="text-align: right;">1.09x</td>
+<td style="text-align: right;">1.22x</td>
+<td style="text-align: right;">0.82x</td>
+<td style="text-align: right;">1.02x</td>
+<td style="text-align: right;">1.33x</td>
+<td style="text-align: right;">1.99x</td>
+<td style="text-align: right;">1.35x</td>
+</tr>
+<tr>
+<td>calc</td>
+<td style="text-align: right;">4.06x</td>
+<td style="text-align: right;">3.74x</td>
+<td style="text-align: right;">1.07x</td>
+<td style="text-align: right;">0.91x</td>
+<td style="text-align: right;">0.91x</td>
+<td style="text-align: right;">0.89x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td>bintrees</td>
+<td style="text-align: right;">15.58x</td>
+<td style="text-align: right;">15.82x</td>
+<td style="text-align: right;">1.91x</td>
+<td style="text-align: right;">2.00x</td>
+<td style="text-align: right;">1.14x</td>
+<td style="text-align: right;">1.16x</td>
+<td style="text-align: right;">2.27x</td>
+<td style="text-align: right;">1.13x</td>
+<td style="text-align: right;">0.99x</td>
+</tr>
+<tr>
+<td>respond</td>
+<td style="text-align: right;">2.10x</td>
+<td style="text-align: right;">2.08x</td>
+<td style="text-align: right;">1.09x</td>
+<td style="text-align: right;">1.01x</td>
+<td style="text-align: right;">1.19x</td>
+<td style="text-align: right;">1.35x</td>
+<td style="text-align: right;">1.01x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td>blur</td>
+<td style="text-align: right;">3.59x</td>
+<td style="text-align: right;">3.96x</td>
+<td style="text-align: right;">1.90x</td>
+<td style="text-align: right;">1.16x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.12x</td>
+<td style="text-align: right;">1.34x</td>
+<td style="text-align: right;">1.00x</td>
+<td style="text-align: right;">1.00x</td>
+</tr>
+<tr>
+<td><strong>geometric mean</strong></td>
+<td style="text-align: right;"><strong>3.51x</strong></td>
+<td style="text-align: right;"><strong>3.54x</strong></td>
+<td style="text-align: right;"><strong>1.24x</strong></td>
+<td style="text-align: right;"><strong>1.26x</strong></td>
+<td style="text-align: right;"><strong>1.13x</strong></td>
+<td style="text-align: right;"><strong>1.19x</strong></td>
+<td style="text-align: right;"><strong>1.95x</strong></td>
+<td style="text-align: right;"><strong>1.32x</strong></td>
+<td style="text-align: right;"><strong>1.25x</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The October 16, 2026 run puts Goose at 3.51x / 3.54x the
+speed of idiomatic C++, 1.24x / 1.26x the speed of expert C++, and 1.13x
+/ 1.19x the speed of the best safe Rust rows</strong>, under MSVC /
+clang respectively. These are geometric means over the sixteen
+benchmarks at their large sizes. Peak-memory ratios are 1.95x, 1.32x and
+1.25x in Goose's favor. The full suite was rebuilt and rerun at all
+three sizes, including the separate JIT measurements.</p>
+<p><strong>The source improvement in this refresh is check-free graph
+traversal.</strong> Both Goose graph rows store vertex IDs as
+<code>u32 in dist</code>; CSR also stores prefix offsets as
+<code>u32 upto out</code>. Validation happens during construction, and
+<code>checkfree fn bfs</code> verifies that none remains in traversal.
+The entries are still four bytes, and construction and validation are
+still timed. The fresh large CSR times are 699/617 ms, against C++
+784/761 and Rust 811: 1.12x/1.23x ahead of matching C++, and 1.16x/1.32x
+ahead of Rust. Linked adjacency remains much slower than CSR in every
+language. Alternating same-compiler trials against the original Goose
+sources measured speedups of 1.21x/1.19x for linked adjacency and
+1.08x/1.17x for CSR at the large size (<code>notes.md</code>). These
+measure the whole source rewrite; the full-suite table alone does not
+isolate a source change from other changes since the previous
+report.</p>
+<p><strong>Compact representation remains the clearest
+advantage.</strong> <code>records</code> is 2.02-2.26x faster than Rust
+on 3.98x less memory: variable-mode enums pay for each record's own
+payload, including inline text. <code>interp</code> is 1.29-1.41x faster
+on 2.04x less memory for the same distinction in a tree.
+<code>sexp</code> uses 2.43x less memory than the Rust arena and 5.04x
+less than the C++ owning nodes. For <code>strlist</code>, distinguish
+Goose's owned inline strings from the borrowing
+<code>string_view</code>, flat-offset and
+<code>Vec&lt;&amp;str&gt;</code> rows; those have different lifetime
+requirements.</p>
+<p><strong>Losses and near-ties remain.</strong> <code>calc</code> takes
+481/491 ms against the Rust arena's 436 ms. <code>lru</code> takes
+2,760/2,068 ms against Rust's 2,249, so it loses under MSVC and wins
+under clang. <code>scene</code> is 460/371 ms against Rust 379, again a
+loss under MSVC and approximately level under clang. This refresh
+measures these differences; it does not re-establish the older
+diagnostic claims about which individual compiler mechanisms caused
+them.</p>
+<p><strong>A check-free kernel can still be limited by backend
+optimization.</strong> The flat blur is now explicitly
+<code>checkfree</code> and takes 952/266 ms. The row-slice form, also
+<code>checkfree</code> including slice construction, takes 298/269 ms.
+Rust's two forms take 299-300 ms. Removing bounds checks therefore does
+not by itself close the MSVC flat-kernel gap. The scene composition and
+recursive update also carry <code>checkfree</code> contracts. The
+fastest particle rows are nearly level across Goose, Rust and clang C++;
+small differences are not evidence of a language advantage on this flat
+numeric workload.</p>
+<p><strong>Allocation and interfaces matter to the comparison.</strong>
+<code>bintrees</code> takes 206/204 ms, against C++'s arena at 393/407
+and Rust's arena at 235. The per-node allocation rows exceed three
+seconds. Goose uses typed references into growing storage where the safe
+Rust arena rows use integer indices. In <code>respond</code>, the inline
+Goose DTO takes 507/491 ms against Rust's DTO at 1,338, while Goose
+streaming takes 454/400 against Rust streaming at 540. Compare matching
+interfaces when deciding which result applies to an application.</p>
+<p><strong>Read the aggregate with the row-level controls.</strong> It
+selects the fastest Goose implementation separately for each backend and
+comparison tier; memory independently selects the smallest
+implementation. Thus <code>graph</code> speed uses CSR while its memory
+figure uses linked adjacency, and <code>words</code> speed uses the
+hand-written table while memory uses <code>dictionary</code>. The
+<code>respond</code> headline uses streaming, and <code>blur</code> uses
+row slices under MSVC and flat indexing under clang. These are not the
+resource profiles of a single implementation. <code>words</code> also
+compares different hash functions and table policies; the Goose
+dictionary uses less memory than its hand-written table but runs more
+slowly.</p>
+<p><strong>These are whole-process measurements on one machine.</strong>
+They include input generation, construction and teardown, use the best
+of three runs after two warm-ups, and do not pin cores. Treat small
+differences cautiously, especially in cache-sensitive graph and LRU
+workloads. The empty-process floor is now 13.1 ms for Goose and 13.8 ms
+for C++, versus about 8 ms in the October 10 report, and MSVC has
+changed from 19.51.36257 to 19.51.36260. Cross-date timing changes
+cannot be attributed solely to Goose compiler improvements. The older
+diagnostic studies are retained, explicitly marked historical, in
+<code>notes.md</code>; current comparisons come from the fresh
+tables.</p>
+<h2 id="sum">sum</h2>
+<p>Control: build a flat i32 array, then scan it eight times.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=1000000)</th>
+<th style="text-align: right;">medium (N=16000000)</th>
+<th style="text-align: right;">large (N=128000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose grow-only array</td>
+<td style="text-align: right;">16.3 / 16.0</td>
+<td style="text-align: right;">50.2 / 54.8</td>
+<td style="text-align: right;">298.8 / 318.5</td>
+<td style="text-align: right;">496.1</td>
+</tr>
+<tr>
+<td>cpp vector</td>
+<td style="text-align: right;">17.6 / 17.6</td>
+<td style="text-align: right;">75.3 / 74.3</td>
+<td style="text-align: right;">477.0 / 484.1</td>
+<td style="text-align: right;">702.0</td>
+</tr>
+<tr>
+<td>cpp vector+reserve</td>
+<td style="text-align: right;">16.3 / 16.2</td>
+<td style="text-align: right;">56.3 / 59.0</td>
+<td style="text-align: right;">332.7 / 362.2</td>
+<td style="text-align: right;">495.8</td>
+</tr>
+<tr>
+<td>rust Vec, collect</td>
+<td style="text-align: right;">15.9</td>
+<td style="text-align: right;">53.3</td>
+<td style="text-align: right;">313.7</td>
+<td style="text-align: right;">495.8</td>
+</tr>
+</tbody>
+</table>
+<p>This control uses the same flat scalar layout in all three languages.
+The unreserved C++ vector pays for growth and spare capacity; the
+reserved vector and Rust collect over a TrustedLen iterator allocate the
+exact size. Whole-process time includes both building the array and
+scanning it.</p>
+<h2 id="push">push</h2>
+<p>Push N records while keeping pointers to every 64th one.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=1000000)</th>
+<th style="text-align: right;">medium (N=16000000)</th>
+<th style="text-align: right;">large (N=64000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose array, typed references</td>
+<td style="text-align: right;">15.8 / 15.6</td>
+<td style="text-align: right;">50.6 / 50.4</td>
+<td style="text-align: right;">162.1 / 162.0</td>
+<td style="text-align: right;">503.8</td>
+</tr>
+<tr>
+<td>cpp vector, indices</td>
+<td style="text-align: right;">20.5 / 20.3</td>
+<td style="text-align: right;">128.7 / 126.4</td>
+<td style="text-align: right;">508.1 / 499.1</td>
+<td style="text-align: right;">940.0</td>
+</tr>
+<tr>
+<td>cpp vector+reserve, indices</td>
+<td style="text-align: right;">16.1 / 18.1</td>
+<td style="text-align: right;">61.0 / 91.2</td>
+<td style="text-align: right;">193.0 / 313.3</td>
+<td style="text-align: right;">505.3</td>
+</tr>
+<tr>
+<td>cpp deque, pointers</td>
+<td style="text-align: right;">37.6 / 35.3</td>
+<td style="text-align: right;">409.5 / 387.5</td>
+<td style="text-align: right;">1,541.1 / 1,863.5</td>
+<td style="text-align: right;">1,254.9</td>
+</tr>
+<tr>
+<td>rust Vec+reserve, indices</td>
+<td style="text-align: right;">18.4</td>
+<td style="text-align: right;">58.4</td>
+<td style="text-align: right;">174.3</td>
+<td style="text-align: right;">504.5</td>
+</tr>
+</tbody>
+</table>
+<p>Goose retains typed Item&amp; references across later pushes. The C++
+vector and safe Rust Vec rows retain indices instead; the pointer-stable
+C++ deque has a different allocation and locality cost. Compare the
+reserved vector with Goose to separate growth strategy from the cost of
+building records.</p>
+<h2 id="strlist">strlist</h2>
+<p>Split a text into N words, keep them as a list, scan it four
+times.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=200000)</th>
+<th style="text-align: right;">medium (N=2000000)</th>
+<th style="text-align: right;">large (N=8000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose inline strings, owned</td>
+<td style="text-align: right;">19.7 / 20.5</td>
+<td style="text-align: right;">76.7 / 81.1</td>
+<td style="text-align: right;">262.7 / 265.8</td>
+<td style="text-align: right;">221.4</td>
+</tr>
+<tr>
+<td>cpp vector<string></td>
+<td style="text-align: right;">33.2 / 30.2</td>
+<td style="text-align: right;">212.1 / 194.1</td>
+<td style="text-align: right;">925.0 / 867.9</td>
+<td style="text-align: right;">691.4</td>
+</tr>
+<tr>
+<td>cpp vector&lt;string_view&gt;</td>
+<td style="text-align: right;">22.7 / 23.1</td>
+<td style="text-align: right;">103.9 / 98.0</td>
+<td style="text-align: right;">374.5 / 345.9</td>
+<td style="text-align: right;">348.1</td>
+</tr>
+<tr>
+<td>cpp flat offsets</td>
+<td style="text-align: right;">23.3 / 21.9</td>
+<td style="text-align: right;">102.5 / 93.8</td>
+<td style="text-align: right;">345.9 / 318.5</td>
+<td style="text-align: right;">194.6</td>
+</tr>
+<tr>
+<td>rust Vec<String></td>
+<td style="text-align: right;">32.2</td>
+<td style="text-align: right;">203.7</td>
+<td style="text-align: right;">777.9</td>
+<td style="text-align: right;">491.1</td>
+</tr>
+<tr>
+<td>rust Vec&lt;&amp;str&gt;</td>
+<td style="text-align: right;">22.5</td>
+<td style="text-align: right;">92.8</td>
+<td style="text-align: right;">324.7</td>
+<td style="text-align: right;">230.9</td>
+</tr>
+</tbody>
+</table>
+<p>Goose, vector<string>, and Vec<String> own the split words. The
+string_view, flat-offset, and Vec&lt;&amp;str&gt; rows borrow the input
+instead, so their lifetime and ownership requirements differ. Goose uses
+the standard library each_split and packs owned strings into one
+contiguous list.</p>
+<h2 id="records">records</h2>
+<p>Build a log of N variant records, aggregate it four times.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=500000)</th>
+<th style="text-align: right;">medium (N=4000000)</th>
+<th style="text-align: right;">large (N=16000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose variable enum</td>
+<td style="text-align: right;">27.8 / 29.5</td>
+<td style="text-align: right;">114.6 / 124.2</td>
+<td style="text-align: right;">394.2 / 441.0</td>
+<td style="text-align: right;">149.0</td>
+</tr>
+<tr>
+<td>goose fixed enum</td>
+<td style="text-align: right;">30.9 / 31.1</td>
+<td style="text-align: right;">130.2 / 130.2</td>
+<td style="text-align: right;">464.5 / 466.8</td>
+<td style="text-align: right;">328.2</td>
+</tr>
+<tr>
+<td>cpp virtual + unique_ptr</td>
+<td style="text-align: right;">66.5 / 66.2</td>
+<td style="text-align: right;">501.1 / 435.5</td>
+<td style="text-align: right;">1,641.5 / 1,678.2</td>
+<td style="text-align: right;">712.9</td>
+</tr>
+<tr>
+<td>cpp variant + string</td>
+<td style="text-align: right;">54.2 / 47.7</td>
+<td style="text-align: right;">312.6 / 268.0</td>
+<td style="text-align: right;">1,090.5 / 1,006.4</td>
+<td style="text-align: right;">1,103.2</td>
+</tr>
+<tr>
+<td>cpp variant + buffer</td>
+<td style="text-align: right;">32.7 / 37.1</td>
+<td style="text-align: right;">162.6 / 173.3</td>
+<td style="text-align: right;">588.6 / 625.5</td>
+<td style="text-align: right;">556.9</td>
+</tr>
+<tr>
+<td>rust enum + String</td>
+<td style="text-align: right;">42.9</td>
+<td style="text-align: right;">232.9</td>
+<td style="text-align: right;">891.8</td>
+<td style="text-align: right;">593.4</td>
+</tr>
+</tbody>
+</table>
+<p>The variable enum stores each record at the size of its own variant,
+including inline text. The fixed-enum Goose row controls for that
+representation choice. C++ variant and Rust enum reserve space for the
+largest payload in every element; their owned strings may also allocate
+separately.</p>
+<h2 id="tree">tree</h2>
+<p>Build a complete binary tree of the given depth, sum it eight
+times.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (depth=16)</th>
+<th style="text-align: right;">medium (depth=20)</th>
+<th style="text-align: right;">large (depth=24)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose pool + typed relative refs</td>
+<td style="text-align: right;">15.9 / 15.7</td>
+<td style="text-align: right;">43.9 / 44.9</td>
+<td style="text-align: right;">618.0 / 658.3</td>
+<td style="text-align: right;">391.8</td>
+</tr>
+<tr>
+<td>cpp unique_ptr</td>
+<td style="text-align: right;">20.0 / 20.1</td>
+<td style="text-align: right;">190.1 / 182.3</td>
+<td style="text-align: right;">2,948.4 / 2,880.6</td>
+<td style="text-align: right;">1,038.7</td>
+</tr>
+<tr>
+<td>cpp new/delete</td>
+<td style="text-align: right;">20.3 / 20.2</td>
+<td style="text-align: right;">175.2 / 172.7</td>
+<td style="text-align: right;">2,726.6 / 2,681.3</td>
+<td style="text-align: right;">1,038.7</td>
+</tr>
+<tr>
+<td>cpp arena + indices</td>
+<td style="text-align: right;">16.5 / 15.8</td>
+<td style="text-align: right;">47.6 / 50.0</td>
+<td style="text-align: right;">733.9 / 737.3</td>
+<td style="text-align: right;">391.5</td>
+</tr>
+<tr>
+<td>rust Box nodes</td>
+<td style="text-align: right;">19.6</td>
+<td style="text-align: right;">179.7</td>
+<td style="text-align: right;">2,777.8</td>
+<td style="text-align: right;">1,038.7</td>
+</tr>
+<tr>
+<td>rust arena + indices</td>
+<td style="text-align: right;">15.8</td>
+<td style="text-align: right;">44.5</td>
+<td style="text-align: right;">675.8</td>
+<td style="text-align: right;">391.5</td>
+</tr>
+</tbody>
+</table>
+<p>The arena rows avoid per-node allocation and recursive destruction.
+Goose links its 12-byte nodes with typed nullable relative references;
+C++ and safe Rust use u32 indices. Compare bintrees for the cost of
+repeatedly building and discarding this shape.</p>
+<h2 id="interp">interp</h2>
+<p>Build an expression tree of the given depth, evaluate it eight
+times.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (depth=16)</th>
+<th style="text-align: right;">medium (depth=20)</th>
+<th style="text-align: right;">large (depth=24)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose case functions + relative refs</td>
+<td style="text-align: right;">14.4 / 14.7</td>
+<td style="text-align: right;">18.6 / 19.1</td>
+<td style="text-align: right;">62.0 / 67.8</td>
+<td style="text-align: right;">28.0</td>
+</tr>
+<tr>
+<td>cpp virtual + unique_ptr</td>
+<td style="text-align: right;">16.3 / 16.2</td>
+<td style="text-align: right;">33.4 / 30.4</td>
+<td style="text-align: right;">341.7 / 415.1</td>
+<td style="text-align: right;">102.9</td>
+</tr>
+<tr>
+<td>cpp variant + arena</td>
+<td style="text-align: right;">15.7 / 15.0</td>
+<td style="text-align: right;">22.0 / 23.1</td>
+<td style="text-align: right;">87.3 / 96.3</td>
+<td style="text-align: right;">63.0</td>
+</tr>
+<tr>
+<td>cpp tagged union + arena</td>
+<td style="text-align: right;">14.7 / 14.7</td>
+<td style="text-align: right;">22.3 / 22.6</td>
+<td style="text-align: right;">83.5 / 93.8</td>
+<td style="text-align: right;">63.4</td>
+</tr>
+<tr>
+<td>rust enum + Box</td>
+<td style="text-align: right;">16.2</td>
+<td style="text-align: right;">33.3</td>
+<td style="text-align: right;">454.2</td>
+<td style="text-align: right;">102.9</td>
+</tr>
+<tr>
+<td>rust enum + arena indices</td>
+<td style="text-align: right;">15.4</td>
+<td style="text-align: right;">22.4</td>
+<td style="text-align: right;">87.5</td>
+<td style="text-align: right;">57.0</td>
+</tr>
+</tbody>
+</table>
+<p>Variable-size leaves and binary nodes use different amounts of
+storage in Goose. The C++ tagged union and Rust enum arenas reserve the
+largest payload in every node. The owning-pointer rows additionally pay
+for allocation and recursive destruction.</p>
+<h2 id="graph">graph</h2>
+<p>Build adjacency for V vertices and 8V edges, then BFS from four
+sources.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (V=100000)</th>
+<th style="text-align: right;">medium (V=500000)</th>
+<th style="text-align: right;">large (V=2000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose one-pass, typed relative refs</td>
+<td style="text-align: right;">42.7 / 41.2</td>
+<td style="text-align: right;">431.4 / 543.4</td>
+<td style="text-align: right;">3,911.7 / 4,078.0</td>
+<td style="text-align: right;">160.5</td>
+</tr>
+<tr>
+<td>goose CSR two-pass</td>
+<td style="text-align: right;">25.9 / 27.7</td>
+<td style="text-align: right;">82.7 / 81.4</td>
+<td style="text-align: right;">698.5 / 616.5</td>
+<td style="text-align: right;">221.7</td>
+</tr>
+<tr>
+<td>cpp vector<vector></td>
+<td style="text-align: right;">61.7 / 59.7</td>
+<td style="text-align: right;">549.3 / 456.5</td>
+<td style="text-align: right;">3,462.1 / 3,381.9</td>
+<td style="text-align: right;">211.0</td>
+</tr>
+<tr>
+<td>cpp CSR two-pass</td>
+<td style="text-align: right;">27.0 / 25.9</td>
+<td style="text-align: right;">87.9 / 94.5</td>
+<td style="text-align: right;">784.3 / 761.1</td>
+<td style="text-align: right;">221.1</td>
+</tr>
+<tr>
+<td>cpp arena + indices</td>
+<td style="text-align: right;">40.8 / 39.2</td>
+<td style="text-align: right;">510.7 / 573.9</td>
+<td style="text-align: right;">4,603.5 / 5,278.6</td>
+<td style="text-align: right;">160.1</td>
+</tr>
+<tr>
+<td>rust Vec<Vec></td>
+<td style="text-align: right;">41.8</td>
+<td style="text-align: right;">334.5</td>
+<td style="text-align: right;">2,085.4</td>
+<td style="text-align: right;">248.2</td>
+</tr>
+<tr>
+<td>rust CSR two-pass</td>
+<td style="text-align: right;">27.2</td>
+<td style="text-align: right;">99.1</td>
+<td style="text-align: right;">810.9</td>
+<td style="text-align: right;">221.1</td>
+</tr>
+<tr>
+<td>rust arena + indices</td>
+<td style="text-align: right;">40.0</td>
+<td style="text-align: right;">426.1</td>
+<td style="text-align: right;">4,441.1</td>
+<td style="text-align: right;">160.1</td>
+</tr>
+</tbody>
+</table>
+<p>CSR and linked adjacency have very different traversal locality in
+every language; compare matching representations before attributing a
+gap to the compiler. Both Goose BFS functions are checkfree: u32 vertex
+index types validate destinations on insertion, and CSR bound types
+validate offsets during construction. These retain the original
+four-byte entries. Construction and distance-array resets remain inside
+the measured process. Random-access timings vary substantially between
+runs.</p>
+<h2 id="words">words</h2>
+<p>Count word frequencies over a text of N words.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=500000)</th>
+<th style="text-align: right;">medium (N=4000000)</th>
+<th style="text-align: right;">large (N=16000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose slices + open addressing</td>
+<td style="text-align: right;">31.0 / 28.2</td>
+<td style="text-align: right;">229.6 / 179.2</td>
+<td style="text-align: right;">1,608.3 / 1,199.5</td>
+<td style="text-align: right;">535.6</td>
+</tr>
+<tr>
+<td>goose std dictionary</td>
+<td style="text-align: right;">33.2 / 34.2</td>
+<td style="text-align: right;">261.1 / 203.1</td>
+<td style="text-align: right;">1,822.2 / 1,473.4</td>
+<td style="text-align: right;">423.6</td>
+</tr>
+<tr>
+<td>cpp unordered_map<string></td>
+<td style="text-align: right;">48.5 / 46.0</td>
+<td style="text-align: right;">388.7 / 346.4</td>
+<td style="text-align: right;">3,534.9 / 3,031.3</td>
+<td style="text-align: right;">568.2</td>
+</tr>
+<tr>
+<td>cpp unordered_map&lt;string_view&gt;</td>
+<td style="text-align: right;">48.9 / 46.7</td>
+<td style="text-align: right;">407.7 / 378.8</td>
+<td style="text-align: right;">3,870.0 / 3,527.0</td>
+<td style="text-align: right;">567.2</td>
+</tr>
+<tr>
+<td>cpp open addressing</td>
+<td style="text-align: right;">45.2 / 43.0</td>
+<td style="text-align: right;">345.4 / 309.9</td>
+<td style="text-align: right;">2,214.5 / 1,987.8</td>
+<td style="text-align: right;">638.4</td>
+</tr>
+<tr>
+<td>rust HashMap&lt;&amp;str&gt;</td>
+<td style="text-align: right;">41.7</td>
+<td style="text-align: right;">320.6</td>
+<td style="text-align: right;">2,919.4</td>
+<td style="text-align: right;">559.0</td>
+</tr>
+<tr>
+<td>rust open addressing</td>
+<td style="text-align: right;">37.0</td>
+<td style="text-align: right;">296.9</td>
+<td style="text-align: right;">2,084.0</td>
+<td style="text-align: right;">675.9</td>
+</tr>
+</tbody>
+</table>
+<p>The hand-written Goose table and std dictionary differ in capacity
+and load-factor policy as well as implementation. Goose uses the
+standard library hash; the C++ and Rust open-addressed tables use
+FNV-1a, while Rust HashMap uses its default keyed hasher. The timing
+comparison therefore includes different hash functions. The dictionary
+row measures the convenience and memory tradeoff of the standard
+container.</p>
+<h2 id="particles">particles</h2>
+<p>Integrate N particles for 200 steps of f32 vector math.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=100000)</th>
+<th style="text-align: right;">medium (N=1000000)</th>
+<th style="text-align: right;">large (N=4000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose AoS, elementwise</td>
+<td style="text-align: right;">34.9 / 28.4</td>
+<td style="text-align: right;">226.8 / 159.9</td>
+<td style="text-align: right;">975.1 / 831.0</td>
+<td style="text-align: right;">99.3</td>
+</tr>
+<tr>
+<td>goose AoS, per component</td>
+<td style="text-align: right;">29.6 / 29.4</td>
+<td style="text-align: right;">170.3 / 162.9</td>
+<td style="text-align: right;">856.1 / 831.2</td>
+<td style="text-align: right;">99.3</td>
+</tr>
+<tr>
+<td>cpp AoS, per component</td>
+<td style="text-align: right;">32.4 / 28.0</td>
+<td style="text-align: right;">204.9 / 162.3</td>
+<td style="text-align: right;">914.4 / 827.2</td>
+<td style="text-align: right;">99.0</td>
+</tr>
+<tr>
+<td>cpp AoS, elementwise</td>
+<td style="text-align: right;">35.9 / 28.5</td>
+<td style="text-align: right;">234.4 / 158.9</td>
+<td style="text-align: right;">1,028.5 / 835.1</td>
+<td style="text-align: right;">99.1</td>
+</tr>
+<tr>
+<td>cpp SoA</td>
+<td style="text-align: right;">62.7 / 39.8</td>
+<td style="text-align: right;">493.7 / 311.6</td>
+<td style="text-align: right;">1,927.1 / 1,182.9</td>
+<td style="text-align: right;">99.1</td>
+</tr>
+<tr>
+<td>rust AoS, elementwise</td>
+<td style="text-align: right;">30.5</td>
+<td style="text-align: right;">173.1</td>
+<td style="text-align: right;">867.8</td>
+<td style="text-align: right;">99.1</td>
+</tr>
+<tr>
+<td>rust AoS, per component</td>
+<td style="text-align: right;">29.6</td>
+<td style="text-align: right;">165.0</td>
+<td style="text-align: right;">857.8</td>
+<td style="text-align: right;">99.1</td>
+</tr>
+</tbody>
+</table>
+<p>This flat floating-point workload offers little representation
+advantage. Compare elementwise and per-component rows to see the cost of
+expression style under each backend. The C++ struct-of-arrays row
+changes layout as well. All arithmetic is exact in binary32, so checksum
+equality is required across implementations.</p>
+<h2 id="sexp">sexp</h2>
+<p>Generate N s-expression forms, parse them into a tree, walk it four
+times.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=20000)</th>
+<th style="text-align: right;">medium (N=100000)</th>
+<th style="text-align: right;">large (N=300000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose pool + refs, inline text</td>
+<td style="text-align: right;">97.0 / 95.4</td>
+<td style="text-align: right;">475.3 / 459.7</td>
+<td style="text-align: right;">1,411.5 / 1,352.9</td>
+<td style="text-align: right;">376.2</td>
+</tr>
+<tr>
+<td>cpp unique_ptr + string</td>
+<td style="text-align: right;">378.1 / 334.3</td>
+<td style="text-align: right;">1,751.8 / 1,579.9</td>
+<td style="text-align: right;">5,256.1 / 4,614.2</td>
+<td style="text-align: right;">1,895.6</td>
+</tr>
+<tr>
+<td>cpp arena + string_view</td>
+<td style="text-align: right;">119.7 / 120.4</td>
+<td style="text-align: right;">537.2 / 542.7</td>
+<td style="text-align: right;">1,612.0 / 1,598.9</td>
+<td style="text-align: right;">968.5</td>
+</tr>
+<tr>
+<td>rust enum + Box + String</td>
+<td style="text-align: right;">300.6</td>
+<td style="text-align: right;">1,449.1</td>
+<td style="text-align: right;">4,271.4</td>
+<td style="text-align: right;">1,384.2</td>
+</tr>
+<tr>
+<td>rust arena + &amp;str</td>
+<td style="text-align: right;">113.2</td>
+<td style="text-align: right;">519.0</td>
+<td style="text-align: right;">1,571.7</td>
+<td style="text-align: right;">913.6</td>
+</tr>
+</tbody>
+</table>
+<p>Goose stores symbol text inline in variable-size nodes and links them
+with four-byte relative references. The C++ and Rust arenas borrow
+symbol text from the completed input; their owning-pointer rows allocate
+nodes and strings separately. Input generation, parsing, four walks, and
+teardown are all timed.</p>
+<h2 id="lru">lru</h2>
+<p>An LRU cache of capacity N/8 under N skewed lookups, with an
+invalidation every 16th operation.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=2000000)</th>
+<th style="text-align: right;">medium (N=8000000)</th>
+<th style="text-align: right;">large (N=32000000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose reusable pool + pool-relative refs</td>
+<td style="text-align: right;">52.7 / 44.3</td>
+<td style="text-align: right;">294.1 / 215.6</td>
+<td style="text-align: right;">2,759.9 / 2,067.9</td>
+<td style="text-align: right;">132.8</td>
+</tr>
+<tr>
+<td>cpp list + unordered_map</td>
+<td style="text-align: right;">188.1 / 240.5</td>
+<td style="text-align: right;">2,016.8 / 1,798.0</td>
+<td style="text-align: right;">9,267.9 / 8,739.2</td>
+<td style="text-align: right;">420.1</td>
+</tr>
+<tr>
+<td>cpp arena + open addressing</td>
+<td style="text-align: right;">53.3 / 47.8</td>
+<td style="text-align: right;">265.0 / 239.3</td>
+<td style="text-align: right;">2,415.2 / 2,258.3</td>
+<td style="text-align: right;">181.6</td>
+</tr>
+<tr>
+<td>rust HashMap + arena</td>
+<td style="text-align: right;">72.9</td>
+<td style="text-align: right;">543.1</td>
+<td style="text-align: right;">5,088.0</td>
+<td style="text-align: right;">172.9</td>
+</tr>
+<tr>
+<td>rust open addressing + arena</td>
+<td style="text-align: right;">49.5</td>
+<td style="text-align: right;">257.7</td>
+<td style="text-align: right;">2,249.2</td>
+<td style="text-align: right;">136.5</td>
+</tr>
+</tbody>
+</table>
+<p>Goose uses a reusable pool with four-byte pool-relative references in
+both nodes and map slots. The C++ and Rust expert rows use arena
+indices; the idiomatic C++ row uses list plus unordered_map. Backend
+differences and cache-sensitive random access matter here. The separate
+lru_indices.goose experiment is not a headline row.</p>
+<h2 id="scene">scene</h2>
+<p>Build a scene graph of the given depth, then animate it and recompute
+world transforms for 16 frames.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (depth=12)</th>
+<th style="text-align: right;">medium (depth=14)</th>
+<th style="text-align: right;">large (depth=16)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose pool + inline child refs</td>
+<td style="text-align: right;">21.6 / 20.4</td>
+<td style="text-align: right;">74.7 / 65.2</td>
+<td style="text-align: right;">459.9 / 371.3</td>
+<td style="text-align: right;">185.4</td>
+</tr>
+<tr>
+<td>cpp unique_ptr children</td>
+<td style="text-align: right;">31.4 / 30.0</td>
+<td style="text-align: right;">414.2 / 262.4</td>
+<td style="text-align: right;">2,655.7 / 2,620.3</td>
+<td style="text-align: right;">246.2</td>
+</tr>
+<tr>
+<td>cpp arena + child indices</td>
+<td style="text-align: right;">23.4 / 21.8</td>
+<td style="text-align: right;">78.8 / 72.4</td>
+<td style="text-align: right;">501.7 / 454.0</td>
+<td style="text-align: right;">369.9</td>
+</tr>
+<tr>
+<td>rust Box children</td>
+<td style="text-align: right;">29.3</td>
+<td style="text-align: right;">277.4</td>
+<td style="text-align: right;">2,628.5</td>
+<td style="text-align: right;">255.9</td>
+</tr>
+<tr>
+<td>rust arena + child indices</td>
+<td style="text-align: right;">21.1</td>
+<td style="text-align: right;">61.3</td>
+<td style="text-align: right;">378.6</td>
+<td style="text-align: right;">249.4</td>
+</tr>
+</tbody>
+</table>
+<p>Goose stores child references inline in each 117-byte node and
+composes transforms directly through references. The Rust arena uses
+child indices and a temporary transform to work within its borrowing
+rules. Goose compose and recursive update are checkfree, protecting the
+matrix kernel and its traversal against bounds-check regressions.</p>
+<h2 id="calc">calc</h2>
+<p>Generate, parse and evaluate N small arithmetic expressions, a third
+of them malformed.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=100000)</th>
+<th style="text-align: right;">medium (N=400000)</th>
+<th style="text-align: right;">large (N=1600000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose local pool + return from</td>
+<td style="text-align: right;">43.5 / 44.1</td>
+<td style="text-align: right;">131.1 / 134.1</td>
+<td style="text-align: right;">481.4 / 490.8</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>cpp unique_ptr + exceptions</td>
+<td style="text-align: right;">136.3 / 129.8</td>
+<td style="text-align: right;">494.4 / 468.4</td>
+<td style="text-align: right;">1,956.0 / 1,834.2</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>cpp arena + error codes</td>
+<td style="text-align: right;">46.3 / 41.6</td>
+<td style="text-align: right;">142.8 / 123.3</td>
+<td style="text-align: right;">514.1 / 447.6</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>rust Box + Result</td>
+<td style="text-align: right;">86.4</td>
+<td style="text-align: right;">305.1</td>
+<td style="text-align: right;">1,175.0</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>rust arena + Result</td>
+<td style="text-align: right;">40.8</td>
+<td style="text-align: right;">119.5</td>
+<td style="text-align: right;">435.8</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+</tbody>
+</table>
+<p>The workload includes malformed input and division by zero, so error
+propagation is part of the comparison. Goose uses a local pool, varint
+number payloads, a global parse cursor, and return from; C++ compares
+exceptions with explicit error codes, and Rust uses Result. This refresh
+does not isolate the individual costs of those choices.</p>
+<h2 id="bintrees">bintrees</h2>
+<p>The Benchmarks Game binary-trees: build, check and discard many trees
+up to the given depth.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (depth=15)</th>
+<th style="text-align: right;">medium (depth=17)</th>
+<th style="text-align: right;">large (depth=19)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose local pool per tree</td>
+<td style="text-align: right;">22.8 / 22.5</td>
+<td style="text-align: right;">55.1 / 54.8</td>
+<td style="text-align: right;">206.0 / 203.8</td>
+<td style="text-align: right;">31.8</td>
+</tr>
+<tr>
+<td>cpp new/delete</td>
+<td style="text-align: right;">151.6 / 151.5</td>
+<td style="text-align: right;">638.2 / 648.4</td>
+<td style="text-align: right;">3,208.4 / 3,223.7</td>
+<td style="text-align: right;">72.0</td>
+</tr>
+<tr>
+<td>cpp vector arena</td>
+<td style="text-align: right;">32.1 / 32.9</td>
+<td style="text-align: right;">98.9 / 102.6</td>
+<td style="text-align: right;">393.3 / 406.9</td>
+<td style="text-align: right;">35.8</td>
+</tr>
+<tr>
+<td>rust Box</td>
+<td style="text-align: right;">170.8</td>
+<td style="text-align: right;">677.4</td>
+<td style="text-align: right;">3,102.5</td>
+<td style="text-align: right;">72.0</td>
+</tr>
+<tr>
+<td>rust Vec arena</td>
+<td style="text-align: right;">24.5</td>
+<td style="text-align: right;">64.7</td>
+<td style="text-align: right;">235.4</td>
+<td style="text-align: right;">31.5</td>
+</tr>
+</tbody>
+</table>
+<p>This repeatedly builds and discards trees rather than retaining one
+large tree. Goose releases a local pool by resetting its data-stack
+pointer; vector arenas reuse their capacity, while new/delete and Box
+pay per-node allocation and teardown. The arena comparisons are the
+relevant controls for the allocator advantage.</p>
+<h2 id="respond">respond</h2>
+<p>Build and render N JSON responses, each a DTO holding a name and a
+list of line items.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (N=100000)</th>
+<th style="text-align: right;">medium (N=400000)</th>
+<th style="text-align: right;">large (N=1600000)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose inline DTO</td>
+<td style="text-align: right;">46.7 / 44.3</td>
+<td style="text-align: right;">140.1 / 135.7</td>
+<td style="text-align: right;">507.0 / 491.0</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>goose streaming</td>
+<td style="text-align: right;">42.2 / 38.1</td>
+<td style="text-align: right;">125.0 / 110.9</td>
+<td style="text-align: right;">454.2 / 399.9</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>cpp DTO + string</td>
+<td style="text-align: right;">74.8 / 66.4</td>
+<td style="text-align: right;">252.1 / 221.3</td>
+<td style="text-align: right;">956.2 / 832.7</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>cpp streaming</td>
+<td style="text-align: right;">45.5 / 38.4</td>
+<td style="text-align: right;">134.7 / 112.4</td>
+<td style="text-align: right;">494.7 / 402.6</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>rust DTO + String</td>
+<td style="text-align: right;">98.3</td>
+<td style="text-align: right;">346.8</td>
+<td style="text-align: right;">1,338.1</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+<tr>
+<td>rust streaming</td>
+<td style="text-align: right;">49.1</td>
+<td style="text-align: right;">145.9</td>
+<td style="text-align: right;">540.4</td>
+<td style="text-align: right;">7.8</td>
+</tr>
+</tbody>
+</table>
+<p>The DTO rows construct an object before rendering; streaming rows
+write the same response without constructing it. Goose keeps the DTO
+name, item list, and per-item text inline and performs no heap
+allocation. All rows checksum the rendered bytes with FNV-1a, including
+the Goose implementations.</p>
+<h2 id="blur">blur</h2>
+<p>16 passes of a 3x3 blur over a WxW 8-bit image.</p>
+<p>Time in ms as <code>v145 / clang</code> for the Goose and C++ rows,
+and a single rustc time for the Rust ones; memory is the peak working
+set at the largest size.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th style="text-align: right;">small (W=1024)</th>
+<th style="text-align: right;">medium (W=2048)</th>
+<th style="text-align: right;">large (W=8192)</th>
+<th style="text-align: right;">large MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>goose flat indexing</td>
+<td style="text-align: right;">32.4 / 19.5</td>
+<td style="text-align: right;">76.3 / 29.8</td>
+<td style="text-align: right;">952.1 / 266.0</td>
+<td style="text-align: right;">135.8</td>
+</tr>
+<tr>
+<td>goose row slices</td>
+<td style="text-align: right;">19.6 / 17.6</td>
+<td style="text-align: right;">31.4 / 29.2</td>
+<td style="text-align: right;">297.9 / 269.2</td>
+<td style="text-align: right;">135.8</td>
+</tr>
+<tr>
+<td>cpp flat indexing</td>
+<td style="text-align: right;">31.4 / 30.2</td>
+<td style="text-align: right;">80.5 / 75.7</td>
+<td style="text-align: right;">1,069.8 / 1,054.4</td>
+<td style="text-align: right;">181.8</td>
+</tr>
+<tr>
+<td>cpp row pointers</td>
+<td style="text-align: right;">22.3 / 20.1</td>
+<td style="text-align: right;">49.7 / 32.6</td>
+<td style="text-align: right;">564.8 / 309.0</td>
+<td style="text-align: right;">135.5</td>
+</tr>
+<tr>
+<td>rust flat indexing</td>
+<td style="text-align: right;">18.8</td>
+<td style="text-align: right;">31.2</td>
+<td style="text-align: right;">299.2</td>
+<td style="text-align: right;">136.0</td>
+</tr>
+<tr>
+<td>rust row slices</td>
+<td style="text-align: right;">17.9</td>
+<td style="text-align: right;">30.4</td>
+<td style="text-align: right;">299.8</td>
+<td style="text-align: right;">136.5</td>
+</tr>
+</tbody>
+</table>
+<p>Both Goose kernels are checkfree, including the row-slice
+constructions, so a backend gap is not evidence of surviving bounds
+checks. Row slices change the information available to the C compiler
+for alias analysis and vectorisation. Compare flat indexing and
+row-based implementations separately; all perform the same stencil and
+include image generation.</p>
+<h2 id="toolchain-v145-vs-clang">Toolchain: v145 vs clang</h2>
+<p>Ratio of v145 time to clang time at the <code>large</code> size
+(&gt;1 means clang is faster). Only rows differing by more than 5% are
+listed, biggest gap first.</p>
+<table>
+<thead>
+<tr>
+<th>benchmark</th>
+<th>implementation</th>
+<th style="text-align: right;">v145 ms</th>
+<th style="text-align: right;">clang ms</th>
+<th style="text-align: right;">v145/clang</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>blur</td>
+<td>goose flat indexing</td>
+<td style="text-align: right;">952.1</td>
+<td style="text-align: right;">266.0</td>
+<td style="text-align: right;">3.58</td>
+</tr>
+<tr>
+<td>blur</td>
+<td>cpp row pointers</td>
+<td style="text-align: right;">564.8</td>
+<td style="text-align: right;">309.0</td>
+<td style="text-align: right;">1.83</td>
+</tr>
+<tr>
+<td>particles</td>
+<td>cpp SoA</td>
+<td style="text-align: right;">1,927.1</td>
+<td style="text-align: right;">1,182.9</td>
+<td style="text-align: right;">1.63</td>
+</tr>
+<tr>
+<td>push</td>
+<td>cpp vector+reserve, indices</td>
+<td style="text-align: right;">193.0</td>
+<td style="text-align: right;">313.3</td>
+<td style="text-align: right;">0.62</td>
+</tr>
+<tr>
+<td>words</td>
+<td>goose slices + open addressing</td>
+<td style="text-align: right;">1,608.3</td>
+<td style="text-align: right;">1,199.5</td>
+<td style="text-align: right;">1.34</td>
+</tr>
+<tr>
+<td>lru</td>
+<td>goose reusable pool + pool-relative refs</td>
+<td style="text-align: right;">2,759.9</td>
+<td style="text-align: right;">2,067.9</td>
+<td style="text-align: right;">1.33</td>
+</tr>
+<tr>
+<td>scene</td>
+<td>goose pool + inline child refs</td>
+<td style="text-align: right;">459.9</td>
+<td style="text-align: right;">371.3</td>
+<td style="text-align: right;">1.24</td>
+</tr>
+<tr>
+<td>words</td>
+<td>goose std dictionary</td>
+<td style="text-align: right;">1,822.2</td>
+<td style="text-align: right;">1,473.4</td>
+<td style="text-align: right;">1.24</td>
+</tr>
+<tr>
+<td>particles</td>
+<td>cpp AoS, elementwise</td>
+<td style="text-align: right;">1,028.5</td>
+<td style="text-align: right;">835.1</td>
+<td style="text-align: right;">1.23</td>
+</tr>
+<tr>
+<td>respond</td>
+<td>cpp streaming</td>
+<td style="text-align: right;">494.7</td>
+<td style="text-align: right;">402.6</td>
+<td style="text-align: right;">1.23</td>
+</tr>
+<tr>
+<td>interp</td>
+<td>cpp virtual + unique_ptr</td>
+<td style="text-align: right;">341.7</td>
+<td style="text-align: right;">415.1</td>
+<td style="text-align: right;">0.82</td>
+</tr>
+<tr>
+<td>particles</td>
+<td>goose AoS, elementwise</td>
+<td style="text-align: right;">975.1</td>
+<td style="text-align: right;">831.0</td>
+<td style="text-align: right;">1.17</td>
+</tr>
+<tr>
+<td>push</td>
+<td>cpp deque, pointers</td>
+<td style="text-align: right;">1,541.1</td>
+<td style="text-align: right;">1,863.5</td>
+<td style="text-align: right;">0.83</td>
+</tr>
+<tr>
+<td>words</td>
+<td>cpp unordered_map<string></td>
+<td style="text-align: right;">3,534.9</td>
+<td style="text-align: right;">3,031.3</td>
+<td style="text-align: right;">1.17</td>
+</tr>
+<tr>
+<td>calc</td>
+<td>cpp arena + error codes</td>
+<td style="text-align: right;">514.1</td>
+<td style="text-align: right;">447.6</td>
+<td style="text-align: right;">1.15</td>
+</tr>
+<tr>
+<td>respond</td>
+<td>cpp DTO + string</td>
+<td style="text-align: right;">956.2</td>
+<td style="text-align: right;">832.7</td>
+<td style="text-align: right;">1.15</td>
+</tr>
+<tr>
+<td>sexp</td>
+<td>cpp unique_ptr + string</td>
+<td style="text-align: right;">5,256.1</td>
+<td style="text-align: right;">4,614.2</td>
+<td style="text-align: right;">1.14</td>
+</tr>
+<tr>
+<td>respond</td>
+<td>goose streaming</td>
+<td style="text-align: right;">454.2</td>
+<td style="text-align: right;">399.9</td>
+<td style="text-align: right;">1.14</td>
+</tr>
+<tr>
+<td>graph</td>
+<td>goose CSR two-pass</td>
+<td style="text-align: right;">698.5</td>
+<td style="text-align: right;">616.5</td>
+<td style="text-align: right;">1.13</td>
+</tr>
+<tr>
+<td>graph</td>
+<td>cpp arena + indices</td>
+<td style="text-align: right;">4,603.5</td>
+<td style="text-align: right;">5,278.6</td>
+<td style="text-align: right;">0.87</td>
+</tr>
+<tr>
+<td>words</td>
+<td>cpp open addressing</td>
+<td style="text-align: right;">2,214.5</td>
+<td style="text-align: right;">1,987.8</td>
+<td style="text-align: right;">1.11</td>
+</tr>
+<tr>
+<td>interp</td>
+<td>cpp tagged union + arena</td>
+<td style="text-align: right;">83.5</td>
+<td style="text-align: right;">93.8</td>
+<td style="text-align: right;">0.89</td>
+</tr>
+<tr>
+<td>blur</td>
+<td>goose row slices</td>
+<td style="text-align: right;">297.9</td>
+<td style="text-align: right;">269.2</td>
+<td style="text-align: right;">1.11</td>
+</tr>
+<tr>
+<td>records</td>
+<td>goose variable enum</td>
+<td style="text-align: right;">394.2</td>
+<td style="text-align: right;">441.0</td>
+<td style="text-align: right;">0.89</td>
+</tr>
+<tr>
+<td>particles</td>
+<td>cpp AoS, per component</td>
+<td style="text-align: right;">914.4</td>
+<td style="text-align: right;">827.2</td>
+<td style="text-align: right;">1.11</td>
+</tr>
+<tr>
+<td>scene</td>
+<td>cpp arena + child indices</td>
+<td style="text-align: right;">501.7</td>
+<td style="text-align: right;">454.0</td>
+<td style="text-align: right;">1.11</td>
+</tr>
+<tr>
+<td>words</td>
+<td>cpp unordered_map&lt;string_view&gt;</td>
+<td style="text-align: right;">3,870.0</td>
+<td style="text-align: right;">3,527.0</td>
+<td style="text-align: right;">1.10</td>
+</tr>
+<tr>
+<td>interp</td>
+<td>cpp variant + arena</td>
+<td style="text-align: right;">87.3</td>
+<td style="text-align: right;">96.3</td>
+<td style="text-align: right;">0.91</td>
+</tr>
+<tr>
+<td>strlist</td>
+<td>cpp flat offsets</td>
+<td style="text-align: right;">345.9</td>
+<td style="text-align: right;">318.5</td>
+<td style="text-align: right;">1.09</td>
+</tr>
+<tr>
+<td>interp</td>
+<td>goose case functions + relative refs</td>
+<td style="text-align: right;">62.0</td>
+<td style="text-align: right;">67.8</td>
+<td style="text-align: right;">0.91</td>
+</tr>
+<tr>
+<td>records</td>
+<td>cpp variant + string</td>
+<td style="text-align: right;">1,090.5</td>
+<td style="text-align: right;">1,006.4</td>
+<td style="text-align: right;">1.08</td>
+</tr>
+<tr>
+<td>strlist</td>
+<td>cpp vector&lt;string_view&gt;</td>
+<td style="text-align: right;">374.5</td>
+<td style="text-align: right;">345.9</td>
+<td style="text-align: right;">1.08</td>
+</tr>
+<tr>
+<td>sum</td>
+<td>cpp vector+reserve</td>
+<td style="text-align: right;">332.7</td>
+<td style="text-align: right;">362.2</td>
+<td style="text-align: right;">0.92</td>
+</tr>
+<tr>
+<td>lru</td>
+<td>cpp arena + open addressing</td>
+<td style="text-align: right;">2,415.2</td>
+<td style="text-align: right;">2,258.3</td>
+<td style="text-align: right;">1.07</td>
+</tr>
+<tr>
+<td>calc</td>
+<td>cpp unique_ptr + exceptions</td>
+<td style="text-align: right;">1,956.0</td>
+<td style="text-align: right;">1,834.2</td>
+<td style="text-align: right;">1.07</td>
+</tr>
+<tr>
+<td>strlist</td>
+<td>cpp vector<string></td>
+<td style="text-align: right;">925.0</td>
+<td style="text-align: right;">867.9</td>
+<td style="text-align: right;">1.07</td>
+</tr>
+<tr>
+<td>sum</td>
+<td>goose grow-only array</td>
+<td style="text-align: right;">298.8</td>
+<td style="text-align: right;">318.5</td>
+<td style="text-align: right;">0.94</td>
+</tr>
+<tr>
+<td>tree</td>
+<td>goose pool + typed relative refs</td>
+<td style="text-align: right;">618.0</td>
+<td style="text-align: right;">658.3</td>
+<td style="text-align: right;">0.94</td>
+</tr>
+<tr>
+<td>lru</td>
+<td>cpp list + unordered_map</td>
+<td style="text-align: right;">9,267.9</td>
+<td style="text-align: right;">8,739.2</td>
+<td style="text-align: right;">1.06</td>
+</tr>
+<tr>
+<td>records</td>
+<td>cpp variant + buffer</td>
+<td style="text-align: right;">588.6</td>
+<td style="text-align: right;">625.5</td>
+<td style="text-align: right;">0.94</td>
+</tr>
+</tbody>
+</table>
+<h2 id="goose-compiled-vs-jit">Goose: compiled vs JIT</h2>
+<p>The same Goose source two ways: built by <code>v145</code> from the
+generated C and run, against the compiler compiling and running it in
+one process through TinyCC. Each cell is <code>compiled / JIT</code> in
+ms.</p>
+<p>The JIT number covers the compiler's own front end and TinyCC
+compiling the program as well as running it, and TinyCC is a one-pass
+compiler with no optimizer, so this is not a measurement of Goose
+against another language -- it is what the convenience of needing no C
+toolchain costs. The memory columns are the peak working set; the JIT
+one holds the compiler, the generated C and the program at once.</p>
+<table>
+<thead>
+<tr>
+<th>benchmark</th>
+<th>implementation</th>
+<th style="text-align: right;">small</th>
+<th style="text-align: right;">medium</th>
+<th style="text-align: right;">large</th>
+<th style="text-align: right;">JIT/compiled (large)</th>
+<th style="text-align: right;">large MB compiled / JIT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sum</td>
+<td>goose grow-only array</td>
+<td style="text-align: right;">16.3 / 42.5</td>
+<td style="text-align: right;">50.2 / 196.9</td>
+<td style="text-align: right;">298.8 / 1,333.8</td>
+<td style="text-align: right;">4.46x</td>
+<td style="text-align: right;">496.1 / 499.4</td>
+</tr>
+<tr>
+<td>push</td>
+<td>goose array, typed references</td>
+<td style="text-align: right;">15.8 / 44.2</td>
+<td style="text-align: right;">50.6 / 202.1</td>
+<td style="text-align: right;">162.1 / 709.4</td>
+<td style="text-align: right;">4.38x</td>
+<td style="text-align: right;">503.8 / 507.1</td>
+</tr>
+<tr>
+<td>strlist</td>
+<td>goose inline strings, owned</td>
+<td style="text-align: right;">19.7 / 53.9</td>
+<td style="text-align: right;">76.7 / 223.9</td>
+<td style="text-align: right;">262.7 / 779.4</td>
+<td style="text-align: right;">2.97x</td>
+<td style="text-align: right;">221.4 / 226.7</td>
+</tr>
+<tr>
+<td>records</td>
+<td>goose variable enum</td>
+<td style="text-align: right;">27.8 / 68.2</td>
+<td style="text-align: right;">114.6 / 271.7</td>
+<td style="text-align: right;">394.2 / 992.0</td>
+<td style="text-align: right;">2.52x</td>
+<td style="text-align: right;">149.0 / 152.6</td>
+</tr>
+<tr>
+<td>records</td>
+<td>goose fixed enum</td>
+<td style="text-align: right;">30.9 / 69.5</td>
+<td style="text-align: right;">130.2 / 338.2</td>
+<td style="text-align: right;">464.5 / 1,222.2</td>
+<td style="text-align: right;">2.63x</td>
+<td style="text-align: right;">328.2 / 331.8</td>
+</tr>
+<tr>
+<td>tree</td>
+<td>goose pool + typed relative refs</td>
+<td style="text-align: right;">15.9 / 37.7</td>
+<td style="text-align: right;">43.9 / 111.5</td>
+<td style="text-align: right;">618.0 / 1,412.6</td>
+<td style="text-align: right;">2.29x</td>
+<td style="text-align: right;">391.8 / 395.3</td>
+</tr>
+<tr>
+<td>interp</td>
+<td>goose case functions + relative refs</td>
+<td style="text-align: right;">14.4 / 33.3</td>
+<td style="text-align: right;">18.6 / 43.1</td>
+<td style="text-align: right;">62.0 / 149.4</td>
+<td style="text-align: right;">2.41x</td>
+<td style="text-align: right;">27.9 / 31.6</td>
+</tr>
+<tr>
+<td>graph</td>
+<td>goose one-pass, typed relative refs</td>
+<td style="text-align: right;">42.7 / 83.9</td>
+<td style="text-align: right;">431.4 / 1,040.5</td>
+<td style="text-align: right;">3,911.7 / 7,662.7</td>
+<td style="text-align: right;">1.96x</td>
+<td style="text-align: right;">160.5 / 166.0</td>
+</tr>
+<tr>
+<td>graph</td>
+<td>goose CSR two-pass</td>
+<td style="text-align: right;">25.9 / 61.6</td>
+<td style="text-align: right;">82.7 / 188.7</td>
+<td style="text-align: right;">698.5 / 1,703.0</td>
+<td style="text-align: right;">2.44x</td>
+<td style="text-align: right;">221.7 / 227.0</td>
+</tr>
+<tr>
+<td>words</td>
+<td>goose slices + open addressing</td>
+<td style="text-align: right;">31.0 / 91.8</td>
+<td style="text-align: right;">229.6 / 728.5</td>
+<td style="text-align: right;">1,608.3 / 4,687.6</td>
+<td style="text-align: right;">2.91x</td>
+<td style="text-align: right;">535.6 / 541.2</td>
+</tr>
+<tr>
+<td>words</td>
+<td>goose std dictionary</td>
+<td style="text-align: right;">33.2 / 103.5</td>
+<td style="text-align: right;">261.1 / 597.7</td>
+<td style="text-align: right;">1,822.2 / 4,231.6</td>
+<td style="text-align: right;">2.32x</td>
+<td style="text-align: right;">423.6 / 429.6</td>
+</tr>
+<tr>
+<td>particles</td>
+<td>goose AoS, elementwise</td>
+<td style="text-align: right;">34.9 / 98.1</td>
+<td style="text-align: right;">226.8 / 684.6</td>
+<td style="text-align: right;">975.1 / 2,648.2</td>
+<td style="text-align: right;">2.72x</td>
+<td style="text-align: right;">99.3 / 103.1</td>
+</tr>
+<tr>
+<td>particles</td>
+<td>goose AoS, per component</td>
+<td style="text-align: right;">29.6 / 95.3</td>
+<td style="text-align: right;">170.3 / 679.1</td>
+<td style="text-align: right;">856.1 / 2,573.4</td>
+<td style="text-align: right;">3.01x</td>
+<td style="text-align: right;">99.3 / 103.2</td>
+</tr>
+<tr>
+<td>sexp</td>
+<td>goose pool + refs, inline text</td>
+<td style="text-align: right;">97.0 / 269.9</td>
+<td style="text-align: right;">475.3 / 1,235.5</td>
+<td style="text-align: right;">1,411.5 / 3,651.0</td>
+<td style="text-align: right;">2.59x</td>
+<td style="text-align: right;">376.2 / 382.0</td>
+</tr>
+<tr>
+<td>lru</td>
+<td>goose reusable pool + pool-relative refs</td>
+<td style="text-align: right;">52.7 / 123.7</td>
+<td style="text-align: right;">294.1 / 775.6</td>
+<td style="text-align: right;">2,759.9 / 6,082.3</td>
+<td style="text-align: right;">2.20x</td>
+<td style="text-align: right;">132.8 / 138.4</td>
+</tr>
+<tr>
+<td>scene</td>
+<td>goose pool + inline child refs</td>
+<td style="text-align: right;">21.6 / 86.1</td>
+<td style="text-align: right;">74.7 / 373.9</td>
+<td style="text-align: right;">459.9 / 2,148.1</td>
+<td style="text-align: right;">4.67x</td>
+<td style="text-align: right;">185.4 / 189.5</td>
+</tr>
+<tr>
+<td>calc</td>
+<td>goose local pool + return from</td>
+<td style="text-align: right;">43.5 / 129.6</td>
+<td style="text-align: right;">131.1 / 418.1</td>
+<td style="text-align: right;">481.4 / 1,547.5</td>
+<td style="text-align: right;">3.21x</td>
+<td style="text-align: right;">7.8 / 17.5</td>
+</tr>
+<tr>
+<td>bintrees</td>
+<td>goose local pool per tree</td>
+<td style="text-align: right;">22.8 / 70.9</td>
+<td style="text-align: right;">55.1 / 218.0</td>
+<td style="text-align: right;">206.0 / 885.4</td>
+<td style="text-align: right;">4.30x</td>
+<td style="text-align: right;">31.8 / 35.3</td>
+</tr>
+<tr>
+<td>respond</td>
+<td>goose inline DTO</td>
+<td style="text-align: right;">46.7 / 143.1</td>
+<td style="text-align: right;">140.1 / 466.9</td>
+<td style="text-align: right;">507.0 / 1,767.1</td>
+<td style="text-align: right;">3.49x</td>
+<td style="text-align: right;">7.8 / 18.5</td>
+</tr>
+<tr>
+<td>respond</td>
+<td>goose streaming</td>
+<td style="text-align: right;">42.2 / 108.1</td>
+<td style="text-align: right;">125.0 / 326.2</td>
+<td style="text-align: right;">454.2 / 1,202.7</td>
+<td style="text-align: right;">2.65x</td>
+<td style="text-align: right;">7.8 / 18.4</td>
+</tr>
+<tr>
+<td>blur</td>
+<td>goose flat indexing</td>
+<td style="text-align: right;">32.4 / 189.6</td>
+<td style="text-align: right;">76.3 / 649.8</td>
+<td style="text-align: right;">952.1 / 9,917.6</td>
+<td style="text-align: right;">10.42x</td>
+<td style="text-align: right;">135.8 / 139.2</td>
+</tr>
+<tr>
+<td>blur</td>
+<td>goose row slices</td>
+<td style="text-align: right;">19.6 / 181.5</td>
+<td style="text-align: right;">31.4 / 626.2</td>
+<td style="text-align: right;">297.9 / 9,512.0</td>
+<td style="text-align: right;">31.93x</td>
+<td style="text-align: right;">135.8 / 139.4</td>
+</tr>
+<tr>
+<td><strong>geometric mean</strong></td>
+<td></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"><strong>3.44x</strong></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<p>Floor for a JIT row (an empty program compiled and run, best of 5):
+30.5 ms / 15.6 MB. That is almost all compilation, and every JIT cell
+above carries it.</p>
+<h2 id="october-16-2026-refresh">October 16, 2026 refresh</h2>
+<p>The main tables are a fresh run of all sixteen benchmarks, at all
+three sizes, under MSVC, clang-cl, rustc and Goose's TinyCC backend. The
+compiler was rebuilt in Release from <code>f6d31d0e</code>, with the
+benchmark source changes in this refresh and no optional native
+packages:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>cmake <span class="op">-</span>S <span class="op">.</span> <span class="op">-</span>B build-bench-refresh <span class="op">-</span>DGOOSE_BUILTIN_LIBS<span class="op">=</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>cmake <span class="op">--</span>build build-bench-refresh <span class="op">--</span>config Release <span class="op">--</span>parallel <span class="dv">1</span> <span class="op">--</span> <span class="op">/</span>nodeReuse<span class="op">:</span>false</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>python bench<span class="op">/</span>run_bench<span class="op">.</span><span class="fu">py</span> <span class="op">--</span>exe build-bench-refresh<span class="op">/</span>Release<span class="op">/</span>goose<span class="op">.</span><span class="fu">exe</span></span></code></pre></div>
+<p>The default measurement policy is unchanged: two warm-ups, then the
+best of three whole-process runs, with checksum agreement across
+implementations. Input construction, validation, traversal, and teardown
+remain timed. No bounds checks are disabled in the headline
+measurements. The JIT rows also include compiling the program, and their
+peak memory includes this minimal compiler build; compare them
+separately from native executables.</p>
+<p>All 528 measurements succeeded. The 48 benchmark/size combinations
+agree across implementations and with the saved previous run's checksums
+(after normalizing line endings). The original and revised graph
+implementations also agree at V=1, V=2 and V=17.</p>
+<h3 id="index-types-and-checkfree-kernels">Index types and checkfree
+kernels</h3>
+<p>Both graph implementations now store destinations and queue entries
+as <code>u32 in dist</code>. The CSR implementation additionally stores
+prefix offsets as <code>u32 upto out</code>. The arrays still have
+four-byte elements and perform the same graph construction and four
+breadth-first searches. <code>dist</code> and <code>out</code> are
+initialized before constructing the typed values they validate.</p>
+<p>Both <code>bfs</code> functions are <code>checkfree</code>. A length
+assertion on the companion head/offset array states its relationship to
+<code>dist</code> once per search. Every access in traversal is then
+proven, including an index loaded from another array. The CSR successor
+offset widens the vertex to i64 before adding one, so the proof does not
+have to allow wrapping u32 arithmetic.</p>
+<p>At the source files' default sizes, <code>--bce-lines</code>
+reports:</p>
+<table>
+<thead>
+<tr>
+<th>source</th>
+<th style="text-align: right;">index checks elided</th>
+<th style="text-align: right;">slice checks elided</th>
+<th>contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>graph</td>
+<td style="text-align: right;">12/12</td>
+<td style="text-align: right;">0/0</td>
+<td>BFS</td>
+</tr>
+<tr>
+<td>graph_csr</td>
+<td style="text-align: right;">23/27</td>
+<td style="text-align: right;">0/0</td>
+<td>BFS; four checks remain in construction</td>
+</tr>
+<tr>
+<td>blur</td>
+<td style="text-align: right;">20/20</td>
+<td style="text-align: right;">0/0</td>
+<td>flat kernel</td>
+</tr>
+<tr>
+<td>blur_assert</td>
+<td style="text-align: right;">20/20</td>
+<td style="text-align: right;">0/0</td>
+<td>flat kernel with explicit precondition</td>
+</tr>
+<tr>
+<td>blur_rows</td>
+<td style="text-align: right;">20/20</td>
+<td style="text-align: right;">8/8</td>
+<td>row slices and stencil</td>
+</tr>
+<tr>
+<td>scene</td>
+<td style="text-align: right;">12/12</td>
+<td style="text-align: right;">0/0</td>
+<td>composition and recursive update</td>
+</tr>
+</tbody>
+</table>
+<p>The blur and scene annotations enforce existing elimination; they do
+not change the computation. An attempted LRU rewrite could not prove
+masked probe indices from a dynamic table length, so it was not adopted.
+This refresh makes no claim that every benchmark is entirely
+check-free.</p>
+<p><code>bench/bce_ab.py</code> still supports the annotated sources:
+its <code>--no-bce</code> diagnostic copy removes only the
+<code>checkfree</code> annotations, since their purpose is to reject
+precisely that build. It retains runtime bounds checks and index-type
+validation. The ordinary source and all headline builds retain their
+contracts.</p>
+<h3 id="paired-comparison-of-the-graph-rewrite">Paired comparison of the
+graph rewrite</h3>
+<p>Original sources from <code>f6d31d0e</code> and the revised sources
+were built with the same fresh Release compiler and C toolchains. Each
+pair ran in alternating order, with two discarded warm-up pairs and five
+measured pairs. The table reports the best time of each version at
+V=2,000,000 (16,000,000 edges, four searches); checksums agree in every
+run.</p>
+<table>
+<thead>
+<tr>
+<th>implementation</th>
+<th>backend</th>
+<th style="text-align: right;">original ms</th>
+<th style="text-align: right;">revised ms</th>
+<th style="text-align: right;">speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>graph</td>
+<td>v145</td>
+<td style="text-align: right;">4,708.4</td>
+<td style="text-align: right;">3,883.8</td>
+<td style="text-align: right;">1.21x</td>
+</tr>
+<tr>
+<td>graph</td>
+<td>clang</td>
+<td style="text-align: right;">4,822.5</td>
+<td style="text-align: right;">4,050.0</td>
+<td style="text-align: right;">1.19x</td>
+</tr>
+<tr>
+<td>graph_csr</td>
+<td>v145</td>
+<td style="text-align: right;">809.6</td>
+<td style="text-align: right;">749.1</td>
+<td style="text-align: right;">1.08x</td>
+</tr>
+<tr>
+<td>graph_csr</td>
+<td>clang</td>
+<td style="text-align: right;">744.0</td>
+<td style="text-align: right;">633.2</td>
+<td style="text-align: right;">1.17x</td>
+</tr>
+</tbody>
+</table>
+<p>This measures the complete source rewrite, including global array
+placement, unsigned index storage and extraction of BFS. It does not
+isolate the cost of removing bounds checks alone. The entry widths and
+storage requirements are unchanged. The separate small-size CSR trials
+were not consistently faster; the improvement claim is for these large
+inputs.</p>
+<p>Raw full-suite measurements are saved locally in
+<code>bench/gen/results.json</code>; the paired samples and source
+snapshots are in <code>bench/gen/refresh/</code>. As with other
+generated benchmark files, that directory is ignored by Git.</p>
+<h2 id="historical-analysis-through-october-10-2026">Historical analysis
+through October 10, 2026</h2>
+<p><strong>Everything below records earlier measurements and compiler
+experiments.</strong> Those A/B studies were not all repeated for the
+October 16 refresh. Their times, elision counts, causal explanations and
+references to "this report" describe the older run, not the current
+tables. In particular, the old conclusion that graph indices loaded from
+memory cannot be proven is superseded by the index-type implementation
+above. Use the current generated tables and <code>summary.md</code> for
+present-day comparisons; the historical material is retained as a record
+of the experiments.</p>
+<h2 id="reading-the-rust-rows-historical">Reading the Rust rows
+(historical)</h2>
+<p>The Rust comparisons use safe, idiomatic implementations. C++ has
+separate idiomatic and expert tiers. Where two Rust implementations
+differ in ownership or data structure, both are listed:</p>
+<ul>
+<li><code>strlist</code> has <code>Vec&lt;String&gt;</code> and
+<code>Vec&lt;&amp;str&gt;</code>, which differ in <em>ownership</em>.
+Only the first can outlive the text it came from, which is the semantics
+the Goose row has.</li>
+<li><code>tree</code>, <code>interp</code>, <code>sexp</code>,
+<code>scene</code>, <code>calc</code> and <code>bintrees</code> have an
+owning-pointer row (<code>Box</code>) and an arena row (<code>Vec</code>
+plus <code>u32</code> indices). Both are safe and both are idiomatic;
+the arena is what the community recommends for anything pointer-heavy,
+and <code>design.md</code> predicted it would be the real comparison
+point rather than <code>Box</code>. It is, by 2.5x (<code>calc</code>)
+to 14x (<code>bintrees</code>) on the six benchmarks that have
+both.</li>
+<li><code>graph</code> has three rows for the same reason the C++ side
+does: <code>Vec&lt;Vec&gt;</code>, CSR, and the one-pass index-linked
+arena. CSR wins there in every language and is index-based in every
+language, so <code>graph</code> is the one place where the
+references-versus-indices question does not show up in the winning
+row.</li>
+<li><code>words</code> and <code>lru</code> have a <code>HashMap</code>
+row and a hand-rolled open-addressed table, because std's default hasher
+is a security policy rather than a speed choice, and the usual Rust
+answer to that -- a hasher crate -- is outside a std-only suite. In
+<code>lru</code> both rows share the same <code>Vec</code> arena and
+free list for the nodes: std has no intrusive list and
+<code>LinkedList</code> hands out no node identity, so the idiomatic
+Rust LRU is <em>already</em> the arena, and the only thing the two rows
+differ in is the map.</li>
+<li><code>respond</code> has a DTO row (<code>String</code> and
+<code>Vec&lt;Item&gt;</code> built per request, rendered by a function
+returning a fresh <code>String</code>) and a streaming row that writes
+the JSON straight into one reused <code>String</code>, mirroring the two
+Goose rows.</li>
+<li><code>blur</code> has the obvious index-everything row and the
+row-slice/<code>windows(3)</code> iterator style a Rust programmer
+switches to when a profiler shows bounds checks -- which, it turns out,
+it would not here (see the bounds-check section).</li>
+</ul>
+<p>Everything else is a single row. The aggregate table compares Goose
+against the fastest Rust implementation in this suite.</p>
+<p>Build flags are <code>-O -C codegen-units=1</code>. Using one codegen
+unit matches the C++ compilation model: every C++ row is one translation
+unit compiled whole, and the rustc default of 16 units would deny Rust
+the same cross-function view. Everything else is left where a shipped
+Rust binary leaves it -- bounds checks on, unwinding panics, no
+<code>target-cpu</code> beyond the x86-64 baseline the C++ rows also
+build for. Goose and Rust are therefore both checked, with C++ as the
+unchecked baseline.</p>
+<h3 id="data-layouts-and-memory-use">Data layouts and memory use</h3>
+<p>Measured with <code>size_of</code> and <code>sizeof</code>, or read
+off the packed declarations:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">Rust</th>
+<th style="text-align: right;">C++</th>
+<th style="text-align: right;">Goose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tree</code> node</td>
+<td style="text-align: right;">12 arena / 24 <code>Box</code></td>
+<td style="text-align: right;">12 arena / 24
+<code>unique_ptr</code></td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr>
+<td><code>interp</code> node</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">12, both <code>variant</code> and
+union</td>
+<td style="text-align: right;">5 leaf, 9 binary</td>
+</tr>
+<tr>
+<td><code>sexp</code> node</td>
+<td style="text-align: right;">24 arena / 32 + heap</td>
+<td style="text-align: right;">24 arena / 64 + heap</td>
+<td style="text-align: right;">variable, text inline, 4-byte links</td>
+</tr>
+<tr>
+<td><code>records</code> event</td>
+<td style="text-align: right;">32 + heap for <code>Say</code></td>
+<td style="text-align: right;">48 + heap / 24 buffer</td>
+<td style="text-align: right;">variable</td>
+</tr>
+<tr>
+<td>string header</td>
+<td style="text-align: right;"><code>String</code> 24,
+<code>&amp;str</code> 16</td>
+<td style="text-align: right;"><code>std::string</code> 32</td>
+<td style="text-align: right;">none: inline varint</td>
+</tr>
+<tr>
+<td><code>lru</code> node</td>
+<td style="text-align: right;">16 arena, both rows</td>
+<td style="text-align: right;">16 arena / 24 <code>std::list</code> node
++ a map node, each malloc'd</td>
+<td style="text-align: right;">16</td>
+</tr>
+<tr>
+<td><code>lru</code> map slot</td>
+<td style="text-align: right;">8 (<code>HashMap</code> adds control
+bytes)</td>
+<td style="text-align: right;">8 / a 32-byte <code>unordered_map</code>
+node</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td><code>scene</code> node</td>
+<td style="text-align: right;">120 arena / 128 + a <code>Vec</code> per
+node</td>
+<td style="text-align: right;">120 arena / 128 + a <code>vector</code>
+per node</td>
+<td style="text-align: right;">117</td>
+</tr>
+<tr>
+<td><code>calc</code> node</td>
+<td style="text-align: right;">12 arena / 24 <code>Box</code> +
+heap</td>
+<td style="text-align: right;">16 arena / 32 <code>unique_ptr</code> +
+heap</td>
+<td style="text-align: right;">2-3 number, 3 negate, 3 paren, 6
+binary</td>
+</tr>
+<tr>
+<td><code>bintrees</code> node</td>
+<td style="text-align: right;">8 arena / 16 <code>Box</code> + heap</td>
+<td style="text-align: right;">8 arena / 16 <code>new</code> + heap</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td><code>respond</code> item</td>
+<td style="text-align: right;">24 <code>String</code> + 16 + heap</td>
+<td style="text-align: right;">32 <code>std::string</code> + 8 +
+heap</td>
+<td style="text-align: right;">sku inline, 1 + 6 + 2 varint bytes</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>records</code> row is where Rust beats C++ outright and
+still loses to Goose by 4.1x. Rust's 32 bytes against MSVC's 48 comes
+from two things: <code>String</code> is three words where
+<code>std::string</code> is four, and the enum tag hides in the
+pointer's niche rather than needing its own word. But it is still a
+<em>fixed</em> enum, so every one of the 16M elements is sized for
+<code>Say</code> whether it is a <code>Say</code> or not, and the text
+is a second allocation on top. This is a property of Rust's enum layout.
+<code>records_fixed.goose</code> provides a control with a fixed-size
+representation.</p>
+<p>Three Goose layouts differ substantially from the corresponding C++
+and Rust implementations. A <code>sexp</code> node is as big as its
+variant needs, with its symbol bytes inline behind a varint length and
+its two links 4-byte offsets into the pool -- 1.3x smaller than the same
+program with 8-byte links, which is what a language that cannot make a
+null link relative would be stuck with. A <code>scene</code> node is a
+117-byte record whose four child links are 4-byte offsets in a limited
+array inside the record (spec 5.3, 3.9), so the whole scene is one
+contiguous, position-independent block; the arena rows in both other
+languages reach the same 120 bytes with <code>uint32</code> indices, and
+their idiomatic rows pay a heap <code>vector</code>/<code>Vec</code> per
+node for the children on top of 128. A <code>calc</code> binary node is
+6 bytes -- a tag, an operator byte and two 2-byte relative references,
+because a per-input tree never spans more than a few hundred bytes --
+where the arenas' <code>u32</code> links make it 12-16 and the
+owning-pointer rows 24-32 plus a heap block per node.</p>
+<h2 id="reading-the-toolchain-table">Reading the toolchain table</h2>
+<p>The two backends are within 10% on most rows and neither dominates.
+The gaps that remain:</p>
+<ul>
+<li><strong>clang vectorises what v145 does not.</strong> Goose's flat
+<code>blur</code> is the largest gap in the suite at 3.64x (930 against
+256 ms), and the next two are the C++ <code>__restrict</code> row of the
+same kernel at 1.83x and <code>particles cpp SoA</code> at 1.62x. With
+every check in the flat kernel proven, what stops v145 is aliasing: MSVC
+reports a possible loop-carried dependence between the loads through
+<code>src</code> and the stores through <code>dst</code> (C5002, reason
+1200) and leaves the loop scalar, where it vectorises the row-slice
+form, which is 1.12x.</li>
+<li><strong>v145 is better at <code>std::vector::push_back</code> and at
+dispatch.</strong> <code>push cpp vector+reserve</code> is 0.61 (185 ms
+against 301), and clang trails on every <code>interp</code> row
+(0.84-0.91) and on <code>sum</code> (0.93 on the reserved vector, 0.97
+on Goose).</li>
+<li><strong>clang is consistently 5-25% ahead on string, hash, allocator
+and float-and-pointer work</strong>: <code>words</code> (1.10-1.12 on
+the C++ rows), <code>strlist</code> (1.06-1.13),
+<code>records variant+string</code> (1.14), <code>sexp unique_ptr</code>
+(1.16), <code>respond</code> (1.16 and 1.23 on the two C++ rows),
+<code>calc cpp arena</code> (1.16), and <code>scene</code>, where it is
+1.21 on the Goose row and 1.10 on the C++ arena.</li>
+<li>On Goose's own rows: <code>records</code> and <code>interp</code>
+favour v145 (0.89 and 0.91), <code>respond</code> streaming,
+<code>particles</code> elementwise and <code>blur_rows</code> favour
+clang by 12-14%, <code>words</code> by 1.28-1.33, and <code>lru</code>
+by 1.53 -- its pool-relative loads are a base-plus-offset that clang
+schedules and v145 does not. <code>bintrees</code>, which favoured v145
+at 0.84, is now level.</li>
+</ul>
+<p>Three conclusions change with the backend, which is why every ratio
+in this report is given per backend: against the best safe Rust row,
+<code>lru</code> is 0.72x under v145 and 1.10x under clang,
+<code>scene</code> 0.83x and 1.00x, and <code>blur</code> 0.98x and
+1.10x. <code>graph</code> and <code>bintrees</code>, which used to be on
+this list, are on the same side of the Rust row under both backends
+now.</p>
+<h2 id="reading-the-jit-table">Reading the JIT table</h2>
+<p>TinyCC keeps a C local in a stack slot and holds values in registers
+only within one expression. The generated C reads each operand into a
+temporary of its own before later operands run, so that a later operand
+cannot change what an earlier one read; clang and MSVC erase those
+temporaries, and TinyCC turns each into a store and a reload. That is
+most of why the JIT rows went from 2.96x their compiled time in the
+previous report to 3.48x in this one: on <code>blur</code>, whose kernel
+is one long expression per pixel, bisecting the JIT slowdown lands on
+the commit that introduced the ordering, which took the W=2048 row from
+365 to 666 ms.</p>
+<h2 id="bounds-check-elimination-measured">Bounds-check elimination,
+measured</h2>
+<p>The compiler proves most index and slice checks away (spec 10.5).
+<code>bench/bce_ab.py</code> builds each benchmark with and without
+<code>--no-bce</code> under both toolchains, at the size baked into each
+source file rather than the report's <code>large</code> one.
+<code>--no-bce</code> switches off more than the checks: the loop-view
+hoist decides whether a loop's array length is invariant by asking BCE's
+kill summary, so with the pass off the view is re-read every iteration
+too. The A/B measures both together. The counts are per generated
+function, so a kernel inlined at two call sites counts its checks
+twice.</p>
+<table>
+<thead>
+<tr>
+<th>benchmark</th>
+<th>index checks elided</th>
+<th>slice</th>
+<th style="text-align: right;">v145 gain</th>
+<th style="text-align: right;">clang gain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>blur</td>
+<td>20/20</td>
+<td>0/0</td>
+<td style="text-align: right;"><strong>+82%</strong></td>
+<td style="text-align: right;">+3%</td>
+</tr>
+<tr>
+<td>blur_assert</td>
+<td>20/20</td>
+<td>0/0</td>
+<td style="text-align: right;"><strong>+81%</strong></td>
+<td style="text-align: right;">-1%</td>
+</tr>
+<tr>
+<td>blur_rows</td>
+<td>20/20</td>
+<td>8/8</td>
+<td style="text-align: right;"><strong>+191%</strong></td>
+<td style="text-align: right;">-1%</td>
+</tr>
+<tr>
+<td>lru</td>
+<td>6/20</td>
+<td>0/0</td>
+<td style="text-align: right;">+2%</td>
+<td style="text-align: right;">+7%</td>
+</tr>
+<tr>
+<td>scene</td>
+<td>12/12</td>
+<td>0/0</td>
+<td style="text-align: right;">+5%</td>
+<td style="text-align: right;">0%</td>
+</tr>
+<tr>
+<td>respond</td>
+<td>3/3</td>
+<td>3/3</td>
+<td style="text-align: right;">+4%</td>
+<td style="text-align: right;">-2%</td>
+</tr>
+<tr>
+<td>strlist</td>
+<td>1/2</td>
+<td>1/2</td>
+<td style="text-align: right;">+4%</td>
+<td style="text-align: right;">-2%</td>
+</tr>
+<tr>
+<td>calc</td>
+<td>19/22</td>
+<td>0/0</td>
+<td style="text-align: right;">+1%</td>
+<td style="text-align: right;">-1%</td>
+</tr>
+<tr>
+<td>records</td>
+<td>0/1</td>
+<td>0/0</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">+1%</td>
+</tr>
+<tr>
+<td>sexp</td>
+<td>11/12</td>
+<td>0/1</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">0%</td>
+</tr>
+<tr>
+<td>graph_csr</td>
+<td>15/21</td>
+<td>0/0</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">-3%</td>
+</tr>
+<tr>
+<td>graph</td>
+<td>7/9</td>
+<td>0/0</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">-6%</td>
+</tr>
+<tr>
+<td>words</td>
+<td>60/67</td>
+<td>11/12</td>
+<td style="text-align: right;">-7%</td>
+<td style="text-align: right;">+1%</td>
+</tr>
+<tr>
+<td>sum, push, tree, interp, particles, bintrees</td>
+<td>no index expressions at all</td>
+<td></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<p><code>words</code> under v145 and <code>graph</code> under clang read
+the pass-on binary <em>slower</em>, which is the noise floor of a
+cache-bound random-access row rather than a result. Everything between
+-7% and +7% is in the same category, which now includes
+<code>graph_csr</code>'s clang column, +31% in the previous round.</p>
+<p><strong>The row where it matters is the image kernel, and only under
+v145.</strong> At W=2048, 16 passes, ms, best of four:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">v145</th>
+<th style="text-align: right;">clang</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>blur</code>: <code>src[y*W + x]</code>, 20/20</td>
+<td style="text-align: right;">68</td>
+<td style="text-align: right;">23</td>
+</tr>
+<tr>
+<td><code>blur_assert</code>: the same plus a now redundant
+<code>assert(src.len == W * W)</code>, 20/20</td>
+<td style="text-align: right;">68</td>
+<td style="text-align: right;">23</td>
+</tr>
+<tr>
+<td><code>blur_rows</code>: row slices with a length assert each,
+20/20</td>
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">23</td>
+</tr>
+<tr>
+<td>any of the three with <code>--no-bce</code></td>
+<td style="text-align: right;">124-74</td>
+<td style="text-align: right;">23-24</td>
+</tr>
+</tbody>
+</table>
+<p>Under v145 the nine checks per pixel keep the loop scalar: proving
+them away is worth 1.8x on the flat kernel and 2.9x on the row-slice
+form. The flat kernel stays scalar even with every check gone, because
+MSVC cannot rule out that the stores through <code>dst</code> feed later
+loads through <code>src</code>; the row-slice form vectorises, which is
+the remaining 2.6x between the two. Under clang the checks cost nothing
+at all -- it vectorises the checked loop as fast as the unchecked one,
+exactly as it does for the Rust <code>blur_index</code> row, which keeps
+ten <code>panic_bounds_check</code> sites in its assembly and runs at
+the speed of the checkless <code>windows</code> row. In the previous
+round clang also needed the <em>loop-view hoist</em>, worth most of a
++327% on the <code>blur</code> row, because <code>src</code> and
+<code>dst</code> were fat reference parameters whose headers a byte
+store through <code>dst</code> might change. The kernel is now inlined
+at both of its calls in <code>main</code>, where the two arrays are
+locals whose headers no store can reach, and the clang build is as fast
+with the pass off as with it on.</p>
+<p><code>blur</code> proves its checks from <code>main</code>'s own
+knowledge that both arrays are <code>W * W</code> long. Before it was
+inlined, the same facts reached the kernel through its call sites: every
+call site of a specialization records what it proves about the lengths
+and integers it passes, and the body enters with the meet of those facts
+(spec 10.5). What keeps the fact alive between the two calls is that a
+call does not kill it: a callee's effects on its callers' arrays are
+summarized, and a kernel that only reads and writes elements has none,
+so the second call in <code>blur(a, b); blur(b, a)</code> knows as much
+as the first. The <code>assert</code> in <code>blur_assert.goose</code>
+is redundant, and the two rows time the same; the row slices in
+<code>blur_rows.goose</code> also lose their slice checks, since the
+slice's upper bound is measured against a length the kernel knows.</p>
+<p><strong>Every check that survives elsewhere is an index that came out
+of memory.</strong> <code>dist[u]</code> where <code>u = q[qh]</code>,
+<code>dist[w]</code> where <code>w = cur.to</code>,
+<code>out[cursor[s]]</code> in the CSR fill,
+<code>pool[slots[at].node]</code> throughout <code>lru</code>. The
+analysis gets everything derived from loop counters, lengths, constant
+masks and reductions, and nothing that was loaded from a data structure
+-- which is what <code>test/optimizer/bce.goose</code> documents.
+<code>blur</code> adds a second class, an index that is a
+<em>product</em> of two counters; the difference-constraint domain
+carries one-shot product and two-term-sum bases for that idiom, which is
+also what takes <code>scene</code> to 12/12.</p>
+<p>Rewrites were tried to see whether any natural form unlocks the
+loaded-index checks, and none is worth adopting: making
+<code>graph</code>'s arrays globals (the invariant would have to hold on
+array <em>contents</em>), deriving <code>words</code>'s mask from
+<code>slots.len</code>, using the documented <code>%</code> reduction
+(the range fact does not survive the loop back-edge), and one
+<code>assert</code> at the top of the probe loop -- all four timing
+within noise of each other, because those checks are perfectly predicted
+branches on values already in registers. Array-contents invariants
+themselves were implemented and measured, and bought elisions on the two
+<code>graph</code> rows with no measurable time on either, so they were
+dropped. The <code>blur</code> measurement above is the counterexample:
+a check per load in a loop that would otherwise vectorise is not free at
+all.</p>
+<h2 id="what-the-standard-library-costs-the-benchmarks">What the
+standard library costs the benchmarks</h2>
+<p>Seven of the sixteen benchmarks use <code>stdlib/</code> functions in
+place of hand-written code with the same behavior. Each adoption was
+measured on its own, at the <code>large</code> size, both toolchains,
+best of three interleaved runs, against the hand-written form it
+replaced (above 1.00 means the library form is faster):</p>
+<table>
+<thead>
+<tr>
+<th>row</th>
+<th>what it uses</th>
+<th style="text-align: right;">v145</th>
+<th style="text-align: right;">clang</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>strlist</code></td>
+<td><code>each_split</code></td>
+<td style="text-align: right;">1.04</td>
+<td style="text-align: right;">1.07</td>
+</tr>
+<tr>
+<td><code>words</code></td>
+<td><code>each_split</code>, <code>hash</code>, <code>next_pow2</code>,
+<code>push_n</code></td>
+<td style="text-align: right;">1.01</td>
+<td style="text-align: right;">1.03</td>
+</tr>
+<tr>
+<td><code>graph</code>, <code>graph_csr</code></td>
+<td><code>fill</code></td>
+<td style="text-align: right;">0.98</td>
+<td style="text-align: right;">1.04</td>
+</tr>
+<tr>
+<td><code>lru</code></td>
+<td><code>next_pow2</code>, <code>push_n</code></td>
+<td style="text-align: right;">1.03</td>
+<td style="text-align: right;">0.98</td>
+</tr>
+<tr>
+<td><code>sexp</code></td>
+<td><code>format_int</code></td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1.01</td>
+</tr>
+<tr>
+<td><code>particles</code>, <code>particles_scalar</code>,
+<code>scene</code></td>
+<td><code>vec</code>'s <code>float3</code></td>
+<td style="text-align: right;">0.99</td>
+<td style="text-align: right;">1.00</td>
+</tr>
+</tbody>
+</table>
+<p>The adopted library functions add no measurable cost; on two
+benchmarks they are slightly faster than the loops they replace. The
+<code>words</code> figures predate std's hash reading 8 bytes a step;
+against the byte-wise FNV-1a it used to be, which is also what the C++
+and Rust tables hash with, the current one measures 0.94 under v145 and
+1.19 under clang on that row. <code>respond</code> and
+<code>respond_stream</code> used <code>hash</code> too, as the checksum
+of each rendered response, and now write FNV-1a out instead: every row
+of a benchmark has to print the same checksum, and the other languages'
+rows compute FNV-1a. <code>words</code> additionally keeps a whole
+second row, <code>words_dictionary.goose</code>, which replaces the
+hand-written table with <code>dictionary&lt;u8[:], i32&gt;</code>: that
+one is a data-structure comparison, not a notation one, and the
+per-benchmark table has it.</p>
+<p>Three other substitutions were tested but not adopted:</p>
+<ul>
+<li><strong><code>format_int</code> in <code>respond</code> and
+<code>respond_stream</code></strong> costs 3-5% under v145 against the
+hand-written digit loop, and nothing under clang. Most of the original
+gap was <code>format_uint</code> dividing by its <code>base</code>
+parameter -- a real division per digit where the hand-written loop
+divides by the constant 10 -- and giving base ten its own loop in the
+library recovered about half of it. What is left is the extra call layer
+and the padding branch on a row that renders four numbers per request
+and does nothing else expensive. <code>sexp</code>, which formats one
+number per node among much other work, does not notice.</li>
+<li><strong><code>push_n</code> in <code>graph</code> and
+<code>graph_csr</code></strong> costs 2-3%: the generic
+<code>push</code> loop does not compile to the specialised one, and it
+also makes the destination array's length unprovable to the bounds-check
+pass a few statements later. <code>fill</code> alone, which is where the
+readability was, is free.</li>
+<li><strong><code>push_n</code> of a value containing self-relative
+references</strong> does not compile at all --
+<code>push_n&lt;A, T&gt;(xs: A&amp;, v: T, n: i64)</code> takes its
+value by value, and such a value cannot be copied (spec 3.9).
+<code>graph</code>'s edge-head fill stays a loop for that reason. A
+<code>T&amp;</code> parameter would not help either: the library would
+still be copying out of it.</li>
+</ul>
+<p>The library also has to be reachable from the benchmarks' own names.
+The <code>std</code> functions are global, so a local named
+<code>fill</code> shadows the library function and produces an error at
+the call rather than the declaration; <code>graph_csr</code>'s CSR write
+cursor is called <code>cursor</code> for that reason, which is also what
+it is.</p>
+<h2 id="where-goose-loses">Where Goose loses</h2>
+<p><strong>Relinking through relative references is the mutation-heavy
+case, and the pool-relative form is what makes it competitive.</strong>
+<code>lru</code> is the one benchmark in the suite that mutates links
+rather than building them once. With self-relative links and index slots
+it is 1.5x behind the Rust and C++ arenas; with spec 3.9's
+<code>in pool</code> form -- 4-byte offsets from the pool's base in the
+nodes and in the 8-byte map slots,
+<code>pool.free(pool.index_of(n))</code> closing the loop -- the row is
+3,163/2,065 ms against the Rust arena's 2,274 and the C++ arena's
+2,607/2,437: 1.10x and 1.18x ahead of them under clang, 1.39x and 1.21x
+behind under v145, on the least memory of the three. The index form is
+kept as <code>lru_indices.goose</code>; back to back, in an earlier
+round, it was level under v145 and 1.31x slower under clang. The same
+program written more ways, at the <code>large</code> size, all with the
+map holding indices, also from an earlier round:</p>
+<table>
+<thead>
+<tr>
+<th>links</th>
+<th style="text-align: right;">node</th>
+<th style="text-align: right;">v145</th>
+<th style="text-align: right;">clang</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Node&amp;&lt;u32&gt;?</code> self-relative</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">3,738</td>
+<td style="text-align: right;">3,189</td>
+</tr>
+<tr>
+<td><code>Node&amp;&lt;u64&gt;?</code> self-relative, no range
+check</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">3,573</td>
+<td style="text-align: right;">2,881</td>
+</tr>
+<tr>
+<td><code>Node?</code> plain references</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">2,557</td>
+<td style="text-align: right;">2,352</td>
+</tr>
+<tr>
+<td><code>i32</code> indices, <code>pool[i]</code> bounds-checked (the
+Rust shape)</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">2,397</td>
+<td style="text-align: right;">2,266</td>
+</tr>
+</tbody>
+</table>
+<p>Plain references and indices are level, so it is not references that
+cost and not the <code>reusable</code> pool (every variant frees and
+reuses through the same freelist, 1.3M times). It is the self-relative
+encoding: an offset computed from two addresses and stored on every
+relink -- six per hit -- and, on every load, a null test and an add
+before the next load can issue. The range check is a tenth of it under
+clang and nothing under v145; the rest is the arithmetic on the
+pointer-chasing critical path. The links were made relative for the 8
+bytes they save per node against plain references, which
+<code>lru</code> never gets to enjoy: the index shape is the same 16
+bytes. On the build-once benchmarks (<code>tree</code>,
+<code>interp</code>, <code>sexp</code>, <code>scene</code>,
+<code>bintrees</code>) the same links cost nothing measurable against
+indices, so this is specifically the relink pattern. The pool-relative
+form replaces the field-address subtraction with one from a base held in
+a register, and the load with <code>base + off</code>; clang schedules
+that far better than v145, which is the 1.53x between the two backends
+on this row and the whole of what is left. The build-once benchmarks
+keep self-relative links, whose position independence they want and
+whose cost against indices there is nothing measurable.</p>
+<p><strong>Recursive construction is no longer one of the losses, except
+in <code>calc</code>.</strong> <code>bintrees</code> builds and discards
+34M nodes in recursive calls, and used to trail the Rust arena by 24%
+under clang (282 against 228 ms). The builder takes its pool by
+reference, and the compiler now keeps that pool's top and count in
+locals across the recursion instead of going through its header at every
+push: Goose lands at 196/191 ms against the Rust arena's 221 and the C++
+arena's 378/391. <code>tree</code> -- the same node built once and
+summed eight times -- has Goose 6-10% ahead of the Rust arena.
+<code>calc</code> is 0.84-0.87x of the Rust arena: what remains there is
+the global cursor, the <code>return from</code> discriminant and a
+varint decode on values that mostly need two bytes.</p>
+<p><strong>Flat scalar kernels depend on backend optimization, with no
+memory advantage.</strong> <code>blur</code> in its obvious form is 3.3x
+behind flat Rust under v145, where MSVC leaves the loop scalar for fear
+that <code>dst</code> aliases <code>src</code>, and 1.10x <em>ahead</em>
+of it under clang (256 against 282 ms); written over row slices it is
+level with Rust under both. <code>particles</code> is 2-4% ahead of Rust
+on identical memory, which is within the noise of the row. There is no
+Goose advantage on either beyond noise, and the design did not predict
+one.</p>
+<p><strong>Pointer-linked adjacency loses to CSR, in all three
+languages.</strong> On <code>graph</code> the one-pass linked build is
+5-6x slower to traverse than two-pass count-then-fill, in every
+language. The Goose CSR row exists to show this is a data-structure
+effect rather than a language one, and Goose writes CSR level with both
+-- 791/793 ms against C++'s 803/824 and Rust's 833.</p>
+<p><strong>And v145 is a worse backend for the float-and-pointer mix
+than clang.</strong> <code>scene</code> is level with the Rust arena
+under clang and 21% behind under v145, with the C++ arena 10% behind its
+own clang build on the same row; padding the 117-byte node to 120
+changes nothing, so it is not the packed layout.</p>
+<h2 id="caveats-on-these-numbers">Caveats on these numbers</h2>
+<ul>
+<li>Whole-process wall clock, so input generation is inside every
+measurement. Where generation is a large share of the work
+(<code>sexp</code>, <code>words</code>, <code>graph</code>,
+<code>calc</code>) the ratios are diluted toward 1.0 and the gap on the
+interesting phase is larger than the table shows.</li>
+<li>Best of three runs after two discarded warm-ups. The warm-ups are
+not optional: on this machine a freshly written executable costs up to
+10x its steady-state time on the first execution and takes about three
+runs to settle, and it hits clang-linked binaries far harder than
+MSVC-linked ones. Without them the toolchain comparison measures the
+malware scanner.</li>
+<li>One machine, no core pinning. Differences under ~10% are within
+measurement noise. The threshold is ~15% for the two cache-bound
+random-access cases, <code>graph</code>'s linked rows and
+<code>lru</code>: two byte-identical <code>lru</code> binaries measured
+14% apart in the bounds-check A/B.</li>
+<li><strong>The allocator-heavy rows are the least reproducible in the
+suite, and they are the ones the headline ratio rests on.</strong>
+Running the whole harness twice back to back, the Goose rows land within
+3% of themselves, and so do the arena and CSR rows in every language --
+but the malloc-bound rows move by up to 23%. A difference in the "vs
+idiomatic" geometric mean of less than about 10% is not significant, and
+a single suite run is not enough to attribute a change to the compiler;
+that wants a per-commit A/B built from the same sources minutes apart,
+with <code>-falign-loops=32</code> under clang so a shifted hot loop
+cannot masquerade as a codegen change.</li>
+<li><strong>Reports are not comparable with each other across machine
+updates.</strong> Between the previous report and this one, most C++ and
+Rust rows got up to 6% faster, every row in every language 3-4 MB
+smaller, and the process-start floor fell from 12.4 to 7.9 ms, with no
+change to their sources: something outside the compilers changed, and
+MSVC did too (19.51.36256 to .36257). The malloc-bound C++ rows moved
+most, <code>sexp</code>'s <code>unique_ptr</code> row by 1.42x, and
+<code>tree</code>'s Goose row under v145 went from 956 to 605 ms
+although the previous compiler's C for it times the same as the current
+one's today. Compare compiler versions by building both and running them
+side by side.</li>
+<li>This CPU has a very large L3, so <code>small</code> and
+<code>medium</code> can sit entirely in cache. The <code>large</code>
+rows are the ones that stress the memory subsystem, and
+<code>calc</code>, <code>respond</code> and <code>bintrees</code> never
+leave it by design: their working set is one input, one request, one
+tree.</li>
+<li>The process-start floor is not constant between runs, and it is
+inside every <code>small</code> cell, so read those as differences from
+the floor and read ratios only at <code>large</code>.</li>
+<li>Rust rows are a single rustc time, not one per backend. rustc is
+LLVM, so the clang column is the one they are most directly comparable
+with; the Goose-vs-Rust ratios are reported against both Goose builds
+anyway.</li>
+</ul>
+<h2 id="what-the-benchmarks-say-about-the-language">What the benchmarks
+say about the language</h2>
+<p>Findings from writing and maintaining the sixteen benchmarks,
+independent of how fast anything ran. Between them they reach
+<code>reusable</code> pools, per-input arenas inside recursion,
+<code>return from</code> as a taken error path, inline child arrays,
+DTOs with nested variable-size parts, and the standard library.</p>
+<p><strong>Features that worked well:</strong> grow-only pools with
+interior references, relative references inside a single root,
+variable-mode ADTs with inline variable-size payloads, case functions as
+the dispatch mechanism, <code>reusable</code> pools with sentinel-linked
+lists, limited arrays of relative references inside pool elements, a DTO
+with a variable-size string and an inline list of variable-size records
+built by a function returning straight into the field,
+<code>return ... from</code> taken on a third of all inputs from three
+levels of recursion, per-input local pools reset by scope exit, and a
+recursive builder building into a pool it is handed by reference.</p>
+<p><strong>Difficulties encountered:</strong></p>
+<ul>
+<li><strong>Inline child arrays need their count at
+construction.</strong> The A.2 shape
+<code>(T&amp;&lt;u32&gt;)[varint]</code> is only reachable when the
+children exist before the parent is built and their number is known; a
+builder that discovers them as it goes uses a limited <code>[..k]</code>
+array inside a fixed-size node (<code>scene</code>, 17 bytes for four
+links) or sibling links (<code>sexp</code>).</li>
+<li><strong>A plain reference parameter cannot be stored relatively
+outside a recursive cycle.</strong>
+<code>fn link(prev: Node?) { pool.push(Node { next: prev }) }</code> is
+rejected at any call site that passes a pool-rooted reference: the
+parameter's root is its own per-call-site class, and nothing identifies
+that class with the global the argument came from. Inside a
+<code>recursive</code> cycle the pool-class machinery (spec 7.8) does
+make the identification, which is why <code>sexp</code>'s parser can do
+exactly this. The same identification outside a cycle is the natural
+fix.</li>
+<li><strong>Arithmetic at the operands' width bites on <code>u8</code>
+data.</strong> The first version of <code>blur</code> summed nine
+<code>u8</code> taps in <code>u8</code> and produced incorrect results;
+every tap needs <code>as u16</code>. C promotes to <code>int</code>
+silently and Rust would panic in a debug build; Goose wraps, as the spec
+says it will (6.2), but nothing in the source points at it.</li>
+<li><strong>A negative literal through a generic parameter takes
+<code>i64</code>.</strong> <code>push_n(dist, -1, V)</code> on an
+<code>i32[&gt;..]</code> fails inside the library, where the bound
+<code>T</code> is <code>i64</code> and the push does not narrow;
+<code>push_n(dist, -1 as i32, V)</code> works, and a plain
+<code>0</code> binds fine. The literal's type should follow the
+destination through the instantiation.</li>
+<li><strong>Two parses to know about.</strong>
+<code>x as u64 &amp; mask</code> reads <code>u64&amp;</code> as a
+reference type (parenthesise the cast), and an
+<code>if</code>/<code>else if</code> chain that ends without an
+<code>else</code> in tail position is an error (write early
+returns).</li>
+<li><strong>Self-relative references trade speed for position
+independence in code that relinks; pool-relative ones do not.</strong>
+Self-relative links cost nothing measurable against indices on the five
+benchmarks that build a structure once and walk it, and 1.5x on
+<code>lru</code>, which relinks six links per hit. Spec 3.9's
+<code>in pool</code> form -- offsets from a named global pool's base --
+makes the relink a subtraction from a register and lets other arrays
+hold 4-byte links into the pool; <code>lru</code> on it is level with
+the arenas under clang. The encoding is a per-field decision:
+self-relative for blobs and for local pools, <code>in pool</code> for
+relink-heavy structures in a global pool.</li>
+<li><strong>Thread queues cannot carry a relative-reference
+structure</strong> (not flat, TODO 9), and at the time of these
+measurements, save/load also lacked the whole-region copy of TODO 16.
+Serialization has since been implemented
+(<code>docs/design/serialization.md</code>); queues can carry its byte
+images, but cannot directly carry values containing relative
+references.</li>
+</ul>
+<h2 id="what-the-rust-implementations-say-about-rust">What the Rust
+implementations say about Rust</h2>
+<p>Findings from implementing the suite in Rust, independent of how fast
+anything ran. In these measurements, Rust is closer to Goose than
+idiomatic C++ on speed. The implementation differences below help
+explain the remaining gaps.</p>
+<p><strong><code>push</code> requires indices in the Rust
+implementation.</strong> <code>push</code> keeps a pointer to every 64th
+element of an array it is still appending to. In Goose that is
+<code>marks.push(items.push(...))</code> and the reference stays valid
+for the array's whole life. In Rust it does not compile: a
+<code>&amp;Item</code> borrows <code>items</code> for as long as it is
+held, so the following <code>items.push</code> is rejected. No std
+container is both pointer-stable and O(1)-append. The row uses indices
+because that is what a Rust programmer writes; the interesting cost is
+in the source, not the numbers.</p>
+<p><strong>Several Rust implementations use indices where Goose uses
+references.</strong> This applies to <code>tree</code>,
+<code>interp</code>, <code>graph</code>, <code>sexp</code>,
+<code>scene</code>, <code>calc</code>, <code>bintrees</code> and
+<code>lru</code>: the fast, safe, recommended Rust shape is a
+<code>Vec</code> arena with <code>u32</code> links, exactly as
+<code>design.md</code> predicted. What that costs is not safety -- an
+out-of-range index panics like any other Rust index -- but: the type
+says <code>u32</code>, not what it points at;
+<code>Option&lt;&amp;T&gt;</code> becomes a sentinel that occupies a
+real slot; and an index into a pool that is later reused is stale in a
+way the compiler cannot see, where a reference would have been rejected.
+Goose reaches the same layouts with <code>TNode&amp;&lt;u32&gt;?</code>:
+checked, nullable, and typed to the thing it points at.</p>
+<p><strong>The arena is sometimes worse to write than the
+<code>Box</code> row, not just different.</strong> In
+<code>scene_arena.rs</code>, <code>update</code> cannot compose into the
+node in place: <code>&amp;pool[i].local</code> and
+<code>&amp;mut pool[i].world</code> are two borrows of one
+<code>Vec</code> and neither <code>Index</code> nor
+<code>IndexMut</code> can split them, so the transform is built in a
+stack local, copied in, and the child list is copied out of the node
+before recursing. <code>scene_box.rs</code> has neither problem, because
+disjoint fields of one <code>&amp;mut</code> borrow independently. Goose
+composes straight through <code>Xf&amp;</code> references into the pool
+element.</p>
+<p><strong>The idiomatic LRU is already the arena.</strong> std has no
+intrusive list and <code>LinkedList</code> hands out no node identity,
+so O(1) move-to-front by handle needs
+<code>Rc&lt;RefCell&lt;Node&gt;&gt;</code> (two allocations and a
+refcount pair per node) or the <code>Vec</code>-plus-indices arena. Both
+Rust rows use the arena; they differ only in whether the map is
+<code>HashMap</code> (SipHash) or open addressing.</p>
+<p><strong>Rust enums are the best fixed-tag ADT of the three.</strong>
+A byte discriminant, a jump table from <code>match</code>, no vtable
+pointer, and niche optimisation that hides the tag inside a payload
+pointer. That is enough to beat <code>std::variant</code> on both time
+and memory in <code>records</code> and <code>interp</code>. What it
+cannot do is stop being fixed: every element is sized for the largest
+variant. Variable-mode enums are the one Goose feature in this suite
+without a direct counterpart in Rust's builtin enums.</p>
+<p><strong><code>Result</code> and <code>?</code> work well in
+<code>calc</code>.</strong> The Rust code reads like the C++ exception
+implementation and has a runtime cost similar to the error-code
+implementation. What the arena version gets for free --
+<code>Vec::clear()</code> as an O(1) teardown -- holds only because
+<code>Expr</code> owns nothing; a node holding a <code>String</code>
+would turn the clear back into a per-node drop walk, which is the
+ordinary case and the one Goose never has.</p>
+<p><strong>Rust's idioms are already the fast ones, twice.</strong>
+<code>collect()</code> over a <code>TrustedLen</code> iterator
+preallocates exactly, so the "did you remember to <code>reserve</code>"
+gap that <code>sum</code> and <code>push</code> measure against C++
+simply does not exist against Rust. And borrowing is the default, so
+<code>Vec&lt;&amp;str&gt;</code> and
+<code>HashMap&lt;&amp;str, _&gt;</code> are the first thing written.
+Both are real language-design wins over C++ and both shrink the Goose
+margin.</p>
+<p><strong>Where Rust pays anyway:</strong>
+<code>Box::new(T { .. })</code> builds the value in a stack temporary
+and moves it to the heap (no guaranteed construct-in-place, spec
+4.3/7.3); teardown is real and it is the same cache-hostile pointer
+chase that building was (<code>interp</code>'s <code>Box</code> row is
+behind C++ virtual dispatch; <code>bintrees</code> is nothing else);
+std's <code>HashMap</code> hashes with SipHash-1-3 by policy; and the
+borrow that makes <code>sexp</code>'s arena row fast works only because
+the text is complete before parsing starts.</p>
+<p><strong>LLVM removes what the Goose pass cannot, and keeps what it
+can.</strong> Rust's <code>blur_index</code> row keeps ten
+<code>panic_bounds_check</code> sites in its assembly and runs as fast
+as the checkless <code>windows</code> row, because LLVM vectorises
+around them; the Goose flat row under v145 is 3.3x slower for a
+different reason: its checks are all proven, but MSVC cannot rule out
+that the stores through <code>dst</code> alias the loads through
+<code>src</code> and leaves the loop scalar. The Goose row-slice form,
+which MSVC does vectorise, runs 3.3x faster than the flat one.</p>
+<h2
+id="where-the-goose-rust-gap-comes-from-and-where-it-can-still-move">Where
+the Goose-Rust gap comes from, and where it can still move</h2>
+<p>The sixteen rows split three ways by <em>why</em> the Rust comparison
+lands where it does, and only two of the three are worth working on.</p>
+<p><strong>Gains from data representation.</strong> The clearest gains
+come from differences in layout and reference rules:</p>
+<ul>
+<li><em>Variable-mode enums.</em> <code>records</code> is 2.1-2.3x
+faster on 4.1x less memory because an element costs its own variant
+rather than the largest one, and a <code>Say</code>'s text is inline
+rather than a second allocation. <code>interp</code> and
+<code>sexp</code> are the same property in a tree. Rust's enum is the
+best fixed-tag ADT of the three languages and still pays max-payload per
+element; changing that requires a different representation.</li>
+<li><em>Variable-size parts stored inside records.</em>
+<code>respond</code> builds a DTO whose string, item list and per-item
+sku are all inline, renders it with no allocation anywhere, and lands
+level with the streaming rows that never build the object. The Rust DTO
+allocates per string and per list, per request.</li>
+<li><em>References into a container that is still growing.</em>
+<code>push</code> has no safe Rust spelling at all; <code>tree</code>,
+<code>graph</code>, <code>scene</code>, <code>bintrees</code> and
+<code>calc</code> have one only as <code>u32</code> indices. Goose gets
+the arena's layout with the pointer version's types.</li>
+<li><em>Links narrower than a pointer.</em> <code>sexp</code>'s nodes
+link with 4-byte offsets, <code>calc</code>'s with 2-byte ones,
+<code>scene</code>'s four child links live in a 17-byte array inside the
+node. Rust's arena reaches 4 bytes too -- as an index, which is untyped,
+needs a sentinel slot, and goes stale silently when the pool is
+reused.</li>
+</ul>
+<p><strong>Backend, not language.</strong> <code>lru</code> under v145
+(0.72x), <code>scene</code> under v145 (0.83x), and <code>blur</code>'s
+flat form under v145 (0.98x). In all three the C++ row built by the
+<em>same</em> toolchain loses in the same direction, so it is what MSVC
+makes of a C shape, not what Goose asked for. Nothing here is closed by
+changing the language, and the ceiling is visible: each of these rows is
+level or ahead under clang. <code>bintrees</code> under clang (0.81x)
+was on this list and was not the backend after all: keeping the
+builder's pool top and count in locals made it 1.16x ahead of the Rust
+arena.</p>
+<p><strong>Costs required by the chosen semantics.</strong> The bounds
+checks that survive are indices loaded out of a data structure, which is
+exactly where a check is not redundant; <code>calc</code>'s
+<code>return from</code> discriminant is a real error path that the C++
+error-code row also pays and the exception row pays far more for. These
+are not gaps to close.</p>
+<p><strong>What would extend the lead, in order:</strong></p>
+<ol type="1">
+<li><strong>Identify a reference parameter's root class with its pool
+outside a recursive cycle</strong> (item 1 below). Narrow links are the
+memory advantage, and today a structure linked by them can only be built
+by functions inside the cycle that builds it. Lifting that makes the
+advantage available to ordinary code rather than to parsers.</li>
+<li><strong>Cross-array narrow links, everywhere they
+typecheck.</strong> <code>T&amp;&lt;u32 in pool&gt;</code> already lets
+a side table hold 4-byte links into a pool instead of indices -- that is
+what <code>lru</code>'s map does, and a grow-only array of such links
+works the same way, so <code>sexp</code>'s root list is a candidate. The
+idiom deserves to be the default advice for a side table, not an
+<code>lru</code> special case.</li>
+<li><strong>Keep looking for places a root requirement is not really
+needed.</strong> A sentinel-ended chain does not force plain 8-byte
+links, because null needs no root -- that alone is 1.3x of
+<code>sexp</code>'s memory. The same question is worth asking of every
+rule that currently demands an exact root: what does the
+<em>representation</em> actually require?</li>
+</ol>
+<h2 id="compiler-work-ordered-by-measured-benefit">Compiler work,
+ordered by measured benefit</h2>
+<p>The first item of the previous round, carrying array lengths across
+calls, is done: a call site's facts about the arguments reach the
+callee's entry, and a call kills only what the callee can actually
+resize, so <code>blur</code> proved all ten checks from what
+<code>main</code> knows and ran at the asserted kernel's speed under
+both toolchains (1.75x under v145, 141 to 77 ms at the time). What
+remains:</p>
+<ol type="1">
+<li><strong>Identify a reference parameter's root class with the pool it
+came from, outside a recursive cycle too.</strong> A non-recursive
+function that takes a <code>Node?</code> and stores it into a
+<code>Node&amp;&lt;u32&gt;?</code> field of the same pool is rejected
+today, though the identical code inside a <code>recursive</code> cycle
+is accepted; the cycle machinery already computes what is needed. This
+is what stops a linked structure's helper functions from being factored
+out of the cycle that builds it.</li>
+<li><strong>Specialise the library's element loops.</strong>
+<code>push_n</code> costs 2-3% against the <code>for</code> loop it
+replaces and blocks a bounds-check elision downstream, which is the
+whole reason two benchmarks kept their loops. The generic form should
+compile to what the loop compiles to.</li>
+<li><strong>Inline a base case that is not the first statement</strong>
+(<code>scene</code>, <code>interp</code>), and match expression-bodied
+folds (<code>if c { 0 } else { 1 + f(x) }</code>) in tail-recursion
+elimination.</li>
+</ol>
+<p>Ideas that were measured and should <strong>not</strong> be done:
+array-contents invariants for the bounds-check pass (more elisions, no
+measurable time), merging tag dispatch (1%), dropping
+<code>#pragma pack(1)</code> where the layout is already gap-free (no
+difference on either backend), fusing an <em>optional</em>
+relative-reference load with its null test (both backends get worse),
+and rewriting benchmark code so the bounds-check pass can prove loaded
+indices (no measurable gain).</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/bench/results.md"><code>bench/results.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>
