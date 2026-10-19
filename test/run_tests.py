@@ -2237,11 +2237,13 @@ def main():
         else:
             r.fail("wasm build", text)
     r.section("the compiler as WebAssembly (wasi-sdk)")
-    r.show_task(wasm_build)
+    wasm_built = r.show_task(wasm_build)
 
     # The playground's WASI shim (docs/site/play/wasi.mjs) under node, and
-    # through goose.wasm where a Wasm build is at hand.
+    # through goose.wasm where a Wasm build is at hand: once wasm_build is
+    # done, which may be relinking it.
     def wasi_shim():
+        wasm_built.result()
         node = shutil.which("node")
         if not node:
             r.say("skip the playground's WASI shim test (no node)")
