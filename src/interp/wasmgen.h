@@ -2,9 +2,11 @@
 // (docs/design/wasm_backend.md §4 to §6). A Program lowered for the VM is
 // emitted as a module whose functions are the unit's reachable ones, each
 // instruction translated to the Wasm instructions that do what the VM's
-// case for it does: every slot an i64 (a float as its bits, as the VM keeps
-// it), the operand stack as Wasm's own, locals in the frame segment at the
-// offsets lowering gave them, and a pointer the same handle, decoded at a
+// case for it does: the operand stack as Wasm's own, a value on it typed
+// (an f32 or an f64 as itself, every integer and pointer an i64, which is
+// the VM's slot with the float cases taken out; §8 item 4), locals in the
+// frame segment at the offsets lowering gave them, and a pointer the same
+// handle, decoded at a
 // load or a store through the host's segment table with the bounds check
 // the VM's Access makes, and the host's AccessSlow behind it for growth and
 // every fault (§5). The module imports the host's memory and seven
@@ -58,17 +60,19 @@ enum WOp : uint8_t {
     WO_I64_LOAD32_S = 0x34, WO_I64_LOAD32_U = 0x35,
     WO_I32_STORE = 0x36, WO_I64_STORE = 0x37, WO_F32_STORE = 0x38, WO_F64_STORE = 0x39,
     WO_I64_STORE8 = 0x3C, WO_I64_STORE16 = 0x3D, WO_I64_STORE32 = 0x3E,
-    WO_I32_CONST = 0x41, WO_I64_CONST = 0x42, WO_F64_CONST = 0x44,
+    WO_I32_CONST = 0x41, WO_I64_CONST = 0x42, WO_F32_CONST = 0x43, WO_F64_CONST = 0x44,
     WO_I32_EQZ = 0x45, WO_I32_EQ = 0x46, WO_I32_NE = 0x47, WO_I32_LT_U = 0x49, WO_I32_GT_U = 0x4B,
     WO_I32_GE_U = 0x4F,
     WO_I64_EQZ = 0x50, WO_I64_EQ = 0x51, WO_I64_NE = 0x52, WO_I64_LT_S = 0x53, WO_I64_LT_U = 0x54,
     WO_I64_GT_S = 0x55, WO_I64_GT_U = 0x56, WO_I64_LE_S = 0x57, WO_I64_LE_U = 0x58, WO_I64_GE_S = 0x59,
     WO_I64_GE_U = 0x5A,
+    WO_F32_EQ = 0x5B, WO_F32_NE = 0x5C, WO_F32_LT = 0x5D, WO_F32_GT = 0x5E, WO_F32_LE = 0x5F, WO_F32_GE = 0x60,
     WO_F64_EQ = 0x61, WO_F64_NE = 0x62, WO_F64_LT = 0x63, WO_F64_GT = 0x64, WO_F64_LE = 0x65, WO_F64_GE = 0x66,
     WO_I32_ADD = 0x6A, WO_I32_SUB = 0x6B, WO_I32_AND = 0x71, WO_I32_OR = 0x72, WO_I32_SHL = 0x74,
     WO_I64_POPCNT = 0x7B, WO_I64_ADD = 0x7C, WO_I64_SUB = 0x7D, WO_I64_MUL = 0x7E, WO_I64_DIV_S = 0x7F, WO_I64_DIV_U = 0x80,
     WO_I64_REM_S = 0x81, WO_I64_REM_U = 0x82, WO_I64_AND = 0x83, WO_I64_OR = 0x84, WO_I64_XOR = 0x85,
     WO_I64_SHL = 0x86, WO_I64_SHR_S = 0x87, WO_I64_SHR_U = 0x88,
+    WO_F32_NEG = 0x8C, WO_F32_ADD = 0x92, WO_F32_SUB = 0x93, WO_F32_MUL = 0x94, WO_F32_DIV = 0x95,
     WO_F64_NEG = 0x9A, WO_F64_ADD = 0xA0, WO_F64_SUB = 0xA1, WO_F64_MUL = 0xA2, WO_F64_DIV = 0xA3,
     WO_I32_WRAP_I64 = 0xA7, WO_I64_EXTEND_I32_S = 0xAC, WO_I64_EXTEND_I32_U = 0xAD,
     WO_I64_TRUNC_F64_S = 0xB0, WO_F32_CONVERT_I64_S = 0xB4, WO_F32_CONVERT_I64_U = 0xB5,
@@ -115,6 +119,7 @@ struct WasmGen {
     string Run() {
         Reach();
         Signatures();
+        Wrappers();
         for (auto fi : emitted) Body(fi);
         Start();
         return Module();
@@ -189,8 +194,10 @@ private:
 
     // ---- Types
 
-    // A signature is its parameter count and whether it has a result:
-    // every slot is an i64 (§4 item 5).
+    // A defined function's signature is its parameters' and result's
+    // value types; an external's, a trampoline's and an indirect call's is
+    // all i64, the slot form (§4 item 5), which a defined function with a
+    // float in its signature gets a wrapper for (Wrappers).
     struct Sig {
         vector<WasmType> params, results;
         bool operator==(const Sig &o) const { return params == o.params && results == o.results; }
@@ -215,10 +222,13 @@ private:
         if (!f.external) return f.params.size();
         return f.decl->type->params.size() + (f.sret ? 1 : 0);
     }
+    // A value's Wasm type: a float as itself, anything else an i64.
+    static WasmType WT(VT t) { return t == VT_F32 ? W_F32 : t == VT_F64 ? W_F64 : W_I64; }
     static Sig FuncSig(const Function &f) {
         Sig s;
-        s.params.assign(Arity(f), W_I64);
-        if (f.ret != VT_VOID) s.results.push_back(W_I64);
+        if (f.external) s.params.assign(Arity(f), W_I64);
+        else for (auto &p : f.params) s.params.push_back(p.size ? W_I64 : WT(p.t));
+        if (f.ret != VT_VOID) s.results.push_back(f.external ? W_I64 : WT(f.ret));
         return s;
     }
     vector<int> importsig;
@@ -254,6 +264,7 @@ private:
         int64_t off = 0;
         int idx = -1;                    // STATIC: the object
         Origin origin;
+        WasmType wt = W_I64;             // VALUE: the Wasm type of the value on the stack
     };
     vector<Sym> syms;
     // A promoted local's value's origin, where it was stored in this block
@@ -275,9 +286,12 @@ private:
     int L_TA;                            // a scratch address (i32)
     vector<int> argspill;                // i64 locals for a CALLI's arguments
     vector<int> spill;                   // i64 locals holding the operand stack across a jump (§4 item 4)
+    int tmpf = 0, tmpg = 0;              // f64 and f32 locals for values set aside, as many as the first pass used
+    int ntmp[2] = { 0, 0 };
     // Frame objects kept in Wasm locals (§8 item 1): a scalar nothing
     // addresses, reached only by the fused local instructions at its own
-    // offset in one type. By frame offset, the local's index, or -1.
+    // offset in one type. By frame offset, the local's index, or -1; the
+    // local is typed as the object is.
     unordered_map<int64_t, int> promoted;
     int L_COND;                          // a jump's condition (i32)
     int nlocals = 0;
@@ -292,6 +306,12 @@ private:
         char bits[8];
         memcpy(bits, &d, 8);
         code.Bytes(string_view(bits, 8));
+    }
+    void F32(float f) {
+        Emit(WO_F32_CONST);
+        char bits[4];
+        memcpy(bits, &f, 4);
+        code.Bytes(string_view(bits, 4));
     }
     void LocalGet(int i) { Emit(WO_LOCAL_GET); code.Uleb((uint64_t)i); }
     void LocalSet(int i) { Emit(WO_LOCAL_SET); code.Uleb((uint64_t)i); }
@@ -337,11 +357,15 @@ private:
         for (int i = 0; i < maxheight; i++) spill.push_back(nlocals++);
         Promote();
         Regions();
-        pairlocals = nlocals + npromoted;
+        pairlocals = nlocals;
         npairs = 0;
-        // Twice: the first finds the pairs each region needs.
+        ntmp[0] = ntmp[1] = 0;
+        // Twice: the first finds the pairs each region needs and the
+        // typed temporaries the code uses, which come after the pairs.
         for (int pass = 0; pass < 2; pass++) {
             collecting = pass == 0;
+            tmpf = pairlocals + 2 * npairs;
+            tmpg = tmpf + ntmp[0];
             code = WasmBuf();
             ctx.clear();
             Prologue();
@@ -354,27 +378,33 @@ private:
             Emit(WO_END);
         }
         // The locals: fpoff, fp (i32), fh, t1, t2, t3 (i64), ta, cond
-        // (i32), the argument and stack spills and the promoted locals
-        // (i64), then the pairs' bases (i32) and sizes (i64).
+        // (i32), the argument and stack spills and the promoted i64
+        // locals (i64), the promoted f64 and f32 ones, the pairs' bases
+        // (i32) and sizes (i64), then the f64 and f32 temporaries.
         WasmBuf body;
-        body.Uleb(6);
+        body.Uleb(10);
         body.Uleb(2); body.U8(W_I32);
         body.Uleb(4); body.U8(W_I64);
         body.Uleb(2); body.U8(W_I32);
-        body.Uleb(argspill.size() + spill.size() + npromoted); body.U8(W_I64);
+        body.Uleb(argspill.size() + spill.size() + npromotedof[0]); body.U8(W_I64);
+        body.Uleb((uint64_t)npromotedof[1]); body.U8(W_F64);
+        body.Uleb((uint64_t)npromotedof[2]); body.U8(W_F32);
         body.Uleb((uint64_t)npairs); body.U8(W_I32);
         body.Uleb((uint64_t)npairs); body.U8(W_I64);
+        body.Uleb((uint64_t)ntmp[0]); body.U8(W_F64);
+        body.Uleb((uint64_t)ntmp[1]); body.U8(W_F32);
         body.Bytes(code.b);
         bodies.push_back(std::move(body));
     }
 
     // ---- Locals in Wasm locals
 
-    int npromoted = 0;
+    int npromotedof[3] = { 0, 0, 0 };    // i64, f64, f32
 
     void Promote() {
         promoted.clear();
-        npromoted = 0;
+        npromotedof[0] = npromotedof[1] = npromotedof[2] = 0;
+        vector<pair<int64_t, VT>> fresh;  // the locals that are not parameters, with their types
         // What each object is reached by: an address taken, or a fused
         // instruction at some offset in some type.
         struct Use { bool addressed = false, other = false; VT t = VT_VOID; };
@@ -409,8 +439,16 @@ private:
             for (size_t p = 0; p < fn->params.size(); p++)
                 if (fn->params[p].off == o.off) param = fn->params[p].size ? -2 : (int)p;
             if (param == -2) continue;
-            promoted[o.off] = param >= 0 ? param : nlocals + npromoted++;
+            if (param >= 0) promoted[o.off] = param;
+            else fresh.push_back({ o.off, u.t });
         }
+        // Grouped by type, in the order the body declares them.
+        for (int g = 0; g < 3; g++) {
+            auto want = g == 0 ? W_I64 : g == 1 ? W_F64 : W_F32;
+            for (auto &[off, t] : fresh)
+                if (WT(t) == want) promoted[off] = nlocals + npromotedof[0] + npromotedof[1] + npromotedof[2], npromotedof[g]++;
+        }
+        nlocals += npromotedof[0] + npromotedof[1] + npromotedof[2];
     }
 
     // ---- Control flow (§4, items 2 to 4)
@@ -607,10 +645,11 @@ private:
         else DoTree(to);
     }
 
-    // The operand stack across an edge: its h values into the spill locals
-    // before, and back after.
+    // The operand stack across an edge: its h values, in slot form, into
+    // the spill locals before, and back after.
     void Spill(int h) {
         MaterializeAll();
+        for (int d = 0; d < h; d++) Coerce(d, W_I64);
         for (int i = h - 1; i >= 0; i--) LocalSet(spill[(size_t)i]);
     }
     void Reload(int h) {
@@ -640,7 +679,8 @@ private:
                 // stack spills; then the two edges as the arms of an if.
                 MaterializeAll();
                 if (last.op == OP_JCMP) { Compare((Op)last.t2, last.t); h -= 2; }
-                else { I64(0); Emit(last.op == OP_JZ ? WO_I64_EQ : WO_I64_NE); h -= 1; }
+                else { Coerce(0, W_I64); I64(0); Emit(last.op == OP_JZ ? WO_I64_EQ : WO_I64_NE); h -= 1; }
+                syms.resize((size_t)h);
                 if (h) { LocalSet(L_COND); Spill(h); LocalGet(L_COND); }
                 Block(WO_IF, -1);
                 ctx.push_back({ Ctx::IF, -1 });
@@ -999,8 +1039,8 @@ private:
         for (auto &p : regions[(size_t)ri].pairs) LoadPair(p);
     }
 
-    // A typed load from the address on top, as the VM's LoadVal: the value
-    // extended to its i64 slot, a float as the bits of its double.
+    // A typed load from the address on top, as the VM's LoadVal: an
+    // integer extended to its i64 slot, a float as itself.
     void Load(VT t, int64_t offset) {
         switch (t) {
             case VT_I8: Mem(WO_I64_LOAD8_S, offset); break;
@@ -1010,18 +1050,21 @@ private:
             case VT_U16: Mem(WO_I64_LOAD16_U, offset); break;
             case VT_I32: Mem(WO_I64_LOAD32_S, offset); break;
             case VT_U32: Mem(WO_I64_LOAD32_U, offset); break;
-            case VT_F32: Mem(WO_F32_LOAD, offset); Emit(WO_F64_PROMOTE_F32); Emit(WO_I64_REINTERPRET_F64); break;
+            case VT_F32: Mem(WO_F32_LOAD, offset); break;
+            case VT_F64: Mem(WO_F64_LOAD, offset); break;
             default: Mem(WO_I64_LOAD, offset); break;
         }
     }
 
-    // A typed store of the value on top to the address below it.
+    // A typed store of the value on top, which is of the type's Wasm
+    // type, to the address below it.
     void Store(VT t, int64_t offset) {
         switch (t) {
             case VT_I8: case VT_U8: case VT_BOOL: Mem(WO_I64_STORE8, offset); break;
             case VT_I16: case VT_U16: Mem(WO_I64_STORE16, offset); break;
             case VT_I32: case VT_U32: Mem(WO_I64_STORE32, offset); break;
-            case VT_F32: Emit(WO_F64_REINTERPRET_I64); Emit(WO_F32_DEMOTE_F64); Mem(WO_F32_STORE, offset); break;
+            case VT_F32: Mem(WO_F32_STORE, offset); break;
+            case VT_F64: Mem(WO_F64_STORE, offset); break;
             default: Mem(WO_I64_STORE, offset); break;
         }
     }
@@ -1042,19 +1085,49 @@ private:
         }
     }
 
-    // The f64 on top back into an i64 slot, rounded to float first where
-    // the type is f32, as the VM's FloatBits.
-    void FloatBits(VT t) {
-        if (t == VT_F32) { Emit(WO_F32_DEMOTE_F64); Emit(WO_F64_PROMOTE_F32); }
-        Emit(WO_I64_REINTERPRET_F64);
+    // The value on top from one Wasm type to another. An i64 holding a
+    // float is the VM's slot form, the bits of its double, so an f32 goes
+    // through f64 both ways, which is exact.
+    void Convert(WasmType from, WasmType to) {
+        if (from == to) return;
+        switch (from) {
+            case W_I64:
+                Emit(WO_F64_REINTERPRET_I64);
+                if (to == W_F32) Emit(WO_F32_DEMOTE_F64);
+                break;
+            case W_F32:
+                Emit(WO_F64_PROMOTE_F32);
+                if (to == W_I64) Emit(WO_I64_REINTERPRET_F64);
+                break;
+            default:
+                Emit(to == W_F32 ? WO_F32_DEMOTE_F64 : WO_I64_REINTERPRET_F64);
+                break;
+        }
     }
 
-    // The two i64 slots on top as two f64s, in order.
-    void TwoFloats() {
-        LocalSet(L_T1);
-        Emit(WO_F64_REINTERPRET_I64);
-        LocalGet(L_T1);
-        Emit(WO_F64_REINTERPRET_I64);
+    // A temporary of a type: the k-th spill local, or its f64 or f32
+    // counterpart, of which a function declares as many as its first
+    // emission asked for. Those are free between instructions, and within
+    // one the first two are scratch.
+    int Tmp(WasmType t, int k) {
+        if (t == W_I64) return spill[(size_t)k];
+        auto &n = ntmp[t == W_F64 ? 0 : 1];
+        if (collecting) n = max(n, k + 1);
+        else if (k >= n) Bad("a typed temporary the first pass did not see");
+        return (t == W_F64 ? tmpf : tmpg) + k;
+    }
+
+    // The value at depth d from the top brought to a Wasm type, the
+    // values above it, which must be on the stack, set aside meanwhile.
+    void Coerce(int d, WasmType want) {
+        auto idx = syms.size() - 1 - (size_t)d;
+        auto &s = syms[idx];
+        if (s.wt == want) return;
+        for (size_t j = idx; j < syms.size(); j++) if (syms[j].kind != Sym::VALUE) Bad("a coercion under a deferred address");
+        for (int k = 0; k < d; k++) LocalSet(Tmp(syms[idx + 1 + (size_t)(d - 1 - k)].wt, k));
+        Convert(s.wt, want);
+        s.wt = want;
+        for (int k = d - 1; k >= 0; k--) LocalGet(Tmp(syms[idx + 1 + (size_t)(d - 1 - k)].wt, k));
     }
 
     // The VM's PtrAdd of the delta on top to the handle below it: the sum
@@ -1078,16 +1151,22 @@ private:
     // An i32 truth value on top into an i64 slot.
     void BoolSlot() { Emit(WO_I64_EXTEND_I32_U); }
 
-    // The VM's Truth of the slot on top, as an i32.
+    // The VM's Truth of the value on top, as an i32.
     void Truth(VT t) {
-        if (IsFloat(t)) { Emit(WO_F64_REINTERPRET_I64); F64(0); Emit(WO_F64_NE); }
+        Coerce(0, WT(t));
+        if (t == VT_F32) { F32(0); Emit(WO_F32_NE); }
+        else if (t == VT_F64) { F64(0); Emit(WO_F64_NE); }
         else { I64(0); Emit(WO_I64_NE); }
     }
 
-    // A comparison of the two slots on top, leaving an i32.
+    // A comparison of the two values on top, leaving an i32.
     void Compare(Op op, VT t) {
-        if (IsFloat(t)) {
-            TwoFloats();
+        Coerce(1, WT(t));
+        Coerce(0, WT(t));
+        if (t == VT_F32) {
+            static const uint8_t ops[] = { WO_F32_EQ, WO_F32_NE, WO_F32_LT, WO_F32_LE, WO_F32_GT, WO_F32_GE };
+            Emit(ops[op - OP_EQ]);
+        } else if (t == VT_F64) {
             static const uint8_t ops[] = { WO_F64_EQ, WO_F64_NE, WO_F64_LT, WO_F64_LE, WO_F64_GT, WO_F64_GE };
             Emit(ops[op - OP_EQ]);
         } else if (IsUnsigned(t)) {
@@ -1100,16 +1179,20 @@ private:
     }
 
     void Arith(Op op, VT t) {
+        Coerce(1, WT(t));
+        Coerce(0, WT(t));
         if (IsFloat(t)) {
-            TwoFloats();
+            // An f32 operation rounds as the VM's double one rounded to
+            // float does, since a double holds the exact result's
+            // rounding (§8 item 4).
+            bool f32 = t == VT_F32;
             switch (op) {
-                case OP_ADD: Emit(WO_F64_ADD); break;
-                case OP_SUB: Emit(WO_F64_SUB); break;
-                case OP_MUL: Emit(WO_F64_MUL); break;
-                case OP_DIV: Emit(WO_F64_DIV); break;
+                case OP_ADD: Emit(f32 ? WO_F32_ADD : WO_F64_ADD); break;
+                case OP_SUB: Emit(f32 ? WO_F32_SUB : WO_F64_SUB); break;
+                case OP_MUL: Emit(f32 ? WO_F32_MUL : WO_F64_MUL); break;
+                case OP_DIV: Emit(f32 ? WO_F32_DIV : WO_F64_DIV); break;
                 default: throw CompileError { cat("wasm backend: ", OpName(op), " on a float") };
             }
-            FloatBits(t);
             return;
         }
         int bits = VTSize(t) * 8;
@@ -1131,20 +1214,20 @@ private:
         }
     }
 
-    // The VM's Convert.
+    // The VM's Convert, of the value on top.
     void Convert(VT from, VT to) {
         if (to == VT_BOOL) { Truth(from); BoolSlot(); return; }
+        Coerce(0, WT(from));
         if (IsFloat(from)) {
-            if (IsFloat(to)) { if (to == VT_F32) { Emit(WO_F64_REINTERPRET_I64); FloatBits(to); } return; }
-            Emit(WO_F64_REINTERPRET_I64);
+            if (IsFloat(to)) { Convert(WT(from), WT(to)); return; }
+            Convert(WT(from), W_F64);
             Call(IsUnsigned(to) ? helper_f2u : helper_f2i);
             Normalize(to);
             return;
         }
         if (IsFloat(to)) {
-            if (to == VT_F32) { Emit(IsUnsigned(from) ? WO_F32_CONVERT_I64_U : WO_F32_CONVERT_I64_S); Emit(WO_F64_PROMOTE_F32); }
+            if (to == VT_F32) Emit(IsUnsigned(from) ? WO_F32_CONVERT_I64_U : WO_F32_CONVERT_I64_S);
             else Emit(IsUnsigned(from) ? WO_F64_CONVERT_I64_U : WO_F64_CONVERT_I64_S);
-            Emit(WO_I64_REINTERPRET_F64);
             return;
         }
         Normalize(to);
@@ -1188,9 +1271,9 @@ private:
     }
 
     void Materialize(size_t idx) {
-        int above = 0;
-        for (size_t j = idx + 1; j < syms.size(); j++) if (syms[j].kind == Sym::VALUE) above++;
-        for (int k = 0; k < above; k++) LocalSet(spill[(size_t)k]);
+        vector<WasmType> above;          // the values above, top first
+        for (size_t j = syms.size(); j-- > idx + 1;) if (syms[j].kind == Sym::VALUE) above.push_back(syms[j].wt);
+        for (size_t k = 0; k < above.size(); k++) LocalSet(Tmp(above[k], (int)k));
         auto &s = syms[idx];
         if (s.kind == Sym::FRAME) { LocalGet(L_FH); I64(s.off); Emit(WO_I64_ADD); }
         else {
@@ -1198,8 +1281,9 @@ private:
             if (s.off) { I64(s.off); PtrAdd(); }
             s.origin = Origin { Origin::STATIC, s.idx };
         }
-        for (int k = above - 1; k >= 0; k--) LocalGet(spill[(size_t)k]);
+        for (size_t k = above.size(); k-- > 0;) LocalGet(Tmp(above[k], (int)k));
         s.kind = Sym::VALUE;
+        s.wt = W_I64;
     }
 
     // Materializes every deferred entry, or just the popped operands other
@@ -1278,9 +1362,28 @@ private:
                 break;
             default: break;
         }
-        if (!deferred) Code(in);
+        if (!deferred) { result.wt = ResultType(in); Code(in); }
         for (int i = 0; i < pops; i++) syms.pop_back();
         for (int i = 0; i < pushes; i++) syms.push_back(result);
+    }
+
+    // The Wasm type of what an instruction pushes, which Code produces.
+    WasmType ResultType(const struct Insn &in) const {
+        switch (in.op) {
+            case OP_LLOAD: case OP_LOAD: case OP_LSTOREK: case OP_STOREK: case OP_NEG:
+            case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+            case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR:
+                return WT(in.t);
+            case OP_INCDEC: return (in.t2 & 2) ? W_I64 : WT(in.t);
+            case OP_CVT: return WT((VT)in.t2);
+            case OP_DUP: return syms.back().wt;
+            case OP_CALL: {
+                auto &callee = prog.funcs[(size_t)in.imm];
+                return callee.external ? WT(in.t) : WT(callee.ret);
+            }
+            case OP_CALLI: return WT(in.t);
+            default: return W_I64;
+        }
     }
 
     void Code(const struct Insn &in) {
@@ -1288,7 +1391,7 @@ private:
             case OP_NOP: break;
             case OP_PUSH: I64(in.imm); break;
             case OP_POP: if (!Deferred(0)) Emit(WO_DROP); break;
-            case OP_DUP: LocalTee(L_T1); LocalGet(L_T1); break;
+            case OP_DUP: LocalTee(Tmp(syms.back().wt, 0)); LocalGet(Tmp(syms.back().wt, 0)); break;
             case OP_LOCAL: LocalGet(L_FH); I64(in.imm); Emit(WO_I64_ADD); break;
             case OP_LLOAD:
                 if (auto it = promoted.find(in.imm); it != promoted.end()) { LocalGet(it->second); break; }
@@ -1299,17 +1402,17 @@ private:
             case OP_LSTOREK:
                 // A promoted local holds the value as a load gives it:
                 // normalized to its type.
+                Coerce(0, WT(in.t));
                 if (auto it = promoted.find(in.imm); it != promoted.end()) {
-                    if (IsFloat(in.t)) { Emit(WO_F64_REINTERPRET_I64); FloatBits(in.t); }
-                    else Normalize(in.t);
+                    Normalize(in.t);
                     if (in.op == OP_LSTOREK) LocalTee(it->second);
                     else LocalSet(it->second);
                     break;
                 }
-                if (in.op == OP_LSTOREK) LocalTee(L_T2);
-                else LocalSet(L_T2);
+                if (in.op == OP_LSTOREK) LocalTee(Tmp(WT(in.t), 1));
+                else LocalSet(Tmp(WT(in.t), 1));
                 LocalGet(L_FP);
-                LocalGet(L_T2);
+                LocalGet(Tmp(WT(in.t), 1));
                 Store(in.t, in.imm);
                 break;
             case OP_GLOBAL: GlobalGet(staticglobal[(size_t)in.imm]); break;
@@ -1321,12 +1424,14 @@ private:
                 break;
             case OP_STORE:
             case OP_STOREK:
-                // The value above the address: set aside while the address
-                // decodes, then stored at it.
-                LocalSet(L_T2);
-                if (Deferred(1)) { DirectBase(1); LocalGet(L_T2); Store(in.t, DirectOff(1)); }
-                else { Decode(VTSize(in.t), syms[syms.size() - 2].origin); LocalGet(L_T2); Store(in.t, 0); }
-                if (in.op == OP_STOREK) LocalGet(L_T2);
+                // The value above the address: set aside, in a temporary
+                // a decode leaves alone, while the address decodes, then
+                // stored at it.
+                Coerce(0, WT(in.t));
+                LocalSet(Tmp(WT(in.t), 1));
+                if (Deferred(1)) { DirectBase(1); LocalGet(Tmp(WT(in.t), 1)); Store(in.t, DirectOff(1)); }
+                else { Decode(VTSize(in.t), syms[syms.size() - 2].origin); LocalGet(Tmp(WT(in.t), 1)); Store(in.t, 0); }
+                if (in.op == OP_STOREK) LocalGet(Tmp(WT(in.t), 1));
                 break;
             case OP_COPY: {
                 auto n = in.imm;
@@ -1387,27 +1492,28 @@ private:
                 Emit(WO_I64_DIV_S);
                 break;
             case OP_INCDEC: {
+                auto wt = (in.t2 & 2) ? W_I64 : WT(in.t);
+                int old = Tmp(wt, 0), fresh = Tmp(wt, 1);
                 if (Deferred(0)) DirectAddr(0);
                 else Decode(VTSize(in.t), syms.back().origin);
                 LocalTee(L_TA);
                 Load(in.t, 0);
-                LocalTee(L_T1);            // the old value
+                LocalTee(old);
                 if (in.t2 & 2) { I64(in.imm); PtrAdd(); }
-                else if (IsFloat(in.t)) {
-                    Emit(WO_F64_REINTERPRET_I64);
-                    F64((double)in.imm);
-                    Emit(WO_F64_ADD);
-                    FloatBits(in.t);
-                } else { I64(in.imm); Emit(WO_I64_ADD); Normalize(in.t); }
-                LocalSet(L_T2);            // the new value
+                else if (in.t == VT_F32) { F32((float)in.imm); Emit(WO_F32_ADD); }
+                else if (in.t == VT_F64) { F64((double)in.imm); Emit(WO_F64_ADD); }
+                else { I64(in.imm); Emit(WO_I64_ADD); Normalize(in.t); }
+                LocalSet(fresh);
                 LocalGet(L_TA);
-                LocalGet(L_T2);
+                LocalGet(fresh);
                 Store(in.t, 0);
-                LocalGet((in.t2 & 1) ? L_T1 : L_T2);
+                LocalGet((in.t2 & 1) ? old : fresh);
                 break;
             }
             case OP_NEG:
-                if (IsFloat(in.t)) { Emit(WO_F64_REINTERPRET_I64); Emit(WO_F64_NEG); FloatBits(in.t); }
+                Coerce(0, WT(in.t));
+                if (in.t == VT_F32) Emit(WO_F32_NEG);
+                else if (in.t == VT_F64) Emit(WO_F64_NEG);
                 else { LocalSet(L_T1); I64(0); LocalGet(L_T1); Emit(WO_I64_SUB); Normalize(in.t); }
                 break;
             case OP_NOT: I64(-1); Emit(WO_I64_XOR); Normalize(in.t); break;
@@ -1427,9 +1533,20 @@ private:
                 auto &callee = prog.funcs[(size_t)in.imm];
                 // The runtime's portable popcount, a loop, is one instruction here.
                 if (callee.name == "gs_popcount" && in.t2 == 1 && in.t == VT_I64) { Emit(WO_I64_POPCNT); break; }
-                if (!callee.external) { Call(wasmidx[(size_t)in.imm]); RefreshPairs(); break; }
-                // An external: the arguments spilled past the frame, the
-                // host called with the unit's index of the function.
+                if (!callee.external) {
+                    // The arguments as the callee's signature types them.
+                    for (int i = 0; i < (int)in.t2; i++) {
+                        auto &p = callee.params[(size_t)i];
+                        Coerce((int)in.t2 - 1 - i, p.size ? W_I64 : WT(p.t));
+                    }
+                    Call(wasmidx[(size_t)in.imm]);
+                    RefreshPairs();
+                    break;
+                }
+                // An external: the arguments, in slot form, spilled past
+                // the frame, the host called with the unit's index of the
+                // function.
+                for (int i = 0; i < (int)in.t2; i++) Coerce(i, W_I64);
                 for (int i = (int)in.t2 - 1; i >= 0; i--) {
                     LocalSet(L_T2);
                     LocalGet(L_FP);
@@ -1443,14 +1560,15 @@ private:
                 I32(in.t2);
                 CallImport(IMP_NATIVE);
                 if (in.t == VT_VOID) Emit(WO_DROP);
-                else Normalize(in.t);
+                else { Normalize(in.t); Convert(W_I64, WT(in.t)); }
                 RefreshPairs();
                 break;
             }
             case OP_CALLI: {
                 // The callee's handle is below the arguments: they go into
-                // locals, the handle decodes to its table index, and they
-                // come back for the indirect call.
+                // locals, in slot form, the handle decodes to its table
+                // index, and they come back for the indirect call.
+                for (int i = 0; i < (int)in.t2; i++) Coerce(i, W_I64);
                 for (int i = (int)in.t2 - 1; i >= 0; i--) LocalSet(argspill[(size_t)i]);
                 LocalTee(L_T1);
                 I64(32);
@@ -1489,10 +1607,12 @@ private:
                 Emit(WO_CALL_INDIRECT);
                 code.Uleb((uint64_t)SlotSig(in.t2, in.t != VT_VOID));
                 code.U8(0);
+                if (in.t != VT_VOID) Convert(W_I64, WT(in.t));
                 RefreshPairs();
                 break;
             }
             case OP_RET:
+                if (in.t != VT_VOID) Coerce(0, WT(fn->ret));
                 Epilogue();
                 Emit(WO_RETURN);
                 break;
@@ -1556,8 +1676,38 @@ private:
         startbody.Bytes(code.b);
     }
 
-    // Every emitted function is in the table, at its position.
-    int TableIndex(int fi) const { return wasmidx[(size_t)fi] - IMP_COUNT; }
+    // ---- The table
+
+    // Every emitted function is in the table at its position, and an
+    // indirect call takes the slot form of its signature, so a defined
+    // function with a float in its own gets a wrapper after them, which
+    // converts and calls it, and is what its handle names.
+    vector<int> tableidx;                // per function, or -1
+    struct Wrapper { int fi; int sig; WasmBuf body; };
+    vector<Wrapper> wrappers;
+
+    void Wrappers() {
+        tableidx.assign(prog.funcs.size(), -1);
+        for (size_t i = 0; i < emitted.size(); i++) tableidx[(size_t)emitted[i]] = (int)i;
+        for (auto fi : emitted) {
+            auto &f = prog.funcs[(size_t)fi];
+            if (f.external || funcglobal[(size_t)fi] < 0) continue;
+            auto typed = FuncSig(f);
+            auto slot = SlotSig((int)typed.params.size(), !typed.results.empty());
+            if (SigIndex(typed) == slot) continue;
+            code = WasmBuf();
+            for (size_t i = 0; i < typed.params.size(); i++) { LocalGet((int)i); Convert(W_I64, typed.params[i]); }
+            Call(wasmidx[(size_t)fi]);
+            if (!typed.results.empty()) Convert(typed.results[0], W_I64);
+            Emit(WO_END);
+            tableidx[(size_t)fi] = (int)(emitted.size() + wrappers.size());
+            Wrapper w { fi, slot, WasmBuf() };
+            w.body.Uleb(0);
+            w.body.Bytes(code.b);
+            wrappers.push_back(std::move(w));
+        }
+    }
+    int TableIndex(int fi) const { return tableidx[(size_t)fi]; }
 
     // ---- Helpers emitted in Wasm
 
@@ -1632,24 +1782,27 @@ private:
             s.Uleb(0);
             section(2, s);
         }
-        // Functions: the emitted ones, then the helpers, then _start.
-        auto nfuncs = emitted.size() + helpers.size() + 1;
+        // Functions: the emitted ones, then the helpers, the wrappers,
+        // and _start.
+        auto nfuncs = emitted.size() + helpers.size() + wrappers.size() + 1;
+        auto wrapper0 = IMP_COUNT + emitted.size() + helpers.size();
         {
             WasmBuf s;
             s.Uleb(nfuncs);
             for (auto sig : funcsig) s.Uleb((uint64_t)sig);
             for (auto &h : helpers) s.Uleb((uint64_t)h.sig);
+            for (auto &w : wrappers) s.Uleb((uint64_t)w.sig);
             s.Uleb((uint64_t)startsig);
             section(3, s);
         }
-        // The table, holding every emitted function.
+        // The table, holding every emitted function and the wrappers.
         {
             WasmBuf s;
             s.Uleb(1);
             s.U8(W_FUNCREF);
             s.U8(0x01);
-            s.Uleb(emitted.size());
-            s.Uleb(emitted.size());
+            s.Uleb(emitted.size() + wrappers.size());
+            s.Uleb(emitted.size() + wrappers.size());
             section(4, s);
         }
         // Globals: the fixed ones, then a handle and an address per static
@@ -1687,8 +1840,9 @@ private:
             s.Uleb(1);
             s.U8(0x00);
             s.U8(WO_I32_CONST); s.Sleb(0); s.U8(WO_END);
-            s.Uleb(emitted.size());
+            s.Uleb(emitted.size() + wrappers.size());
             for (size_t i = 0; i < emitted.size(); i++) s.Uleb(IMP_COUNT + i);
+            for (size_t i = 0; i < wrappers.size(); i++) s.Uleb(wrapper0 + i);
             section(9, s);
         }
         // Code.
@@ -1697,6 +1851,7 @@ private:
             s.Uleb(nfuncs);
             for (auto &b : bodies) s.Sized(b);
             for (auto &h : helpers) s.Sized(h.body);
+            for (auto &w : wrappers) s.Sized(w.body);
             s.Sized(startbody);
             section(10, s);
         }
@@ -1707,6 +1862,7 @@ private:
             for (int i = 0; i < IMP_COUNT; i++) { names.Uleb((uint64_t)i); names.Name(HostImportName((HostImport)i)); }
             for (size_t i = 0; i < emitted.size(); i++) { names.Uleb(IMP_COUNT + i); names.Name(prog.funcs[(size_t)emitted[i]].name); }
             for (size_t i = 0; i < helpers.size(); i++) { names.Uleb(IMP_COUNT + emitted.size() + i); names.Name(helpers[i].name); }
+            for (size_t i = 0; i < wrappers.size(); i++) { names.Uleb(wrapper0 + i); names.Name(prog.funcs[(size_t)wrappers[i].fi].name + "$slot"); }
             names.Uleb(IMP_COUNT + nfuncs - 1);
             names.Name("_start");
             WasmBuf s;

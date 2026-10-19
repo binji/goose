@@ -33,8 +33,8 @@ they are. The speed figures in section 3 are measurements taken on October
 twice as slow and the ratios the same); those in section 9 are estimates
 derived from them, followed by what the implementation measured.
 
-**Status.** Steps 1 to 6 of the plan (§13) and the first three items of
-§8 are implemented, in `src/interp/wasmgen.h` and the host side of
+**Status.** Steps 1 to 6 of the plan (§13) and items 1 to 4 of §8 are
+implemented, in `src/interp/wasmgen.h` and the host side of
 `vm.h` and `interp.cpp`: `goose.wasm` compiles a program's bytecode to a
 module and runs it on its own exports under `--wasm`, natively `-o`
 writes the module, `test/wasm_backend.py` runs the interpreter's C
@@ -48,8 +48,11 @@ record's or a static object's fields are accessed without a decode
 (§4 item 7 covered only the function's own scalar slots); and hoisting
 keeps a pair of locals per origin and region, refreshed after calls, in
 place of the sync-extent analysis sketched in §8, which needed none of
-codegen's analyses. Items 4 and 5 of §8 (typed slots) are not started,
-nor is the frame yield of §7.
+codegen's analyses. Typed slots (§8 item 4) type the floats only, since
+the integer kernels showed nothing to gain, and leave the slot form at the
+edges: a spill across a jump, a native call, and the table, where a
+function with a float in its signature gets an all-i64 wrapper for the
+indirect calls. The frame yield of §7 is not started.
 
 ## 1. The goal
 
@@ -401,7 +404,16 @@ are what section 9's lower estimate assumes.
    floats, removing the extends and demotes. A pass over the symbolic
    stack assigns each producer the type its consumer names (`OP_PUSH` has
    none of its own). Worth doing when a profile shows the extends, and
-   not before.
+   not before. (Done for the floats, without the pass: a value on the
+   symbolic stack carries the Wasm type its producer gave it, an `f32`
+   or `f64` as itself, and a consumer coerces what it pops, so a float
+   constant, which `OP_PUSH` leaves an i64, is reinterpreted where it is
+   used and the engine folds that. A promoted float local is a typed Wasm
+   local, and a function's signature is typed by its parameters' value
+   types. The integers stay i64: the language's integer is 64 bits wide,
+   so the narrow types are the byte arrays, whose loads extend for free,
+   and on a 64-bit host an i32 saves nothing in the arithmetic itself.
+   Measured below: the float kernel gains, the integer ones are unmoved.)
 5. **Fused compare-and-branch** is already in the bytecode (`OP_JCMP`),
    and `i64.lt_s; br_if` is what it becomes.
 
@@ -469,15 +481,37 @@ The same kernels after each step, under node, against the interpreter in
 | `21_raytrace` | 1,070 | 245 | 217 | 111 | 104 | 107 | 7.0 |
 
 Eight to twenty-eight times the interpreter, and within 2.5 to 5 times of
-the ceiling on all but the raytrace, which at 15 times off points at the
+the ceiling on all but the raytrace, which at 15 times off pointed at the
 i64 slots and the reinterprets around every float operation, item 4's
 case. The first column fell below the table above's lower estimate
 because the generated C reads a slice's data pointer through its struct
 in the frame on every element access, a decode of the frame segment the
-estimate did not count; the third column is that decode removed. The
-sieve's inner loop still spends some twenty instructions on the handle
-arithmetic and the hoisted check around its one byte store, which is
-where the next step lies.
+estimate did not count; the third column is that decode removed.
+
+Typed float slots (§8 item 4) were measured against the hoisting build
+rebuilt and run beside them on a quiet machine, which found the hoisting
+column above inflated, by the test suite that ran during it, on every
+kernel but the sieve; the ceilings re-timed the same day agree with the
+table's. Each figure is the middle of three runs:
+
+| kernel | + hoisting, re-timed | + typed floats (§8.4) | ceiling |
+|---|---|---|---|
+| `07_sieve` | 117 ms | 119 ms | 64 ms |
+| `09_sorting` merge sort | 328 | 318 | 103 |
+| `09_sorting` std sort | 521 | 512 | 59 |
+| `09_sorting` insertion | 469 | 453 | 256 |
+| `10_sudoku` sparse | 327 | 331 | 100 |
+| `21_raytrace` | 70 | 47 | 7.6 |
+
+The raytrace's `dot` is now three `f32.mul` and two `f32.add` over direct
+loads, as clang emits it, and the kernel went from 10 to 6 times the
+ceiling; the integer kernels did not move, as item 4 expected. What the
+raytrace still pays is the call protocol: each `float3` parameter is a
+decode and a `memory.copy` into the callee's frame, and each small
+function a frame bump with its limit check, which is where its next
+factor lies. The sieve's inner loop still spends some twenty instructions
+on the handle arithmetic and the hoisted check around its one byte
+store.
 
 ## 10. Changes to the existing code
 
