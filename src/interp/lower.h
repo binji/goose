@@ -164,6 +164,7 @@ private:
         frametop = RoundUp(frametop, max(align, 1));
         auto off = frametop;
         frametop += max<int64_t>(size, 1);
+        fn->locals.push_back(FrameObj { off, size });
         return off;
     }
 

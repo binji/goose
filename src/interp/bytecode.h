@@ -146,10 +146,18 @@ struct Param {
     int64_t size = 0;    // a record's size; 0 for a scalar
 };
 
+// An object in a function's frame: a parameter, a local, or a slot
+// lowering made for itself. The backend keeps a scalar one that nothing
+// addresses in a Wasm local (wasmgen.h).
+struct FrameObj {
+    int64_t off = 0, size = 0;
+};
+
 struct Function {
     string name;
     CDecl *decl = nullptr;
     vector<Insn> code;           // empty for an external
+    vector<FrameObj> locals;     // every object in the frame, in allocation order
     int64_t framesize = 0;
     int64_t maxstack = 0;        // operand slots the code needs at most, which a call reserves
     vector<Param> params;        // the hidden result pointer first where sret

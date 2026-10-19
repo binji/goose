@@ -245,6 +245,10 @@ private:
     int L_TA;                            // a scratch address (i32)
     vector<int> argspill;                // i64 locals for a CALLI's arguments
     vector<int> spill;                   // i64 locals holding the operand stack across a jump (§4 item 4)
+    // Frame objects kept in Wasm locals (§8 item 1): a scalar nothing
+    // addresses, reached only by the fused local instructions at its own
+    // offset in one type. By frame offset, the local's index, or -1.
+    unordered_map<int64_t, int> promoted;
     int L_COND;                          // a jump's condition (i32)
     int nlocals = 0;
     int64_t scratch = 0;                 // bytes past the frame for a native call's arguments
@@ -301,6 +305,7 @@ private:
         Graph();
         spill.clear();
         for (int i = 0; i < maxheight; i++) spill.push_back(nlocals++);
+        Promote();
         Prologue();
         ctx.clear();
         DoTree(0);
@@ -315,9 +320,54 @@ private:
         body.Uleb(2); body.U8(W_I32);
         body.Uleb(4); body.U8(W_I64);
         body.Uleb(2); body.U8(W_I32);
-        body.Uleb(argspill.size() + spill.size()); body.U8(W_I64);
+        body.Uleb(argspill.size() + spill.size() + npromoted); body.U8(W_I64);
         body.Bytes(code.b);
         bodies.push_back(std::move(body));
+    }
+
+    // ---- Locals in Wasm locals
+
+    int npromoted = 0;
+
+    void Promote() {
+        promoted.clear();
+        npromoted = 0;
+        // What each object is reached by: an address taken, or a fused
+        // instruction at some offset in some type.
+        struct Use { bool addressed = false, other = false; VT t = VT_VOID; };
+        vector<Use> uses(fn->locals.size());
+        auto objof = [&](int64_t off) -> int {
+            for (size_t i = 0; i < fn->locals.size(); i++) {
+                auto &o = fn->locals[i];
+                if (off >= o.off && off < o.off + max<int64_t>(o.size, 1)) return (int)i;
+            }
+            return -1;
+        };
+        for (auto &in : fn->code) {
+            if (in.op == OP_LOCAL) {
+                if (auto i = objof(in.imm); i >= 0) uses[(size_t)i].addressed = true;
+            } else if (in.op == OP_LLOAD || in.op == OP_LSTORE || in.op == OP_LSTOREK) {
+                auto i = objof(in.imm);
+                if (i < 0) continue;
+                auto &u = uses[(size_t)i];
+                auto &o = fn->locals[(size_t)i];
+                if (in.imm != o.off || VTSize(in.t) != o.size || (u.t != VT_VOID && u.t != in.t)) u.other = true;
+                u.t = in.t;
+            }
+        }
+        for (size_t i = 0; i < fn->locals.size(); i++) {
+            auto &o = fn->locals[(size_t)i];
+            auto &u = uses[i];
+            if (u.addressed || u.other || u.t == VT_VOID) continue;
+            if (o.size != 1 && o.size != 2 && o.size != 4 && o.size != 8) continue;
+            // A parameter's Wasm local is the parameter itself, unless it
+            // is a record, whose local holds the caller's address.
+            int param = -1;
+            for (size_t p = 0; p < fn->params.size(); p++)
+                if (fn->params[p].off == o.off) param = fn->params[p].size ? -2 : (int)p;
+            if (param == -2) continue;
+            promoted[o.off] = param >= 0 ? param : nlocals + npromoted++;
+        }
     }
 
     // ---- Control flow (§4, items 2 to 4)
@@ -613,6 +663,7 @@ private:
         LocalSet(L_FH);
         for (size_t i = 0; i < fn->params.size(); i++) {
             auto &p = fn->params[i];
+            if (promoted.count(p.off)) continue;
             if (p.size) {
                 LocalGet(L_FP);
                 I32((int32_t)p.off);
@@ -844,9 +895,28 @@ private:
             case OP_POP: Emit(WO_DROP); break;
             case OP_DUP: LocalTee(L_T1); LocalGet(L_T1); break;
             case OP_LOCAL: LocalGet(L_FH); I64(in.imm); Emit(WO_I64_ADD); break;
-            case OP_LLOAD: LocalGet(L_FP); Load(in.t, in.imm); break;
-            case OP_LSTORE: LocalSet(L_T2); LocalGet(L_FP); LocalGet(L_T2); Store(in.t, in.imm); break;
-            case OP_LSTOREK: LocalTee(L_T2); LocalGet(L_FP); LocalGet(L_T2); Store(in.t, in.imm); break;
+            case OP_LLOAD:
+                if (auto it = promoted.find(in.imm); it != promoted.end()) { LocalGet(it->second); break; }
+                LocalGet(L_FP);
+                Load(in.t, in.imm);
+                break;
+            case OP_LSTORE:
+            case OP_LSTOREK:
+                // A promoted local holds the value as a load gives it:
+                // normalized to its type.
+                if (auto it = promoted.find(in.imm); it != promoted.end()) {
+                    if (IsFloat(in.t)) { Emit(WO_F64_REINTERPRET_I64); FloatBits(in.t); }
+                    else Normalize(in.t);
+                    if (in.op == OP_LSTOREK) LocalTee(it->second);
+                    else LocalSet(it->second);
+                    break;
+                }
+                if (in.op == OP_LSTOREK) LocalTee(L_T2);
+                else LocalSet(L_T2);
+                LocalGet(L_FP);
+                LocalGet(L_T2);
+                Store(in.t, in.imm);
+                break;
             case OP_GLOBAL: GlobalGet(staticglobal[(size_t)in.imm]); break;
             case OP_FUNC: GlobalGet(funcglobal[(size_t)in.imm]); break;
             case OP_LOAD: Decode(VTSize(in.t)); Load(in.t, 0); break;
