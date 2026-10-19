@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A WebAssembly backend from the interpreter's
+bytecode · Goose</title>
+<link rel="icon" href="../../docs/logo/logo_black_fg_white_bg_square.png">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../index.html"><img src="../../docs/logo/logo_black_fg_trans_bg.png" alt=""> Goose</a>
+  <nav>
+    <a href="../../docs/index.html">Docs</a>
+    <a href="../../docs/tutorial.html">Tutorial</a>
+    <a href="../../docs/reference.html">Reference</a>
+    <a href="../../docs/goose_spec.html">Spec</a>
+    <a href="../../docs/stdlib.html">Library</a>
+    <a href="../../samples/index.html">Samples</a>
+    <a href="../../bench/summary.html">Benchmarks</a>
+    <a href="../../play/index.html">Play</a>
+    <a href="https://github.com/aardappel/goose">GitHub</a>
+  </nav>
+</header>
+<div class="page with-toc">
+<aside class="toc">
+<nav aria-label="Contents">
+<ul>
+<li><a href="#a-webassembly-backend-from-the-interpreters-bytecode"
+id="toc-a-webassembly-backend-from-the-interpreters-bytecode">A
+WebAssembly backend from the interpreter's bytecode</a>
+<ul>
+<li><a href="#1-the-goal" id="toc-1-the-goal">1. The goal</a></li>
+<li><a href="#2-why-the-bytecode-is-the-right-input"
+id="toc-2-why-the-bytecode-is-the-right-input">2. Why the bytecode is
+the right input</a></li>
+<li><a href="#3-what-the-measurements-say"
+id="toc-3-what-the-measurements-say">3. What the measurements
+say</a></li>
+<li><a href="#4-the-design" id="toc-4-the-design">4. The design</a></li>
+<li><a href="#5-memory-the-same-handles-compiled"
+id="toc-5-memory-the-same-handles-compiled">5. Memory: the same handles,
+compiled</a></li>
+<li><a href="#6-the-host-contract" id="toc-6-the-host-contract">6. The
+host contract</a></li>
+<li><a href="#7-stopping-faults-and-suspension"
+id="toc-7-stopping-faults-and-suspension">7. Stopping, faults and
+suspension</a></li>
+<li><a href="#8-optimizations-in-order-of-return"
+id="toc-8-optimizations-in-order-of-return">8. Optimizations, in order
+of return</a></li>
+<li><a href="#9-expected-speed" id="toc-9-expected-speed">9. Expected
+speed</a>
+<ul>
+<li><a href="#measured" id="toc-measured">Measured</a></li>
+</ul></li>
+<li><a href="#10-changes-to-the-existing-code"
+id="toc-10-changes-to-the-existing-code">10. Changes to the existing
+code</a></li>
+<li><a href="#11-testing" id="toc-11-testing">11. Testing</a></li>
+<li><a href="#12-estimates" id="toc-12-estimates">12. Estimates</a></li>
+<li><a href="#13-the-plan" id="toc-13-the-plan">13. The plan</a></li>
+</ul></li>
+</ul>
+</nav>
+</aside>
+<main>
+<h1 id="a-webassembly-backend-from-the-interpreters-bytecode">A
+WebAssembly backend from the interpreter's bytecode</h1>
+<p>A proposal, not implemented. <a
+href="interpreter.html">interpreter.md</a> put the compiler in a browser
+page and runs programs there by interpreting the C that codegen emits,
+through a typed stack bytecode (<code>src/interp/lower.h</code>,
+<code>bytecode.h</code>) and a <code>switch</code> loop over it
+(<code>vm.h</code>). That was the smallest change that made the page
+work, and it is 15 to 100 times slower than the code TinyCC emits for
+<code>goose run</code>. This note designs the next step: a backend that
+takes the bytecode the interpreter already produces and emits a
+WebAssembly module for the browser's own compiler to run, keeping the
+interpreter's memory model, its C library and its native-package thunks
+as they are. The speed figures in section 3 are measurements taken on
+October 19, 2026, on a laptop on mains power (on battery every column
+was about twice as slow and the ratios the same); those in section 9 are
+estimates derived from them, followed by what the implementation
+measured.</p>
+<p><strong>Status.</strong> Steps 1 to 6 of the plan (§13) and items 1
+to 4 of §8 are implemented, in <code>src/interp/wasmgen.h</code> and the
+host side of <code>vm.h</code> and <code>interp.cpp</code>:
+<code>goose.wasm</code> compiles a program's bytecode to a module and
+runs it on its own exports under <code>--wasm</code>, natively
+<code>-o</code> writes the module, <code>test/wasm_backend.py</code>
+runs the interpreter's C fixtures through it, and
+<code>test/run_tests.py --wasm</code> runs the text areas' fixtures and
+the samples. The playground's Run compiles by default, with
+"interpreted" a choice on the page; the compiled path is one function of
+the shim module, <code>runCompiled</code> in
+<code>docs/site/play/wasi.mjs</code>, which the worker and
+<code>scripts/wasm_run.mjs</code> share. Two departures from the design
+as written: the operand stack is followed symbolically during emission,
+so that a frame record's or a static object's fields are accessed
+without a decode (§4 item 7 covered only the function's own scalar
+slots); and hoisting keeps a pair of locals per origin and region,
+refreshed after calls, in place of the sync-extent analysis sketched in
+§8, which needed none of codegen's analyses. Typed slots (§8 item 4)
+type the floats only, since the integer kernels showed nothing to gain,
+and leave the slot form at the edges: a spill across a jump, a native
+call, and the table, where a function with a float in its signature gets
+an all-i64 wrapper for the indirect calls. The frame yield of §7 is not
+started.</p>
+<h2 id="1-the-goal">1. The goal</h2>
+<p>A <code>Run</code> on the playground that runs the program at a speed
+within a small factor of a native build, for everything the interpreter
+runs today: samples 01 to 22 and 24 to 26 through
+<code>goose.wasm</code>, and the graphical ones through
+<code>goose-gfx.wasm</code> once section 7's suspension question is
+settled. Nothing in the compiler before lowering changes; nothing in the
+generated C changes; the interpreter stays, as the sanitizer it doubles
+as and as the fallback for programs the backend does not yet take.</p>
+<h2 id="2-why-the-bytecode-is-the-right-input">2. Why the bytecode is
+the right input</h2>
+<p>The question interpreter.md §2 answered for an interpreter has the
+same answer for a compiler. The typed AST would need a second backend
+that reproduces every layout decision of codegen; codegen itself writes
+C text while it runs its analyses, so a second emitter inside it is a
+rewrite; and clang in the browser is tens of megabytes and gives back
+the problem <a href="wasm.html">wasm.md</a> works out, growth checks and
+relocation in the emitted code. The bytecode has none of these
+costs:</p>
+<ul>
+<li>It already holds the <em>whole</em> program: the runtime, the
+generated types and bodies, and any <code>--include</code> header,
+parsed, laid out under <code>#pragma pack(1)</code> and lowered to
+operations whose types are decided (<code>add.i32</code>,
+<code>load.u8</code>, <code>cvt.f64.i32</code>, <code>ptradd</code>).
+The emitter never looks at a C type again.</li>
+<li>Its memory model is the one a relocating Wasm port needs (wasm.md
+§4), and it is already paid for: a pointer is a handle, segment id above
+and offset below, and only loads, stores and calls into compiled code
+decode it. The stacks that grow and move under the program do so inside
+the host's <code>AccessSlow</code>, which the compiled code calls on the
+slow path exactly as the VM does.</li>
+<li>The C library adapters (<code>clib.h</code>, some 150 functions) and
+the packages' thunks (<code>goose_thunks_&lt;name&gt;.c</code>) take
+their arguments as 64-bit slots and decode handles through the VM.
+Compiled code hands them the same slots.</li>
+<li>It is a stack machine with a statically known stack height at every
+instruction (lowering tracks it to size <code>maxstack</code>), and Wasm
+is a stack machine too. Most instructions translate one to one.</li>
+</ul>
+<p>What the bytecode lacks, and the backend must add, is structured
+control flow (its jumps are arbitrary, Wasm's are blocks and loops), a
+decision about which values live in Wasm locals rather than in the frame
+segment, and the structure of a Wasm binary.</p>
+<h2 id="3-what-the-measurements-say">3. What the measurements say</h2>
+<p>Four samples time their own kernels on stderr. Each was run under
+every backend at hand, at <code>-O2</code>, on the machine the
+interpreter note's numbers come from (Linux, x86-64, node 26, wasi-sdk
+34). The three rightmost columns are the emitted C built to
+<code>wasm32-wasip1</code> with wasi-sdk's clang and run under node,
+over a stand-in host for the runtime's <code>GS_INTERP</code> branch
+that gives each data stack one <code>calloc</code>'d block of its
+reservation (16 MB) and never grows it: no handles, no checks, so the
+<code>-O2</code> column is the <em>ceiling</em> for any backend that
+compiles this program for this engine, not a thing that can ship. (The
+same stand-in built natively runs within a few milliseconds of the real
+runtime on every kernel, so the stand-in costs nothing of its own; the
+native column is the real runtime, <code>goose build</code>.)</p>
+<table>
+<thead>
+<tr>
+<th>kernel</th>
+<th>TinyCC, native</th>
+<th>clang -O2, native</th>
+<th>interpreter, native</th>
+<th>interpreter, in goose.wasm under node</th>
+<th>C to Wasm, clang -O2</th>
+<th>clang -O1</th>
+<th>clang -O0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>07_sieve</code></td>
+<td>66 ms</td>
+<td>30 ms</td>
+<td>1,295 ms</td>
+<td>1,378 ms</td>
+<td>71 ms</td>
+<td>61 ms</td>
+<td>97 ms</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> merge sort</td>
+<td>273</td>
+<td>53</td>
+<td>6,675</td>
+<td>7,224</td>
+<td>102</td>
+<td>107</td>
+<td>296</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> std sort</td>
+<td>280</td>
+<td>23</td>
+<td>5,780</td>
+<td>6,503</td>
+<td>58</td>
+<td>75</td>
+<td>443</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> insertion</td>
+<td>394</td>
+<td>36</td>
+<td>16,794</td>
+<td>19,489</td>
+<td>287</td>
+<td>314</td>
+<td>419</td>
+</tr>
+<tr>
+<td><code>10_sudoku</code> hard</td>
+<td>22.5</td>
+<td>2.5</td>
+<td>252</td>
+<td>416</td>
+<td>3.3</td>
+<td>3.9</td>
+<td>9.8</td>
+</tr>
+<tr>
+<td><code>10_sudoku</code> sparse</td>
+<td>807</td>
+<td>101</td>
+<td>9,700</td>
+<td>11,924</td>
+<td>98</td>
+<td>106</td>
+<td>276</td>
+</tr>
+<tr>
+<td><code>21_raytrace</code></td>
+<td>34</td>
+<td>4.4</td>
+<td>675</td>
+<td>1,070</td>
+<td>7.0</td>
+<td>7.5</td>
+<td>31</td>
+</tr>
+</tbody>
+</table>
+<p>Three things follow.</p>
+<ul>
+<li><p><strong>The interpreter in the browser is 19 to 153 times slower
+than compiled Wasm of the same program</strong>, and the gap is widest
+on call-heavy and arithmetic code (sorting, sudoku, the raytrace) and
+narrowest on the memory-bound sieve. Wasm at clang's <code>-O2</code>
+runs between 1.0 and 2.5 times clang's native code on six of the seven
+kernels (8 times on the insertion sort), and <em>beats TinyCC's native
+code</em> on everything but the sieve, where it is level, by 1.4 to 8
+times. A compiled playground can be faster than <code>goose run</code>
+on the desktop.</p></li>
+<li><p><strong>Where the interpreter's time goes</strong> (perf on
+<code>21_raytrace</code>): 72% in the dispatch loop itself, 10% in
+<code>Access</code>, 7% in <code>PtrAdd</code>, 2.5% in
+<code>Enter</code>. A compiler removes the first entirely and turns the
+second into a compare and a branch.</p></li>
+<li><p><strong>The handle decode is cheap once compiled.</strong> A
+micro-benchmark in C, built to Wasm the same way, of the sieve's inner
+loop storing through a 64-bit handle with the VM's
+<code>base + size</code> table and bounds check on every store, against
+the raw store:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>raw</th>
+<th>checked on every access</th>
+<th>checked, base and size hoisted out of the loop</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sieve stores, Wasm under node</td>
+<td>64 ms</td>
+<td>114 ms</td>
+<td>61 ms</td>
+</tr>
+<tr>
+<td>sieve stores, native</td>
+<td>41</td>
+<td>46</td>
+<td>34</td>
+</tr>
+<tr>
+<td>linked-list walk of a million nodes, 20 passes, Wasm</td>
+<td>1,972</td>
+<td>2,033</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<p>A decode per access costs 1.8 times on a loop that is nothing but
+stores, 3% on pointer chasing (the cache miss is the cost), and nothing
+when hoisted. This is the 1.1 to 1.5 wasm.md §4 estimated, now measured
+at both ends.</p></li>
+</ul>
+<p>The <code>-O1</code> and <code>-O0</code> columns matter for the
+estimate in section 9. Clang at <code>-O0</code> keeps every local in
+memory and inlines nothing, which is a translation of the bytecode with
+every local left in the frame segment, except that it still addresses
+memory directly; <code>-O1</code> keeps locals in registers and inlines
+the small helpers but does no loop transformation, which is what a
+translation with scalar locals in Wasm locals gets from the engine's
+optimizing tier. The two bracket a straightforward backend, before the
+decode's cost.</p>
+<h2 id="4-the-design">4. The design</h2>
+<p>A fourth piece in <code>src/interp/</code>, <code>wasmgen.h</code>,
+that takes the <code>Program</code> lowering produced and writes a
+module. In the driver it sits where the VM does: <code>RunInterp</code>
+lowers as before and then, when the host has asked for compiled code,
+emits the module and hands it back instead of running the loop. The
+pieces, in the order the bytes flow:</p>
+<ol type="1">
+<li><strong>Reachability.</strong> The unit holds the whole runtime (170
+to 190 function bodies for a sample, of which the program's own are 50
+to 60). From <code>main</code>, the static initializer and every
+<code>OP_FUNC</code>, mark the functions reached by <code>OP_CALL</code>
+and <code>OP_FUNC</code>; emit only those. <code>OP_CALLI</code> can
+reach only functions whose handle some <code>OP_FUNC</code> made.</li>
+<li><strong>The control-flow graph</strong> of each function: leaders at
+jump targets and after jumps, edges from <code>JMP</code>,
+<code>JZ</code>, <code>JNZ</code>, <code>JCMP</code> and fallthrough,
+<code>RET</code> and <code>UNREACHABLE</code> ending a block. The
+operand stack's height at each block's entry comes from one pass in
+reverse postorder, as lowering computed it in emission order; the two
+agree because statements leave the stack where they found it and
+<code>?:</code>, <code>&amp;&amp;</code> and <code>||</code> join at
+equal heights (lowering's <code>Effect</code>).</li>
+<li><strong>Structuring.</strong> Wasm has no <code>goto</code>. The
+CFGs codegen's C produces are reducible (its gotos are scope exits and
+the flat <code>if</code>, forward or to a loop's head;
+<code>switch</code> lowers to compare chains), so the dominator tree and
+reverse postorder give a nesting of <code>block</code> and
+<code>loop</code> with a <code>br</code> per edge, by the algorithm of
+Ramsey's <em>Beyond Relooper</em> (2022): a <code>loop</code> for each
+header with a back edge, a <code>block</code> ending at each merge node
+(two or more forward predecessors), placed in dominator order. A
+function whose CFG turns out irreducible gets the fallback, a
+<code>loop</code> over a <code>br_table</code> on a block index, which
+is slow but never wrong; the test in section 11 counts how often it
+happens, and the expected count is zero.</li>
+<li><strong>Values across edges.</strong> Wasm's stack inside a block
+starts empty, so a jump taken with values below the condition (the
+<code>?:</code> arms, the short-circuit operators) cannot leave them on
+the stack. The emitter stores them into scratch locals at the jump and
+reloads them at the target; it knows the height at both. This is rare
+and the engine's register allocator makes it free; multi-value block
+types could carry them instead and are not worth the complexity.</li>
+<li><strong>Slots.</strong> A bytecode slot is 64 bits; the module keeps
+that: <code>i64</code> for every integer and pointer slot,
+<code>f64</code> for every float slot, so a <code>Function</code>'s
+signature is <code>(i64 | f64) * nargs -&gt; result</code>, and
+<code>OP_CALLI</code>'s <code>call_indirect</code> type follows from its
+arity and the slot types. <code>Normalize</code> after an arithmetic
+operation in a narrow type is <code>i64.extend8_s</code>,
+<code>i64.extend16_s</code>, <code>i64.extend32_s</code> or an
+<code>i64.and</code>; an <code>f32</code> operation is the
+<code>f64</code> operation followed by <code>f32.demote_f64</code> and
+<code>f64.promote_f32</code>, which is exactly the VM's rounding. Typed
+slots (<code>i32</code> where the type is 32 bits or less,
+<code>f32</code> for floats) are a later refinement (section 8); on a
+64-bit host the engine's <code>i64</code> operations are native and the
+extends are one instruction.</li>
+<li><strong>Locals.</strong> A scalar local the function only ever
+reaches through <code>LLOAD</code>, <code>LSTORE</code> and
+<code>LSTOREK</code> becomes a Wasm local, which the engine keeps in a
+register. Everything else, records and every local whose address some
+<code>OP_LOCAL</code> takes, stays in the frame segment at the offset
+lowering gave it, addressed as <code>framebase + fp + off</code> with
+<code>fp</code> a Wasm local set on entry. Lowering gains a per-function
+list of its locals, offset, size and whether addressed, so the emitter
+need not infer extents from <code>OP_LOCAL</code>s (section 10).</li>
+<li><strong>Frames.</strong> The frame segment is allocated at its limit
+once and never moves, so frame accesses need no decode;
+<code>frametop</code> is a Wasm global. Entry bumps it by
+<code>framesize</code> and compares against the limit, which is the
+native-overflow report; exit restores it. A handle to a frame slot
+(<code>OP_LOCAL</code>) is <code>Handle(frameseg, fp + off)</code> as in
+the VM and decodes through the segment table like any other, whose entry
+for the frame segment has <code>size = limit</code>. Record parameters,
+which the VM copies into the callee's frame on entry, are a
+<code>memory.copy</code> from the decoded argument into the frame
+slot.</li>
+<li><strong>Calls.</strong> <code>OP_CALL</code> to a function of the
+unit is <code>call</code>; to an external it is the <code>native</code>
+import of section 6 with the arguments spilled to a scratch area at the
+frame top; <code>OP_CALLI</code> is <code>call_indirect</code> through
+the segment table's entry for the function handle, which holds the table
+index (section 5). The <code>mem*</code> externals the runtime leans on
+(<code>memcpy</code>, <code>memmove</code>, <code>memset</code>,
+<code>memcmp</code>) are emitted inline as two decodes and
+<code>memory.copy</code> or <code>memory.fill</code>, as
+<code>OP_COPY</code> and <code>OP_ZERO</code> are.</li>
+<li><strong>The binary.</strong> Type, import, function, table, memory
+import, global, export, element, data and code sections, a passive data
+segment per static object with bytes, and a name section so that the
+engine's stack traces name the function a fault happened in. LEB128 and
+section framing are two hundred lines; no validator is needed, the
+engine validates at instantiation and the test suite in section 11 keeps
+it honest.</li>
+</ol>
+<h2 id="5-memory-the-same-handles-compiled">5. Memory: the same handles,
+compiled</h2>
+<p>Section 5 of interpreter.md stands unchanged: a handle is a segment
+id in the high 32 bits and a byte offset in the low 32, and every
+pointer operation but an access is integer arithmetic on it. What
+changes is that the decode is now emitted code, so the host keeps the
+segment table in a form the code can read:</p>
+<ul>
+<li><strong>The segment table</strong> is a flat array in linear memory
+of <code>{ base: u32, size: u32 }</code> per id, at a fixed address the
+module imports as a global, with a fixed capacity (a million entries, 8
+MB of address space that is touched as used). The VM's <code>segs</code>
+vector stays as it is for everything the host does; <code>NewSeg</code>,
+<code>Grow</code>, <code>free</code> and <code>Finish</code> mirror base
+and size into the flat table. A freed segment's size is 0, so every
+access to it takes the slow path, which reports the use after free as
+the VM does. A function segment's <code>base</code> is the function's
+index in the module's table, so <code>call_indirect</code> reads its
+callee from the same entry.</li>
+<li><strong>The decode</strong> on an access of <code>n</code> bytes at
+<code>h</code>: <code>id = wrap(h &gt;&gt; 32)</code>,
+<code>off = wrap(h)</code>, <code>size = load(tab + id * 8 + 4)</code>,
+and if <code>off + n &gt; size</code> then
+<code>access_slow(h, n)</code>, else
+<code>load(tab + id * 8) + off</code>. Twelve Wasm instructions, of
+which the two loads are what hoisting removes. <code>id == 0</code> has
+<code>size = 0</code>, so a null access is the slow path's fault.</li>
+<li><strong>Growth</strong> stays the host's: <code>access_slow</code>
+is the VM's <code>AccessSlow</code>, which doubles a stack segment up to
+its limit, possibly moving it, and updates the table before returning
+the new address. Compiled code holds no decoded pointer across anything
+that can grow, except where the hoisting of section 8 refreshes it from
+the table on the slow path.</li>
+<li><strong>Pointer arithmetic is unchecked.</strong> The VM's
+<code>PtrAdd</code> faults when an offset leaves its segment's reach;
+the compiled <code>OP_OFFSET</code>, <code>OP_PTRADD</code> and
+<code>OP_PTRSUB</code> are an <code>i64.add</code> and a multiply, and
+an offset that wraps into the id is caught, if at all, at the next
+access. The interpreter remains the run that checks arithmetic;
+<code>--interp</code> keeps it.</li>
+<li><strong><code>OP_PTRDIFF</code></strong> is the difference of the
+low halves, divided by the size; the VM's check that both name one
+segment is dropped with the same justification.</li>
+</ul>
+<p>The frame segment and the static objects are segments like any other;
+the decode does not know them apart. Only the emitter does, when it
+addresses a frame slot of the function it is emitting directly.</p>
+<h2 id="6-the-host-contract">6. The host contract</h2>
+<p>The module runs beside the compiler, in the same Web Worker, on the
+compiler module's memory. It imports from a module named
+<code>goose</code>:</p>
+<table>
+<thead>
+<tr>
+<th>import</th>
+<th>what it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>memory</code></td>
+<td><code>goose.wasm</code>'s linear memory, which the reactor already
+exports for the WASI shim</td>
+</tr>
+<tr>
+<td><code>segtab</code> (global i32)</td>
+<td>the segment table's address</td>
+</tr>
+<tr>
+<td><code>frameseg</code> (global i64), <code>framebase</code>,
+<code>framelimit</code></td>
+<td>the frame segment's handle, address and limit</td>
+</tr>
+<tr>
+<td><code>seg_new(kind, size) -&gt; id</code></td>
+<td>a static object's or a function handle's segment, called from the
+module's <code>start</code> function</td>
+</tr>
+<tr>
+<td><code>access_slow(h, n) -&gt; addr</code></td>
+<td>growth, and every fault</td>
+</tr>
+<tr>
+<td><code>native(idx, args, nargs) -&gt; i64</code></td>
+<td>the C library adapters and the thunks, by index into a table the
+compiler fixes when it emits the module</td>
+</tr>
+<tr>
+<td><code>stop(status)</code></td>
+<td><code>exit</code>, and the end of <code>main</code></td>
+</tr>
+</tbody>
+</table>
+<p>and exports <code>main</code>, the static initializer as
+<code>start</code>, and the runtime's two overflow reporters. The worker
+instantiates it with an import object built from
+<code>goose.wasm</code>'s exports: <code>goose_run</code> returns a new
+status, <code>kWasmReady</code> (-3), with the module's bytes at an
+address and length the worker reads out of memory; the worker
+instantiates and calls <code>main</code>, and whatever ends it (section
+7) is read back through one more export,
+<code>goose_stop_reason()</code>. Every entry in the table is a
+Wasm-to-Wasm call with no JavaScript between, which is what keeps
+<code>memcpy</code> and <code>fwrite</code> cheap. A
+<code>goose.wasm</code> built without the backend, or asked with
+<code>--interp</code>, runs the VM as today.</p>
+<p>Natively there is no engine in the process, and none is added: the
+backend's native form is <code>-o prog.wasm</code>, which writes the
+module for inspection (<code>wasm-objdump</code> reads the name section)
+and for the test runner, which runs it the way the page does, through
+node with <code>goose.wasm</code> as the host (section 11). The module
+is self-contained in the sense that matters for this: its statics are
+passive data segments initialized at <code>start</code> by
+<code>seg_new</code> and <code>memory.init</code>, and its handles are
+globals set there, so the same bytes run in any host that implements the
+seven imports.</p>
+<h2 id="7-stopping-faults-and-suspension">7. Stopping, faults and
+suspension</h2>
+<p><strong>Every stop is a trap with a recorded reason.</strong> The VM
+today ends a run with C++ exceptions (<code>Exit</code>,
+<code>Fault</code>, <code>Reroute</code>) thrown from an adapter through
+the loop. Compiled frames sit between the adapter and the driver, and
+threading a C++ exception through another module's frames is possible
+under the exception-handling proposal the build already uses, but
+needless: the host records what happened and executes
+<code>__builtin_trap()</code>, the engine unwinds the program module
+with a <code>RuntimeError</code>, and the worker, which called
+<code>main</code>, asks <code>goose_stop_reason()</code>:</p>
+<ul>
+<li><code>exit(n)</code> and a normal return: the status.</li>
+<li>A fault (an access past a segment, a use after free, a null access,
+a division by zero, which Wasm traps on by itself): the message, which
+the worker prints with the engine's stack trace, named by the name
+section, in place of the VM's interpreted call stack.</li>
+<li>A data stack past its reservation: the base of the region, with
+which the worker calls the exported <code>gs_data_overflow</code>, a
+plain function that prints the runtime's message from the region table
+and exits. Native call stack overflow is the frame limit in the entry
+prologue, and also the engine's own stack limit, which arrives as a
+<code>RangeError</code> the worker reports with the same message; the
+frame limit is set so that the prologue fires first on recursion of
+ordinary frames.</li>
+</ul>
+<p><strong>Suspension</strong> is the one thing the interpreter does
+that compiled code cannot do as a matter of course. The VM yields on a
+step budget, to keep a page responsive, and at a yielding thunk
+(<code>gs_gfx_frame</code>), to let the browser's animation callback run
+between frames (interpreter.md §7.2).</p>
+<ul>
+<li>The budget is unnecessary: the playground already runs each command
+in a Worker of its own, Stop terminates the worker, and output reaches
+the page through the shim's <code>fd_write</code>, which can post each
+write as it comes rather than at the end of a piece. A compiled run is
+simply synchronous in the worker.</li>
+<li>The frame yield is real. Three ways, from least to most work, all
+compatible with the module as designed, since the choice is the host's:
+(a) <strong>JSPI</strong>, the JavaScript Promise Integration API, wraps
+the <code>native</code> import as <code>WebAssembly.Suspending</code>; a
+yielding thunk returns a promise the animation callback resolves, and
+the engine parks the program's stack. Chrome ships it; the other
+engines' status should be checked when section 13's last step is
+reached. (b) <strong>An OffscreenCanvas in the worker</strong> with a
+<code>SharedArrayBuffer</code> and <code>Atomics.wait</code> in the
+frame thunk, which needs the page cross-origin isolated, a header GitHub
+Pages does not send but a service worker can add. (c) <strong>Asyncify
+restricted to the yield's call chain</strong>: the emitter knows which
+functions can reach a yielding thunk (a call-graph walk from the thunk
+table's <code>yields</code> entries), typically <code>main</code> and
+the frame loop's few callers, and emits only those in an
+unwind-and-rewind form that saves their Wasm locals to the frame segment
+at the call. This costs nothing elsewhere and needs no browser feature,
+and it is the one the compiler controls. The plan takes (a) first where
+it exists and (c) as the portable answer; until one of them is in,
+<code>goose-gfx.wasm</code> compiles a program whose unit calls no
+yielding thunk and interprets the rest, which the thunk table tells it
+at emission time.</li>
+</ul>
+<h2 id="8-optimizations-in-order-of-return">8. Optimizations, in order
+of return</h2>
+<p>None of these is needed for the backend to be correct, and the first
+two are what section 9's lower estimate assumes.</p>
+<ol type="1">
+<li><strong>Scalar locals in Wasm locals</strong> (section 4, item 6).
+Without it every local is a frame-segment load and store, which the
+<code>-O0</code> column of section 3 puts at 1.3 to 6 times slower than
+the <code>-O1</code> column, mostly 2 to 3.</li>
+<li><strong>Dead function elimination</strong> (item 1): compile time
+and module size, not speed.</li>
+<li><strong>Decode hoisting.</strong> For a loop whose body has no call,
+each handle that is loop-invariant (a Wasm local assigned only outside
+the loop, or a frame slot never stored in the loop) gets a pair of
+locals, <code>base</code> and <code>size</code>, loaded from the table
+once before the loop; an access derived from it by
+<code>OP_OFFSET</code> or <code>OP_PTRADD</code> keeps its
+<code>off + n &lt;= size</code> compare but reads no table, and the slow
+path, which may have moved the segment, reassigns both locals before
+continuing. The sieve's loop goes from the "checked" row of section 3's
+second table to the "hoisted" one. A loop with calls refreshes the pair
+after each call instead, which is still two loads per call rather than
+two per access. This is the extent analysis wasm.md §4 wanted from
+codegen, done once on the bytecode where every access is explicit.</li>
+<li><strong>Typed slots</strong>: <code>i32</code> for types of 32 bits
+or less and <code>f32</code> for floats, removing the extends and
+demotes. A pass over the symbolic stack assigns each producer the type
+its consumer names (<code>OP_PUSH</code> has none of its own). Worth
+doing when a profile shows the extends, and not before. (Done for the
+floats, without the pass: a value on the symbolic stack carries the Wasm
+type its producer gave it, an <code>f32</code> or <code>f64</code> as
+itself, and a consumer coerces what it pops, so a float constant, which
+<code>OP_PUSH</code> leaves an i64, is reinterpreted where it is used
+and the engine folds that. A promoted float local is a typed Wasm local,
+and a function's signature is typed by its parameters' value types. The
+integers stay i64: the language's integer is 64 bits wide, so the narrow
+types are the byte arrays, whose loads extend for free, and on a 64-bit
+host an i32 saves nothing in the arithmetic itself. Measured below: the
+float kernel gains, the integer ones are unmoved.)</li>
+<li><strong>Fused compare-and-branch</strong> is already in the bytecode
+(<code>OP_JCMP</code>), and <code>i64.lt_s; br_if</code> is what it
+becomes.</li>
+</ol>
+<p>What the engine does on its own: register allocation, instruction
+selection, inlining of small functions (the runtime's
+<code>static inline</code> helpers, which lowering made separate
+functions, come back inline in the optimizing tier), and bounds checks
+on the memory itself at no cost on 64-bit hosts.</p>
+<h2 id="9-expected-speed">9. Expected speed</h2>
+<p>Against the interpreter in the browser, from the ratios of section
+3's table. The first column is a translation that keeps scalar locals in
+Wasm locals and decodes on every access: its low end is the
+<code>-O0</code> column's ratio divided by the decode's worst measured
+cost (1.8), its high end the <code>-O1</code> column's ratio with no
+decode cost, as on pointer chasing. The second column adds hoisting and
+typed slots, which take the decode out of the loops that are nothing but
+accesses, and approaches the <code>-O2</code> ceiling from below.</p>
+<table>
+<thead>
+<tr>
+<th>kernel</th>
+<th>backend with items 1 and 2 of §8</th>
+<th>with hoisting and typed slots</th>
+<th>ceiling (clang -O2)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>07_sieve</code></td>
+<td>8 to 23x</td>
+<td>15 to 19x</td>
+<td>19x</td>
+</tr>
+<tr>
+<td><code>09_sorting</code></td>
+<td>8 to 87x per kernel, 16 to 67x on the three together</td>
+<td>50 to 100x</td>
+<td>70 to 110x</td>
+</tr>
+<tr>
+<td><code>10_sudoku</code> sparse</td>
+<td>24 to 112x</td>
+<td>80 to 120x</td>
+<td>122x</td>
+</tr>
+<tr>
+<td><code>21_raytrace</code></td>
+<td>19 to 143x</td>
+<td>100 to 150x</td>
+<td>153x</td>
+</tr>
+</tbody>
+</table>
+<p>The brackets are wide because the two proxies are far apart on the
+sorting kernels and the raytrace, where clang's inlining of the
+runtime's helpers is most of the difference and the engine's own
+inlining is the unknown. In absolute terms the first column takes the
+sorting sample from 33 seconds in the browser to between half a second
+and two, the sudoku from 12 to under half a second, and the sieve and
+the raytrace from over a second to a tenth of one. The second column is
+within about 1.5 times of what clang makes of the same C, which is as
+far as a backend without an optimizer of its own should expect to go;
+the remaining gap is clang's alias analysis and loop transformations,
+which the engine does not attempt. Against the desktop, the first
+column's midpoint already matches or beats TinyCC's native code on every
+kernel but the sieve.</p>
+<p>The uncertainty is in the engine's treatment of the decode's table
+loads and compares, which section 3's micro-benchmark measured in
+isolation but not in the runtime's helpers, where <code>gs_rref</code>
+chasing and the pool freelists decode several times per operation. If
+the first column's low end is what lands, hoisting is the fix and its
+mechanism is already decided. The Chrome figures on the machine these
+were measured on are a further four times slower than node's for reasons
+outside the engine (the interpreter note's §9 records the observation);
+a compiled module is affected the same way, so the ratios hold while the
+absolute figures there do not.</p>
+<h3 id="measured">Measured</h3>
+<p>The same kernels after each step, under node, against the interpreter
+in <code>goose.wasm</code> and the ceiling of section 3:</p>
+<table>
+<thead>
+<tr>
+<th>kernel</th>
+<th>interpreter</th>
+<th>translation (§4)</th>
+<th>+ locals (§8.1)</th>
+<th>+ frame records</th>
+<th>+ statics, popcount</th>
+<th>+ hoisting (§8.3)</th>
+<th>ceiling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>07_sieve</code></td>
+<td>1,378 ms</td>
+<td>350 ms</td>
+<td>262 ms</td>
+<td>178 ms</td>
+<td>180 ms</td>
+<td>174 ms</td>
+<td>71 ms</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> merge sort</td>
+<td>7,224</td>
+<td>1,077</td>
+<td>952</td>
+<td>577</td>
+<td>576</td>
+<td>489</td>
+<td>102</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> std sort</td>
+<td>6,503</td>
+<td>1,458</td>
+<td>1,115</td>
+<td>727</td>
+<td>731</td>
+<td>771</td>
+<td>58</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> insertion</td>
+<td>19,489</td>
+<td>1,983</td>
+<td>1,629</td>
+<td>1,051</td>
+<td>1,041</td>
+<td>705</td>
+<td>287</td>
+</tr>
+<tr>
+<td><code>10_sudoku</code> sparse</td>
+<td>11,924</td>
+<td>1,089</td>
+<td>681</td>
+<td>675</td>
+<td>512</td>
+<td>485</td>
+<td>98</td>
+</tr>
+<tr>
+<td><code>21_raytrace</code></td>
+<td>1,070</td>
+<td>245</td>
+<td>217</td>
+<td>111</td>
+<td>104</td>
+<td>107</td>
+<td>7.0</td>
+</tr>
+</tbody>
+</table>
+<p>Eight to twenty-eight times the interpreter, and within 2.5 to 5
+times of the ceiling on all but the raytrace, which at 15 times off
+pointed at the i64 slots and the reinterprets around every float
+operation, item 4's case. The first column fell below the table above's
+lower estimate because the generated C reads a slice's data pointer
+through its struct in the frame on every element access, a decode of the
+frame segment the estimate did not count; the third column is that
+decode removed.</p>
+<p>Typed float slots (§8 item 4) were measured against the hoisting
+build rebuilt and run beside them on a quiet machine, which found the
+hoisting column above inflated, by the test suite that ran during it, on
+every kernel but the sieve; the ceilings re-timed the same day agree
+with the table's. Each figure is the middle of three runs:</p>
+<table>
+<thead>
+<tr>
+<th>kernel</th>
+<th>+ hoisting, re-timed</th>
+<th>+ typed floats (§8.4)</th>
+<th>ceiling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>07_sieve</code></td>
+<td>117 ms</td>
+<td>119 ms</td>
+<td>64 ms</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> merge sort</td>
+<td>328</td>
+<td>318</td>
+<td>103</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> std sort</td>
+<td>521</td>
+<td>512</td>
+<td>59</td>
+</tr>
+<tr>
+<td><code>09_sorting</code> insertion</td>
+<td>469</td>
+<td>453</td>
+<td>256</td>
+</tr>
+<tr>
+<td><code>10_sudoku</code> sparse</td>
+<td>327</td>
+<td>331</td>
+<td>100</td>
+</tr>
+<tr>
+<td><code>21_raytrace</code></td>
+<td>70</td>
+<td>47</td>
+<td>7.6</td>
+</tr>
+</tbody>
+</table>
+<p>The raytrace's <code>dot</code> is now three <code>f32.mul</code> and
+two <code>f32.add</code> over direct loads, as clang emits it, and the
+kernel went from 10 to 6 times the ceiling; the integer kernels did not
+move, as item 4 expected. What the raytrace still pays is the call
+protocol: each <code>float3</code> parameter is a decode and a
+<code>memory.copy</code> into the callee's frame, and each small
+function a frame bump with its limit check, which is where its next
+factor lies. The sieve's inner loop still spends some twenty
+instructions on the handle arithmetic and the hoisted check around its
+one byte store.</p>
+<h2 id="10-changes-to-the-existing-code">10. Changes to the existing
+code</h2>
+<ol type="1">
+<li><strong><code>src/interp/wasmgen.h</code></strong>, new: the emitter
+of section 4.</li>
+<li><strong><code>src/interp/bytecode.h</code>,
+<code>lower.h</code></strong>: <code>Function</code> gains
+<code>locals</code>, a list of <code>{ off, size, t, addressed }</code>
+that lowering fills as it allocates slots and sets
+<code>addressed</code> where it emits <code>OP_LOCAL</code> for one.
+Twenty lines.</li>
+<li><strong><code>src/interp/vm.h</code></strong>: the flat segment
+table beside <code>segs</code>, kept in step by <code>NewSeg</code>,
+<code>Grow</code>, the <code>free</code> adapter and
+<code>Finish</code>; the frame segment allocated at its limit when a
+compiled run is asked for; the <code>native</code> dispatch by index
+over the library and thunk tables; the stop reason. A hundred lines,
+none in the loop.</li>
+<li><strong><code>src/interp/interp.cpp</code>,
+<code>interp.h</code></strong>: <code>kWasmReady</code> and the
+compiled-run request beside <code>InterpResumable</code>;
+<code>RunInterp</code> returning the module's bytes; the
+<code>--interp</code> flag's meaning narrowed to "the VM, not the
+backend" where both exist.</li>
+<li><strong><code>src/main.cpp</code></strong>:
+<code>-o prog.wasm</code> writing the module natively.</li>
+<li><strong><code>src/web_entry.cpp</code></strong>:
+<code>goose_module_bytes</code>, <code>goose_stop_reason</code>.</li>
+<li><strong><code>docs/site/play/worker.mjs</code></strong>,
+<code>scripts/wasm_run.mjs</code>: instantiate the program module on the
+host's exports, run <code>main</code>, report the stop reason. Perhaps
+120 lines between them.</li>
+<li><strong><code>test/run_tests.py</code></strong>: <code>--wasm</code>
+(section 11).</li>
+</ol>
+<p>The parser, typechecker, optimizer, BCE, codegen, the runtime and the
+standard library are untouched, as they were by the interpreter.</p>
+<h2 id="11-testing">11. Testing</h2>
+<p>The interpreter's suite is the backend's suite.
+<code>test/interp/run/*.c</code> are C programs with expected output
+that reach every instruction and every kind of segment, growth and
+fault; each runs through node with <code>goose.wasm</code> as the host
+and the module the backend wrote, by the runner
+<code>test/wasm_build.py</code> already uses for two programs, and its
+expected output is the VM's. Then the fixture areas interpreter.md §14
+step 7 widened over, under <code>--wasm</code> in place of
+<code>--interp</code>, with faults compared by message (the VM's stack
+listing is not expected). A unit test over the emitter counts the
+functions that fell back to the dispatcher loop, and expects none;
+another checks that <code>-o prog.wasm</code> on the samples validates,
+with <code>wasm-tools validate</code> where it is installed and
+instantiation under node otherwise.</p>
+<p>The two backends diverging on a fixture is a finding about one of
+them, and the VM, which checks more, is the reference. Programs that
+need a yielding thunk run under <code>--interp</code> until section 7's
+answer is in.</p>
+<h2 id="12-estimates">12. Estimates</h2>
+<p>Sizes guessed from the pieces in section 4 and the sizes the
+interpreter's pieces came to.</p>
+<table>
+<thead>
+<tr>
+<th>piece</th>
+<th>lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>binary writer: sections, LEB128, names</td>
+<td>250 to 350 C++</td>
+</tr>
+<tr>
+<td>CFG, dominators, structuring, stack heights</td>
+<td>500 to 700 C++</td>
+</tr>
+<tr>
+<td>instruction emission, locals, calls, decodes</td>
+<td>900 to 1,300 C++</td>
+</tr>
+<tr>
+<td>decode hoisting and typed slots (§8, items 3 and 4)</td>
+<td>400 to 600 C++</td>
+</tr>
+<tr>
+<td>host side: segment table, native dispatch, stop reason, entry
+points</td>
+<td>250 to 350 C++</td>
+</tr>
+<tr>
+<td>worker and node runner</td>
+<td>100 to 150 JS</td>
+</tr>
+<tr>
+<td>test runner mode, fixtures' expectations</td>
+<td>150 to 250</td>
+</tr>
+</tbody>
+</table>
+<p>About 2,500 to 3,500 lines for the first column of section 9, and
+3,000 to 4,000 for the second, against the interpreter's 6,500. The
+frame yield's portable form (§7, Asyncify on the call chain) is a
+further 400 to 600 lines in the emitter and is independent of the
+rest.</p>
+<h2 id="13-the-plan">13. The plan</h2>
+<p>Each step is one commit, or a few, with the test that shows it
+working.</p>
+<ol type="1">
+<li><strong>The binary writer and a module with one function.</strong>
+<code>wasmgen.h</code> emits a module whose <code>main</code> returns a
+constant; <code>-o prog.wasm</code>; <code>wasm_run.mjs</code>
+instantiates it on <code>goose.wasm</code>'s exports. Test: node runs it
+and reports the status.</li>
+<li><strong>Straight-line code, locals and calls.</strong> Every
+instruction but the jumps; <code>Function::locals</code>; the segment
+table, decodes and <code>access_slow</code>; <code>native</code> with
+the spilled arguments; <code>seg_new</code> and the statics at
+<code>start</code>. Test: the arithmetic, pointer and static-data
+fixtures of <code>test/interp/run/</code>, which are straight-line,
+through node.</li>
+<li><strong>Control flow.</strong> The CFG, stack heights, Ramsey's
+structuring, the dispatcher fallback, values across edges. Test: the
+rest of <code>test/interp/run/</code>, and the fallback counter at
+zero.</li>
+<li><strong>Stops.</strong> Faults, <code>exit</code>, the overflow
+reporters, the trap-and-reason protocol. Test: the fault fixtures,
+compared by message.</li>
+<li><strong>Goose programs.</strong> <code>run_tests.py --wasm</code>
+over <code>test/codegen/</code> first, then the other areas as in
+interpreter.md step 7, fixing what each finds. The four timed samples
+give the first row of section 9's table as measurements.</li>
+<li><strong>The page.</strong> <code>worker.mjs</code> takes the
+compiled path by default and <code>--interp</code> as an option; the
+generated-C tab stays.</li>
+<li><strong>Hoisting and typed slots</strong>, each measured on the four
+samples before and after.</li>
+<li><strong>The frame yield</strong>: JSPI in the worker where the
+engine has it, and the restricted Asyncify after, measured on
+<code>27_gfx_cube</code>.</li>
+</ol>
+<p>Steps 1 to 4 are sequential; the host-side work of step 2 can be
+written beside step 1; step 7 and step 8 are independent of each other
+and of the page.</p>
+<footer>
+<p>Built from <a href="https://github.com/aardappel/goose/blob/master/docs/design/wasm_backend.md"><code>docs/design/wasm_backend.md</code></a>.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

@@ -823,15 +823,19 @@ status at the end, with the files the page asked to read back
 once whatever it is doing, and the VM's step budget only sets the
 cadence of the output. A fresh instance per run is right anyway, since a
 run leaves its state behind and the compiler is not written to run twice
-in one process. (Step 13 first ran the module on the main thread,
-resuming from <code>requestAnimationFrame</code> with Stop a flag the
-next piece saw. The worker did not change the speed: a sieve of ten
-million takes about ten seconds in Chrome 147 either way, against four
-in Firefox, three under node and two natively. The compile phase takes
-the same 0.3 s everywhere; it is the VM loop's pieces that run four
-times slower in Chrome than in node, from the first piece on, slower
-even than node with Liftoff alone, so Chrome's engine is treating the
-loop function differently. Not investigated further; the page's note
+in one process. (Since the WebAssembly backend, wasm_backend.md, Run
+adds <code>--wasm</code> unless the page's engine picker says
+"interpreted": the worker then runs the program's own module on
+<code>goose.wasm</code>'s exports, synchronously, with the output posted
+as the shim's writes fill a batch.) (Step 13 first ran the module on the
+main thread, resuming from <code>requestAnimationFrame</code> with Stop
+a flag the next piece saw. The worker did not change the speed: a sieve
+of ten million takes about ten seconds in Chrome 147 either way, against
+four in Firefox, three under node and two natively. The compile phase
+takes the same 0.3 s everywhere; it is the VM loop's pieces that run
+four times slower in Chrome than in node, from the first piece on,
+slower even than node with Liftoff alone, so Chrome's engine is treating
+the loop function differently. Not investigated further; the page's note
 gives the slowdown as a range.) The gfx binary's frame yield of §7.2
 will still need the main thread's animation callback, since WebGL and
 input live there; its page can keep the worker for the compile and the

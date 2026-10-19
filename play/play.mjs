@@ -4,8 +4,10 @@
 // as /prog.goose. Every run is a Worker of its own (worker.mjs), given the
 // module the page compiled once: the worker runs the compiler and the
 // program back to back, streaming the output, so the page stays responsive
-// and Stop ends the run at once by terminating the worker. Check
-// typechecks; Generated C writes -o /out.c and shows it.
+// and Stop ends the run at once by terminating the worker. Run compiles
+// the program to WebAssembly (docs/design/wasm_backend.md) unless the
+// engine picker says to interpret it; Check typechecks; Generated C writes
+// -o /out.c and shows it.
 const $ = id => document.getElementById(id);
 const state = { module: null, files: null, worker: null };
 
@@ -42,7 +44,7 @@ function setBusy(busy) {
 // the editor's program. `done(code, files)` is called at the end with the
 // exit status, null for a stopped run, and the files of `readback` the run
 // left in the tree.
-function runCommand(cmdline, readback, done) {
+function runCommand(cmdline, readback, done, env = {}) {
     if (state.worker) return;
     setBusy(true);
     clearViews();
@@ -77,11 +79,13 @@ function runCommand(cmdline, readback, done) {
         finish(1);
     };
     const files = { ...state.files, "/prog.goose": $("source").value };
-    worker.postMessage({ module: state.module, files, cmdline, readback });
+    worker.postMessage({ module: state.module, files, cmdline, readback, env });
     status("compiling…");
 }
 
 function optLevel() { return $("opt").value; }
+
+function engine() { return $("engine").value; }
 
 function programArgs() {
     const a = $("args").value.trim();
@@ -90,7 +94,9 @@ function programArgs() {
 
 $("run").onclick = () => {
     show("output");
-    runCommand(`run /prog.goose ${optLevel()} --stdlib /stdlib${programArgs()}`, [], () => {});
+    // The samples open their data as data/..., relative to /samples.
+    runCommand(`run /prog.goose ${optLevel()} ${engine()} --stdlib /stdlib${programArgs()}`, [], () => {},
+               { GOOSE_CWD: "/samples" });
 };
 $("check").onclick = () => {
     show("messages");

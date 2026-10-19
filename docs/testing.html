@@ -122,14 +122,25 @@ lets the toolchain file fetch the sdk) builds the compiler to
 WebAssembly with <code>cmake/wasm32-wasi.cmake</code> and runs the
 hello-world fixture and the sieve sample through <code>goose.wasm</code>
 under node's WASI (<code>scripts/wasm_run.mjs</code>), against the same
-blessed output. Where node is installed, the playground's own WASI shim
-(<code>docs/site/play/wasi.mjs</code>) is tested too
-(<code>wasi_test.mjs</code>): its file calls through a memory of their
-own, and with a <code>build/wasm/goose.wasm</code> at hand the
+blessed output. With <code>--wasm</code>, and a
+<code>build/wasm/goose.wasm</code> at hand, the fixtures of the text
+areas (<code>codegen/</code>, <code>runtime/</code>,
+<code>stdlib/</code>, <code>storage/</code>, <code>lifetimes/</code>,
+<code>optimizer/</code>) also run through the WebAssembly backend
+(design/wasm_backend.md §11): <code>goose.wasm</code> compiles each to a
+module under node and runs it, against the same blessed output, and
+<code>test/wasm_backend.py</code> runs the interpreter's C fixtures
+(<code>test/interp/run/</code>) the same way, with the VM's call stack
+left out of a fault's expected message. Where node is installed, the
+playground's own WASI shim (<code>docs/site/play/wasi.mjs</code>) is
+tested too (<code>wasi_test.mjs</code>): its file calls through a memory
+of their own, and with a <code>build/wasm/goose.wasm</code> at hand the
 hello-world fixture, a generated-C run and a type error through the shim
 end to end, and the same runs through the playground's worker
 (<code>worker.mjs</code>) under node's worker threads, which take the
-browser's messages.</p>
+browser's messages, then a hello world, a loop, an abort and a stack
+overflow compiled to WebAssembly (<code>--wasm</code>) through the
+worker.</p>
 <p>Most of those runs, and those of the <code>errors/</code> and
 <code>errors_tc/</code> fixtures, share a compiler process with others:
 <code>goose --multi-test &lt;flags&gt; a.goose b.goose ...</code>
